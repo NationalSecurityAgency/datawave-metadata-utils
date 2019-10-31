@@ -3,6 +3,8 @@ package datawave.query.model;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -16,7 +18,11 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import datawave.util.StringUtils;
 
-public class QueryModel {
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+public class QueryModel implements Serializable {
+    private static final long serialVersionUID = -7618411736250884135L;
+    
     private static final String EMPTY_STR = "";
     public static final char PARAM_VALUE_SEP = ',';
     public static final String PARAM_VALUE_SEP_STR = new String(new char[] {PARAM_VALUE_SEP});
@@ -204,12 +210,16 @@ public class QueryModel {
     
     @Override
     public String toString() {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        PrintStream stream = new PrintStream(new BufferedOutputStream(bytes));
-        stream.println(super.toString());
-        dumpForward(stream);
-        dumpReverse(stream);
-        stream.flush();
-        return bytes.toString();
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            PrintStream stream = new PrintStream(new BufferedOutputStream(bytes), false, UTF_8.name());
+            stream.println(super.toString());
+            dumpForward(stream);
+            dumpReverse(stream);
+            stream.flush();
+            return bytes.toString(UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
