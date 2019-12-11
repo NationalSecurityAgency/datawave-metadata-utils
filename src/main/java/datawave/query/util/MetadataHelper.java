@@ -24,10 +24,9 @@ import datawave.query.model.QueryModel;
 import datawave.security.util.ScannerHelper;
 import datawave.util.time.DateHelper;
 import datawave.util.time.TraceStopwatch;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.TableNotFoundException;
@@ -114,8 +113,7 @@ public class MetadataHelper {
     protected final List<Text> metadataCompositeIndexColfs = Arrays.asList(ColumnFamilyConstants.COLF_CI);
     protected final List<Text> metadataCardinalityColfs = Arrays.asList(ColumnFamilyConstants.COLF_COUNT);
     
-    protected final Connector connector;
-    protected final Instance instance;
+    protected final AccumuloClient accumuloClient;
     protected final String metadataTableName;
     protected final Set<Authorizations> auths;
     protected Set<Authorizations> fullUserAuths;
@@ -123,7 +121,7 @@ public class MetadataHelper {
     protected final AllFieldMetadataHelper allFieldMetadataHelper;
     protected final Collection<Authorizations> allMetadataAuths;
     
-    public MetadataHelper(AllFieldMetadataHelper allFieldMetadataHelper, Collection<Authorizations> allMetadataAuths, Connector connector,
+    public MetadataHelper(AllFieldMetadataHelper allFieldMetadataHelper, Collection<Authorizations> allMetadataAuths, AccumuloClient client,
                     String metadataTableName, Set<Authorizations> auths, Set<Authorizations> fullUserAuths) {
         Preconditions.checkNotNull(allFieldMetadataHelper, "An AllFieldMetadataHelper is required by MetadataHelper");
         this.allFieldMetadataHelper = allFieldMetadataHelper;
@@ -131,9 +129,8 @@ public class MetadataHelper {
         Preconditions.checkNotNull(allMetadataAuths, "The set of all metadata authorization is required by MetadataHelper");
         this.allMetadataAuths = allMetadataAuths;
         
-        Preconditions.checkNotNull(connector, "A valid Accumulo Connector is required by MetadataHelper");
-        this.connector = connector;
-        this.instance = connector.getInstance();
+        Preconditions.checkNotNull(client, "A valid AccumuloClient is required by MetadataHelper");
+        this.accumuloClient = client;
         
         Preconditions.checkNotNull(metadataTableName, "The name of the metadata table is required by MetadataHelper");
         this.metadataTableName = metadataTableName;
@@ -145,7 +142,7 @@ public class MetadataHelper {
         this.fullUserAuths = fullUserAuths;
         log.debug("initialized with auths subset: {}", this.auths);
         
-        log.trace("Constructor connector: {} with auths: {} and metadata table name: {}", connector.getClass().getCanonicalName(), auths, metadataTableName);
+        log.trace("Constructor client: {} with auths: {} and metadata table name: {}", accumuloClient.getClass().getCanonicalName(), auths, metadataTableName);
     }
     
     /**
@@ -414,10 +411,10 @@ public class MetadataHelper {
         
         Set<String> unevalFields = null;
         if (log.isTraceEnabled())
-            log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
+            log.trace("using client: " + accumuloClient.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
                             + " looking at model " + modelName + " unevaluatedFields " + unevaluatedFields);
         
-        Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
+        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
         scan.setRange(new Range());
         scan.fetchColumnFamily(new Text(modelName));
         Set<String> indexOnlyFields = new HashSet<>(); // will hold index only
@@ -488,9 +485,9 @@ public class MetadataHelper {
         stopWatch.start();
         
         if (log.isTraceEnabled())
-            log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName);
+            log.trace("using client: " + accumuloClient.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName);
         
-        Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
+        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
         scan.setRange(new Range());
         Set<String> modelNames = new HashSet<>();
         Set<Text> ignoreColfs = new HashSet<>();
@@ -563,7 +560,7 @@ public class MetadataHelper {
         log.debug("cache fault for getFacets(" + this.auths + "," + table + ")");
         Multimap<String,String> fieldPivots = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, table, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -604,7 +601,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getTermCounts from table: " + metadataTableName);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -620,11 +617,7 @@ public class MetadataHelper {
                 
                 if (null != key.getRow()) {
                     MetadataCardinalityCounts counts = new MetadataCardinalityCounts(key, entry.getValue());
-                    Map<String,MetadataCardinalityCounts> values = allCounts.get(counts.getField());
-                    if (values == null) {
-                        values = Maps.newHashMapWithExpectedSize(5);
-                        allCounts.put(counts.getField(), values);
-                    }
+                    Map<String,MetadataCardinalityCounts> values = allCounts.computeIfAbsent(counts.getField(), k -> Maps.newHashMapWithExpectedSize(5));
                     values.put(counts.getFieldValue(), counts);
                 } else {
                     log.warn("Row null in ColumnFamilyConstants for key: " + key);
@@ -638,7 +631,7 @@ public class MetadataHelper {
     }
     
     /**
-     * Returns a Set of all Counts using the connector's principal's auths. This resulting informations cannot be exposed outside of the system.
+     * Returns a Set of all Counts using the client's principal's auths. This resulting informations cannot be exposed outside of the system.
      *
      * @return
      * @throws InstantiationException
@@ -654,9 +647,9 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getTermCounts from table: " + metadataTableName);
         
-        Authorizations rootAuths = connector.securityOperations().getUserAuthorizations(connector.whoami());
+        Authorizations rootAuths = accumuloClient.securityOperations().getUserAuthorizations(accumuloClient.whoami());
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, Collections.singleton(rootAuths));
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths));
         Range range = new Range();
         
         bs.setRange(range);
@@ -672,11 +665,7 @@ public class MetadataHelper {
                 
                 if (null != key.getRow()) {
                     MetadataCardinalityCounts counts = new MetadataCardinalityCounts(key, entry.getValue());
-                    Map<String,MetadataCardinalityCounts> values = allCounts.get(counts.getField());
-                    if (values == null) {
-                        values = Maps.newHashMapWithExpectedSize(5);
-                        allCounts.put(counts.getField(), values);
-                    }
+                    Map<String,MetadataCardinalityCounts> values = allCounts.computeIfAbsent(counts.getField(), k -> Maps.newHashMapWithExpectedSize(5));
                     values.put(counts.getFieldValue(), counts);
                 } else {
                     log.warn("Row null in ColumnFamilyConstants for key: " + key);
@@ -705,7 +694,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getAllNormalized from table: " + metadataTableName);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -856,7 +845,7 @@ public class MetadataHelper {
             log.trace("getEdges from table: " + metadataTableName);
         // unlike other entries, the edges colf entries have many auths set. We'll use the fullUserAuths in the scanner instead
         // of the minimal set in this.auths
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, fullUserAuths);
+        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths);
         
         scanner.setRange(new Range());
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
@@ -1073,7 +1062,7 @@ public class MetadataHelper {
         
         // Get all the rows in DatawaveMetadata for the field, only in the 'f'
         // colfam
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         Key startKey = new Key(row);
         bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
@@ -1216,7 +1205,7 @@ public class MetadataHelper {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
         
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         scanner.setRange(Range.exact(fieldName));
         
@@ -1294,7 +1283,7 @@ public class MetadataHelper {
     protected Multimap<String,String> loadAllFields() throws TableNotFoundException {
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         if (log.isTraceEnabled())
             log.trace("loadAllFields from table: " + metadataTableName);
         
@@ -1346,7 +1335,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("loadTermFrequencyFields from table: " + metadataTableName);
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
@@ -1358,15 +1347,15 @@ public class MetadataHelper {
         return Multimaps.unmodifiableMultimap(fields);
     }
     
-    private static String getKey(Instance instance, String metadataTableName) {
+    private static String getKey(String instanceID, String metadataTableName) {
         StringBuilder builder = new StringBuilder();
-        builder.append(instance != null ? instance.getInstanceID() : null).append('\0');
+        builder.append(instanceID).append('\0');
         builder.append(metadataTableName).append('\0');
         return builder.toString();
     }
     
     private static String getKey(MetadataHelper helper) {
-        return getKey(helper.instance, helper.metadataTableName);
+        return getKey(helper.accumuloClient.instanceOperations().getInstanceID(), helper.metadataTableName);
     }
     
     @Override
@@ -1374,11 +1363,11 @@ public class MetadataHelper {
         return getKey(this);
     }
     
-    public static void basicIterator(Connector connector, String tableName, Collection<Authorizations> auths)
+    public static void basicIterator(AccumuloClient client, String tableName, Collection<Authorizations> auths)
                     throws TableNotFoundException, InvalidProtocolBufferException {
         if (log.isTraceEnabled())
             log.trace("--- basicIterator ---" + tableName);
-        Scanner scanner = connector.createScanner(tableName, auths.iterator().next());
+        Scanner scanner = client.createScanner(tableName, auths.iterator().next());
         Range range = new Range();
         scanner.setRange(range);
         Iterator<Entry<Key,Value>> iter = scanner.iterator();

@@ -3,8 +3,7 @@ package datawave.query.composite;
 import com.google.common.base.Preconditions;
 import datawave.data.ColumnFamilyConstants;
 import datawave.security.util.ScannerHelper;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.data.Key;
@@ -39,25 +38,23 @@ public class CompositeMetadataHelper {
     protected final List<Text> metadataCompositeColfs = Arrays.asList(ColumnFamilyConstants.COLF_CI, ColumnFamilyConstants.COLF_CITD,
                     ColumnFamilyConstants.COLF_CISEP);
     
-    protected final Connector connector;
-    protected final Instance instance;
+    protected final AccumuloClient accumuloClient;
     protected final String metadataTableName;
     protected final Set<Authorizations> auths;
     
     /**
      * Initializes the instance with a provided update interval.
      *
-     * @param connector
-     *            A Connector to Accumulo
+     * @param client
+     *            A client connection to Accumulo
      * @param metadataTableName
      *            The name of the DatawaveMetadata table
      * @param auths
      *            Any {@link Authorizations} to use
      */
-    public CompositeMetadataHelper(Connector connector, String metadataTableName, Set<Authorizations> auths) {
-        Preconditions.checkNotNull(connector, "A valid Accumulo Connector is required by CompositeMetadataHelper");
-        this.connector = connector;
-        this.instance = connector.getInstance();
+    public CompositeMetadataHelper(AccumuloClient client, String metadataTableName, Set<Authorizations> auths) {
+        Preconditions.checkNotNull(client, "A valid AccumuloClient is required by CompositeMetadataHelper");
+        this.accumuloClient = client;
         
         Preconditions.checkNotNull(metadataTableName, "The metadata table name is required by CompositeMetadataHelper");
         this.metadataTableName = metadataTableName;
@@ -66,7 +63,7 @@ public class CompositeMetadataHelper {
         this.auths = auths;
         
         if (log.isTraceEnabled()) {
-            log.trace("Constructor  connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and metadata table name: "
+            log.trace("Constructor  connector: " + accumuloClient.getClass().getCanonicalName() + " with auths: " + auths + " and metadata table name: "
                             + metadataTableName);
         }
     }
@@ -94,7 +91,7 @@ public class CompositeMetadataHelper {
         SimpleDateFormat dateFormat = new SimpleDateFormat(transitionDateFormat);
         
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         Range range = new Range();
         bs.setRange(range);
