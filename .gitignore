@@ -1,9 +1,2 @@
-target/
-
-.idea/
-*.iml
-*.iws
-
-.classpath
-.project
-.settings/
+.idea
+target
