@@ -95,6 +95,8 @@ public class MetadataHelper {
     
     protected static final Text PV = new Text("pv");
     
+    public static String COL_QUAL_PREFIX = "compressed-";
+    
     protected static final Function<MetadataEntry,String> toFieldName = new MetadataEntryToFieldName(), toDatatype = new MetadataEntryToDatatype();
     
     protected String getDatatype(Key k) {
@@ -1070,6 +1072,7 @@ public class MetadataHelper {
     public long getCardinalityForField(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
         log.trace("getCardinalityForField from table: " + metadataTableName);
         Text row = new Text(fieldName.toUpperCase());
+        FrequencyFamilyCounter dateFreqMap = new FrequencyFamilyCounter();
         
         // Get all the rows in DatawaveMetadata for the field, only in the 'f'
         // colfam
@@ -1080,43 +1083,53 @@ public class MetadataHelper {
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         
         long count = 0;
+        Value aggregatedValue = null;
         
         for (Entry<Key,Value> entry : bs) {
-            Text colq = entry.getKey().getColumnQualifier();
+            if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX))
+                aggregatedValue = entry.getValue();
+        }
+        
+        if (aggregatedValue != null) {
+            // Text colq = entry.getKey().getColumnQualifier();
+            dateFreqMap.initialize(aggregatedValue);
             
-            int index = colq.find(NULL_BYTE);
-            if (index != -1) {
-                // If we were given a non-null datatype
-                // Ensure that we process records only on that type
-                if (null != datatype) {
-                    try {
-                        String type = Text.decode(colq.getBytes(), 0, index);
-                        if (!type.equals(datatype)) {
+            for (Entry<String,Long> dateFrequency : dateFreqMap.getQualifierToFrequencyValueMap().entrySet()) {
+                
+                int index = dateFrequency.getKey().indexOf(NULL_BYTE);
+                if (index != -1) {
+                    // If we were given a non-null datatype
+                    // Ensure that we process records only on that type
+                    if (null != datatype) {
+                        try {
+                            String type = Text.decode(dateFrequency.getKey().getBytes(), 0, index);
+                            if (!type.equals(datatype)) {
+                                continue;
+                            }
+                        } catch (CharacterCodingException e) {
+                            log.warn("Could not deserialize colqual: " + dateFrequency.getKey());
                             continue;
                         }
+                    }
+                    
+                    // Parse the date to ensure that we want this record
+                    String dateStr = "null";
+                    Date date;
+                    try {
+                        dateStr = Text.decode(dateFrequency.getKey().getBytes(), index + 1, dateFrequency.getKey().length() - (index + 1));
+                        date = DateHelper.parse(dateStr);
+                        // Add the provided count if we fall within begin and end,
+                        // inclusive
+                        if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
+                            count += dateFrequency.getValue();
+                        }
+                    } catch (ValueFormatException e) {
+                        log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
                     } catch (CharacterCodingException e) {
-                        log.warn("Could not deserialize colqual: " + entry.getKey());
-                        continue;
+                        log.warn("Could not deserialize colqual: " + dateFrequency.getKey());
+                    } catch (DateTimeParseException e) {
+                        log.warn("Could not convert date string: " + dateStr);
                     }
-                }
-                
-                // Parse the date to ensure that we want this record
-                String dateStr = "null";
-                Date date;
-                try {
-                    dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
-                    date = DateHelper.parse(dateStr);
-                    // Add the provided count if we fall within begin and end,
-                    // inclusive
-                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                        count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
-                    }
-                } catch (ValueFormatException e) {
-                    log.warn("Could not convert the Value to a long" + entry.getValue());
-                } catch (CharacterCodingException e) {
-                    log.warn("Could not deserialize colqual: " + entry.getKey());
-                } catch (DateTimeParseException e) {
-                    log.warn("Could not convert date string: " + dateStr);
                 }
             }
         }
@@ -1211,7 +1224,8 @@ public class MetadataHelper {
             throw new RuntimeException(e);
         }
     }
-    
+
+    //TODO: Need to get this to work for frequency column compression
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
