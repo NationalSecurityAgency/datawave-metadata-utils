@@ -1,5 +1,6 @@
 package datawave.query.util;
 
+import datawave.data.ColumnFamilyConstants;
 import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,15 @@ public class FrequencyFamilyCounter {
     public HashMap<String,Long> getQualifierToFrequencyValueMap() {
         return qualifierToFrequencyValueMap;
     }
-    
+
+    /**
+     * Takes the value of a compressed f column record and creates the qualifierToFrequencyValueMap
+     * so that other records that are not yet aggregated can be added to the compressed record.
+     * After those records are aggregated they are discarded.
+     *
+     * @param oldValue
+     * @return
+     */
     public void deserializeCompressedValue(Value oldValue) {
         String[] kvps = oldValue.toString().split("|");
         log.info("deserializeCompressedValue: there are " + kvps.length + " key value pairs.");
@@ -53,7 +62,14 @@ public class FrequencyFamilyCounter {
         }
         log.info("The contents of the frequency map are " + qualifierToFrequencyValueMap.toString());
     }
-    
+
+    /**
+     * Inserts a key and value into the qualifiedToFrequencyValueMap and converts
+     * the string value to a long
+     * @param key
+     * @param value
+     * @return
+     */
     public void insertIntoMap(String key, String value) {
         long parsedLong;
         
@@ -82,7 +98,11 @@ public class FrequencyFamilyCounter {
             log.error("Error inserting into map", e);
         }
     }
-    
+    /**
+     * Return the serialized value of the qualifierToFrequencyValueMap
+     * Presently only called by the FrequencyTransformIterator after aggregating a
+     * rows frequency records
+     */
     public Value serialize() {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String,Long> entry : qualifierToFrequencyValueMap.entrySet()) {
