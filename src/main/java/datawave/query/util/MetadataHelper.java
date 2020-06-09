@@ -1086,12 +1086,12 @@ public class MetadataHelper {
         long count = 0;
         Value aggregatedValue = null;
         
-        Text cq = null;
+        String cq = "";
         
         for (Entry<Key,Value> entry : bs) {
             if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX))
                 aggregatedValue = entry.getValue();
-            cq = entry.getKey().getColumnQualifier();
+            cq = entry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
         }
         
         if (aggregatedValue != null) {
@@ -1101,9 +1101,9 @@ public class MetadataHelper {
             for (Entry<String,Long> dateFrequency : dateFreqMap.getQualifierToFrequencyValueMap().entrySet()) {
                 // If we were given a non-null datatype
                 // Ensure that we process records only on that type
-                if (null != datatype && cq != null) {
+                if (null != datatype && !cq.isEmpty()) {
                     try {
-                        String type = cq.toString();
+                        String type = cq;
                         if (!type.equals(datatype)) {
                             continue;
                         }
