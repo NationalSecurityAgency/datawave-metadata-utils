@@ -63,6 +63,6 @@
     <property name="sun.cpu.isalist" value=""/>
   </properties>
   <testcase classname="datawave.util.DateSchemaTest" name="testDateSchemaConfig" time="0"/>
-  <testcase classname="datawave.util.DateSchemaTest" name="testProtobufReadError" time="0"/>
-  <testcase classname="datawave.util.DateSchemaTest" name="testProtobufReadWrite" time="0.001"/>
+  <testcase classname="datawave.util.DateSchemaTest" name="testProtobufReadError" time="0.001"/>
+  <testcase classname="datawave.util.DateSchemaTest" name="testProtobufReadWrite" time="0"/>
 </testsuite>

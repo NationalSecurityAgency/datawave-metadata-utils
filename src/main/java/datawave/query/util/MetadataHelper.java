@@ -1086,52 +1086,48 @@ public class MetadataHelper {
         long count = 0;
         Value aggregatedValue = null;
         
+        Text cq = null;
+        
         for (Entry<Key,Value> entry : bs) {
             if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX))
                 aggregatedValue = entry.getValue();
+            cq = entry.getKey().getColumnQualifier();
         }
         
         if (aggregatedValue != null) {
-            // Text colq = entry.getKey().getColumnQualifier();
+            
             dateFreqMap.initialize(aggregatedValue);
             
             for (Entry<String,Long> dateFrequency : dateFreqMap.getQualifierToFrequencyValueMap().entrySet()) {
-                
-                int index = dateFrequency.getKey().indexOf(NULL_BYTE);
-                if (index != -1) {
-                    // If we were given a non-null datatype
-                    // Ensure that we process records only on that type
-                    if (null != datatype) {
-                        try {
-                            String type = Text.decode(dateFrequency.getKey().getBytes(Charset.defaultCharset()), 0, index);
-                            if (!type.equals(datatype)) {
-                                continue;
-                            }
-                        } catch (CharacterCodingException e) {
-                            log.warn("Could not deserialize colqual: " + dateFrequency.getKey());
+                // If we were given a non-null datatype
+                // Ensure that we process records only on that type
+                if (null != datatype && cq != null) {
+                    try {
+                        String type = cq.toString();
+                        if (!type.equals(datatype)) {
                             continue;
                         }
-                    }
-                    
-                    // Parse the date to ensure that we want this record
-                    String dateStr = "null";
-                    Date date;
-                    try {
-                        dateStr = Text.decode(dateFrequency.getKey().getBytes(Charset.defaultCharset()), index + 1,
-                                        dateFrequency.getKey().length() - (index + 1));
-                        date = DateHelper.parse(dateStr);
-                        // Add the provided count if we fall within begin and end,
-                        // inclusive
-                        if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                            count += dateFrequency.getValue();
-                        }
-                    } catch (ValueFormatException e) {
-                        log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
-                    } catch (CharacterCodingException e) {
+                    } catch (Exception e) {
                         log.warn("Could not deserialize colqual: " + dateFrequency.getKey());
-                    } catch (DateTimeParseException e) {
-                        log.warn("Could not convert date string: " + dateStr);
+                        continue;
                     }
+                }
+                
+                // Parse the date to ensure that we want this record
+                String dateStr = "null";
+                Date date;
+                try {
+                    dateStr = dateFrequency.getKey();
+                    date = DateHelper.parse(dateStr);
+                    // Add the provided count if we fall within begin and end,
+                    // inclusive
+                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
+                        count += dateFrequency.getValue();
+                    }
+                } catch (ValueFormatException e) {
+                    log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
+                } catch (DateTimeParseException e) {
+                    log.warn("Could not convert date string: " + dateStr);
                 }
             }
         }
