@@ -1,7 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="7ef6735a-e0d4-40a1-817f-b94e10af4627" name="Default Changelist" comment="" />
+    <list default="true" id="7ef6735a-e0d4-40a1-817f-b94e10af4627" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Maven__gov_nsa_datawave_microservice_accumulo_utils_1_2.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Maven__gov_nsa_datawave_microservice_type_utils_1_0.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Maven__org_slf4j_slf4j_api_1_7_25.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/metadata-utils.iml" beforeDir="false" afterPath="$PROJECT_DIR$/metadata-utils.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/datawave/query/util/FrequencyFamilyCounter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/datawave/query/util/FrequencyFamilyCounter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/datawave/query/util/MetadataHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/datawave/query/util/MetadataHelper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/classes/datawave/query/composite/CompositeMetadata.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/datawave/query/composite/CompositeMetadata.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/classes/datawave/query/model/QueryModel.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/datawave/query/model/QueryModel.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/classes/datawave/query/util/FrequencyFamilyCounter.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/datawave/query/util/FrequencyFamilyCounter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/classes/datawave/query/util/MetadataHelper.class" beforeDir="false" afterPath="$PROJECT_DIR$/target/classes/datawave/query/util/MetadataHelper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/formatter-maven-cache.properties" beforeDir="false" afterPath="$PROJECT_DIR$/target/formatter-maven-cache.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/maven-archiver/pom.properties" beforeDir="false" afterPath="$PROJECT_DIR$/target/maven-archiver/pom.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/metadata-utils-1.3-SNAPSHOT.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.iterators.EdgeMetadataCombinerTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.iterators.EdgeMetadataCombinerTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.iterators.filter.EdgeMetadataCQStripperCombinerTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.iterators.filter.EdgeMetadataCQStripperCombinerTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.query.composite.CompositeMetadataTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.query.composite.CompositeMetadataTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.DateSchemaTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.DateSchemaTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.StringMultimapSchemaTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.StringMultimapSchemaTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.UniversalSetTest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/TEST-datawave.util.UniversalSetTest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/datawave.iterators.EdgeMetadataCombinerTest.txt" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/datawave.iterators.EdgeMetadataCombinerTest.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/datawave.iterators.filter.EdgeMetadataCQStripperCombinerTest.txt" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/datawave.iterators.filter.EdgeMetadataCQStripperCombinerTest.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/datawave.query.composite.CompositeMetadataTest.txt" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/datawave.query.composite.CompositeMetadataTest.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/surefire-reports/datawave.util.StringMultimapSchemaTest.txt" beforeDir="false" afterPath="$PROJECT_DIR$/target/surefire-reports/datawave.util.StringMultimapSchemaTest.txt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -16,6 +41,9 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="jrt:///usr/lib/jvm/java-11-openjdk-amd64!/java.base/java/nio/charset/Charset.class" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
@@ -55,5 +83,13 @@
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="841" y="295" width="374" height="569" key="#com.intellij.ide.util.MemberChooser/0.27.1920.1053@0.27.1920.1053" timestamp="1591641038509" />
+    <state x="217" y="140" width="1499" height="807" key="com.intellij.history.integration.ui.views.FileHistoryDialog" timestamp="1591724989938">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="217" y="140" width="1499" height="807" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1591724989938" />
+    <state x="724" y="283" width="590" height="512" key="find.popup" timestamp="1591725970222">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="724" y="283" width="590" height="512" key="find.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1591725970222" />
   </component>
 </project>

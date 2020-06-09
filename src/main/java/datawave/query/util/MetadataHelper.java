@@ -53,6 +53,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -95,7 +96,7 @@ public class MetadataHelper {
     
     protected static final Text PV = new Text("pv");
     
-    public static String COL_QUAL_PREFIX = "compressed-";
+    public static final String COL_QUAL_PREFIX = "compressed-";
     
     protected static final Function<MetadataEntry,String> toFieldName = new MetadataEntryToFieldName(), toDatatype = new MetadataEntryToDatatype();
     
@@ -1102,7 +1103,7 @@ public class MetadataHelper {
                     // Ensure that we process records only on that type
                     if (null != datatype) {
                         try {
-                            String type = Text.decode(dateFrequency.getKey().getBytes(), 0, index);
+                            String type = Text.decode(dateFrequency.getKey().getBytes(Charset.defaultCharset()), 0, index);
                             if (!type.equals(datatype)) {
                                 continue;
                             }
@@ -1116,7 +1117,8 @@ public class MetadataHelper {
                     String dateStr = "null";
                     Date date;
                     try {
-                        dateStr = Text.decode(dateFrequency.getKey().getBytes(), index + 1, dateFrequency.getKey().length() - (index + 1));
+                        dateStr = Text.decode(dateFrequency.getKey().getBytes(Charset.defaultCharset()), index + 1,
+                                        dateFrequency.getKey().length() - (index + 1));
                         date = DateHelper.parse(dateStr);
                         // Add the provided count if we fall within begin and end,
                         // inclusive
@@ -1224,8 +1226,8 @@ public class MetadataHelper {
             throw new RuntimeException(e);
         }
     }
-
-    //TODO: Need to get this to work for frequency column compression
+    
+    // TODO: Need to get this to work for frequency column compression
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
