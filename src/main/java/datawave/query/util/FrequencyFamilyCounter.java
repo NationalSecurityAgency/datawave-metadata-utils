@@ -13,7 +13,7 @@ public class FrequencyFamilyCounter {
     
     private long total = 0L;
     private HashMap<String,Long> qualifierToFrequencyValueMap = new HashMap<>();
-
+    
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
@@ -46,7 +46,6 @@ public class FrequencyFamilyCounter {
      * added to the compressed record. After those records are aggregated they are discarded.
      *
      * @param oldValue
-     * @return
      */
     public void deserializeCompressedValue(Value oldValue) {
         String[] kvps = oldValue.toString().split("\\|");
@@ -70,7 +69,6 @@ public class FrequencyFamilyCounter {
      * 
      * @param key
      * @param value
-     * @return
      */
     public void insertIntoMap(String key, String value) {
         long parsedLong;
@@ -115,6 +113,8 @@ public class FrequencyFamilyCounter {
     /**
      * Return the serialized value of the qualifierToFrequencyValueMap Presently only called by the FrequencyTransformIterator after aggregating a rows
      * frequency records
+     * 
+     * @return Value
      */
     public Value serialize() {
         StringBuilder sb = new StringBuilder();
