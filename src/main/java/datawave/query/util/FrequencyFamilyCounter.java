@@ -13,7 +13,7 @@ public class FrequencyFamilyCounter {
     
     private long total = 0L;
     private HashMap<String,Long> qualifierToFrequencyValueMap = new HashMap<>();
-    
+
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
