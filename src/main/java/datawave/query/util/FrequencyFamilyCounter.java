@@ -13,6 +13,7 @@ public class FrequencyFamilyCounter {
     
     private long total = 0L;
     private HashMap<String,Long> qualifierToFrequencyValueMap = new HashMap<>();
+    private static final int SIMPLEDATE_LENGTH = 8;
     
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
@@ -76,9 +77,9 @@ public class FrequencyFamilyCounter {
         
         // Assuming that as SimpleDate is at the end of the key passed in. yyyyMMdd
         if (key != null) {
-            if (key.length() > 8) {
-                cleanKey = key.substring(key.length() - 8);
-            } else if (key.length() <= 8) {
+            if (key.length() > SIMPLEDATE_LENGTH) {
+                cleanKey = key.substring(key.length() - SIMPLEDATE_LENGTH);
+            } else if (key.length() <= SIMPLEDATE_LENGTH) {
                 cleanKey = key;
             }
         } else
