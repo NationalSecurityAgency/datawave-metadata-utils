@@ -1,18 +1,16 @@
 package datawave.query.util;
 
-import datawave.data.ColumnFamilyConstants;
 import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 public class FrequencyFamilyCounter {
     
     private long total = 0L;
-    private HashMap<String,Long> qualifierToFrequencyValueMap = new HashMap<>();
+    private HashMap<String,Long> dateToFrequencyValueMap = new HashMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
@@ -26,7 +24,7 @@ public class FrequencyFamilyCounter {
     }
     
     public void clear() {
-        qualifierToFrequencyValueMap.clear();
+        dateToFrequencyValueMap.clear();
         total = 0;
     }
     
@@ -38,8 +36,8 @@ public class FrequencyFamilyCounter {
         return total;
     }
     
-    public HashMap<String,Long> getQualifierToFrequencyValueMap() {
-        return qualifierToFrequencyValueMap;
+    public HashMap<String,Long> getDateToFrequencyValueMap() {
+        return dateToFrequencyValueMap;
     }
     
     /**
@@ -62,7 +60,12 @@ public class FrequencyFamilyCounter {
                 
             }
         }
-        log.info("The contents of the frequency map are " + qualifierToFrequencyValueMap.toString());
+        log.info("The contents of the frequency map are " + dateToFrequencyValueMap.toString());
+    }
+    
+    public void aggregateRecord(String key, String value) {
+        
+        insertIntoMap(key, value);
     }
     
     /**
@@ -93,18 +96,26 @@ public class FrequencyFamilyCounter {
             parsedLong = Long.parseLong(value);
             total += parsedLong;
         } catch (Exception e) {
-            log.error("Could not parse " + value + " to long for this key " + cleanKey, e);
-            return;
+            try {
+                log.info("Could not parse " + value + " to long for this key " + cleanKey, e);
+                log.info("Trying to use Byte.decode");
+                parsedLong = Long.parseLong(String.valueOf(Byte.decode(value)));
+                total += parsedLong;
+            } catch (Exception e2) {
+                log.error("Could not parse " + value + " to long for this key " + cleanKey, e2);
+                return;
+            }
+            
         }
         
         try {
             
-            if (!qualifierToFrequencyValueMap.containsKey(cleanKey))
-                qualifierToFrequencyValueMap.put(cleanKey, parsedLong);
+            if (!dateToFrequencyValueMap.containsKey(cleanKey))
+                dateToFrequencyValueMap.put(cleanKey, parsedLong);
             else {
                 
-                long lastValue = qualifierToFrequencyValueMap.get(cleanKey);
-                qualifierToFrequencyValueMap.put(cleanKey, lastValue + parsedLong);
+                long lastValue = dateToFrequencyValueMap.get(cleanKey);
+                dateToFrequencyValueMap.put(cleanKey, lastValue + parsedLong);
             }
         } catch (Exception e) {
             log.error("Error inserting into map", e);
@@ -119,7 +130,7 @@ public class FrequencyFamilyCounter {
      */
     public Value serialize() {
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String,Long> entry : qualifierToFrequencyValueMap.entrySet()) {
+        for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
             sb.append(entry.getKey()).append("^").append(entry.getValue()).append("|");
         }
         
