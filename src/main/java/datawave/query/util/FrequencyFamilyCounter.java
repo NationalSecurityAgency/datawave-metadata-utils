@@ -12,6 +12,7 @@ public class FrequencyFamilyCounter {
     private long total = 0L;
     private HashMap<String,Long> dateToFrequencyValueMap = new HashMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
+    private DateFrequencyValue serializer = new DateFrequencyValue();
     
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
@@ -47,20 +48,17 @@ public class FrequencyFamilyCounter {
      * @param oldValue
      */
     public void deserializeCompressedValue(Value oldValue) {
-        String[] kvps = oldValue.toString().split("\\|");
-        log.info("deserializeCompressedValue: there are " + kvps.length + " key value pairs.");
-        for (String kvp : kvps) {
-            String[] pair = kvp.split("^");
-            if (pair.length == 2) {
-                log.info("deserializeCompressedValue -- cq: " + pair[0] + " value: " + pair[1]);
-                String key = pair[0];
-                String value = pair[1];
-                log.info("deserializeCompressedValue key: " + pair[0] + " value: " + pair[2]);
-                insertIntoMap(key, value);
-                
-            }
-        }
-        log.info("The contents of the frequency map are " + dateToFrequencyValueMap.toString());
+        /*
+         * String[] kvps = oldValue.toString().split("\\|"); log.info("deserializeCompressedValue: there are " + kvps.length + " key value pairs."); for (String
+         * kvp : kvps) { String[] pair = kvp.split("^"); if (pair.length == 2) { log.info("deserializeCompressedValue -- cq: " + pair[0] + " value: " +
+         * pair[1]); String key = pair[0]; String value = pair[1]; log.info("deserializeCompressedValue key: " + pair[0] + " value: " + pair[2]);
+         * insertIntoMap(key, value);
+         * 
+         * } } log.info("The contents of the frequency map are " + dateToFrequencyValueMap.toString());
+         */
+        HashMap<String,Long> uncompressedValueMap = serializer.deserialize(oldValue);
+        dateToFrequencyValueMap.clear();
+        dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
     
     public void aggregateRecord(String key, String value) {
@@ -128,13 +126,13 @@ public class FrequencyFamilyCounter {
      * 
      * @return Value
      */
-    public Value serialize() {
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
-            sb.append(entry.getKey()).append("^").append(entry.getValue()).append("|");
-        }
+    public Value serialize(boolean compress) {
+        /*
+         * StringBuilder sb = new StringBuilder(); for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
+         * sb.append(entry.getKey()).append("^").append(entry.getValue()).append("|"); }
+         */
         
-        return new Value(sb.toString());
+        return serializer.serialize(dateToFrequencyValueMap, compress);
     }
     
 }
