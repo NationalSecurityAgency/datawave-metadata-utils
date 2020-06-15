@@ -61,9 +61,9 @@ public class FrequencyFamilyCounter {
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
     
-    public void aggregateRecord(String key, String value) {
+    public void aggregateRecord(String key, String value, boolean compressKey) {
         
-        insertIntoMap(key, value);
+        insertIntoMap(key, value, compressKey);
     }
     
     /**
@@ -72,7 +72,7 @@ public class FrequencyFamilyCounter {
      * @param key
      * @param value
      */
-    public void insertIntoMap(String key, String value) {
+    public void insertIntoMap(String key, String value, boolean compressKey) {
         long parsedLong;
         String cleanKey = "null";
         
@@ -95,12 +95,12 @@ public class FrequencyFamilyCounter {
             total += parsedLong;
         } catch (Exception e) {
             try {
-                log.info("Could not parse " + value + " to long for this key " + cleanKey, e);
-                log.info("Trying to use Byte.decode");
-                parsedLong = Long.parseLong(String.valueOf(Byte.decode(value)));
+                log.info("Long.parseLong could not parse " + value + " to long for this key " + cleanKey, e);
+                log.info("Trying to use Long.decode");
+                parsedLong = Long.decode(value);
                 total += parsedLong;
             } catch (Exception e2) {
-                log.error("Could not parse " + value + " to long for this key " + cleanKey, e2);
+                log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, e2);
                 return;
             }
             
