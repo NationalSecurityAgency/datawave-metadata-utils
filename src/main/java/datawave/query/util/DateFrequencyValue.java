@@ -1,15 +1,11 @@
 package datawave.query.util;
 
 import org.apache.accumulo.core.data.Value;
-import org.mortbay.util.IO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.print.attribute.HashPrintJobAttributeSet;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,15 +37,15 @@ public class DateFrequencyValue {
      *            the keys should be dates in yyyyMMdd format
      * @return Value the value to store in accumulo
      */
-    public Value serialize(HashMap<String,Long> dateToFrequencyValueMap, boolean compress) {
+    public Value serialize(HashMap<String,Integer> dateToFrequencyValueMap, boolean compress) {
         
         Value serializedMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.reset();
         
         if (compress) {
-            for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
-                Base127Compression keyContent = new Base127Compression(entry.getKey(), true);
+            for (Map.Entry<String,Integer> entry : dateToFrequencyValueMap.entrySet()) {
+                Base256Compression keyContent = new Base256Compression(entry.getKey(), true);
                 try {
                     baos.write(keyContent.getCompressedYear());
                     baos.write(keyContent.getCompressedMonth());
@@ -59,13 +55,18 @@ public class DateFrequencyValue {
                     log.error("We wrote this key uncompressed when compressed was specified " + entry.getKey(), exception);
                 }
                 if (entry.getValue() != null || entry.getValue().toString().isEmpty())
-                    baos.write(Long.valueOf(entry.getValue()).byteValue());
+                    try {
+                        baos.write(String.valueOf(entry.getValue()).getBytes(Charset.defaultCharset()));
+                    } catch (IOException ioe) {
+                        log.error("could not write out the Long value for frequency");
+                    }
+                
                 else
                     baos.write('0');
                 baos.write('\u0000'); // null byte terminator
             }
         } else {
-            for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
+            for (Map.Entry<String,Integer> entry : dateToFrequencyValueMap.entrySet()) {
                 writeUncompressedKey(baos, entry);
                 baos.write(Long.valueOf(entry.getValue()).byteValue());
                 baos.write('\u0000');
@@ -82,7 +83,7 @@ public class DateFrequencyValue {
         return serializedMap;
     }
     
-    private void writeUncompressedKey(ByteArrayOutputStream baos, Map.Entry<String,Long> entry) {
+    private void writeUncompressedKey(ByteArrayOutputStream baos, Map.Entry<String,Integer> entry) {
         try {
             baos.write(entry.getKey().getBytes(Charset.defaultCharset()));
         } catch (IOException ioe) {
@@ -90,23 +91,23 @@ public class DateFrequencyValue {
         }
     }
     
-    public HashMap<String,Long> deserialize(Value oldValue) {
+    public HashMap<String,Integer> deserialize(Value oldValue) {
         
-        HashMap<String,Long> dateFrequencyMap = new HashMap<>();
+        HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
         if (oldValue == null || oldValue.toString().isEmpty())
             return dateFrequencyMap;
         
         String[] kvps = oldValue.toString().split("\u0000");
         
         for (String kvp : kvps) {
-            Long deserializedFrequency;
+            Integer deserializedFrequency;
             
             try {
                 log.info("deserialize is attempting to cast this value to Long " + kvp.substring(3));
-                deserializedFrequency = Long.valueOf(kvp.substring(3));
+                deserializedFrequency = Integer.valueOf(kvp.substring(3));
                 
             } catch (NumberFormatException numberFormatException) {
-                deserializedFrequency = 0L;
+                deserializedFrequency = 0;
                 log.info("The frequency for kvp " + kvp + " could not be dertermined by Long.valueof");
                 log.error("The value " + kvp.substring(3) + " could not be deserialized properly", numberFormatException);
             }
@@ -121,7 +122,7 @@ public class DateFrequencyValue {
     /**
      * This is a helper class that will compress the yyyyMMdd and the frequency date concatenated to it without a delimiter
      */
-    private static class Base127Compression {
+    public static class Base256Compression {
         
         private String content;
         private boolean doCompression = false;
@@ -130,24 +131,29 @@ public class DateFrequencyValue {
         private Base127Day day;
         private Base127Frequency frequency;
         
-        public Base127Compression(String content, boolean compress) {
+        public Base256Compression(String content, boolean compress) {
             this.content = content;
             doCompression = compress;
-            if (doCompression)
+            
+            if (doCompression) {
                 year = new Base127Year(content.substring(0, 3), doCompression);
-            else
+                month = new Base127Month(content.substring(4, 5), doCompression);
+                
+            } else {
                 year = new Base127Year((byte) content.charAt(0), doCompression);
+                month = new Base127Month((byte) content.charAt(1), doCompression);
+            }
             
         }
         
         public byte getCompressedYear() {
             
-            byte abyte = year.year;
+            byte abyte = year.yearByte;
             return abyte;
         }
         
         public byte getCompressedMonth() {
-            byte abyte = (byte) content.getBytes(Charset.defaultCharset())[5];
+            byte abyte = month.monthCompressed;
             return abyte;
         }
         
@@ -170,7 +176,7 @@ public class DateFrequencyValue {
             
         }
         
-        public byte[] numToBytes(long num) {
+        public static byte[] numToBytes(long num) {
             if (num == 0) {
                 return new byte[] {};
             } else if (num < 256) {
@@ -184,23 +190,92 @@ public class DateFrequencyValue {
             }
         }
         
-        private class Base127Month {
-            public byte month;
+        public static long bytesToLong(byte[] byteArray) {
+            long result = 0l;
+            if (byteArray == null)
+                return 0l;
+            if (byteArray.length > 4)
+                return 2_147_483_647;
             
-            public Base127Month(byte value) {
+            if (byteArray.length == 1) {
+                // TODO need to program a tranform from Binary twos complement or this can
+                // be interpreted as a negative number if highest bit is one.
+                if (byteArray[0] > 0 && byteArray[0] < 128)
+                    return byteArray[0];
+                else {
+                    return byteArray[0] & 0xFF;
+                }
+                
+            }
+            
+            int numBytes = byteArray.length;
+            int bitShifts = numBytes * 8 - 8;
+            long addToResult;
+            
+            for (byte aByte : byteArray) {
+                
+                if (aByte < 0)
+                    aByte = (byte) (256 + aByte);
+                
+                addToResult = ((long) aByte & 0xFF) << bitShifts;
+                
+                if (addToResult < 0)
+                    addToResult = -addToResult;
+                
+                result += (addToResult);
+                bitShifts -= 8;
+                
+            }
+            
+            return result;
+        }
+        
+        private class Base127Month {
+            public byte monthCompressed;
+            public String monthExpanded;
+            public boolean doCompression;
+            
+            public Base127Month(byte value, boolean compress) {
                 if (value < 1 || value > 12) {
                     log.error("Month out of Base127 encoded range");
                 }
-                month = value;
+                monthCompressed = value;
+                monthExpanded = decode(value);
+                doCompression = compress;
+                
+            }
+            
+            public Base127Month(String value, boolean compress) {
+                if (value.length() != 2) {
+                    log.error("Month needs to be two characters to encode " + value);
+                }
+                monthCompressed = encode(value);
+                monthExpanded = value;
             }
             
             public byte encode(String month) {
-                byte encMonth = '\u0001';
-                return encMonth;
+                if (month.length() != 2) {
+                    log.error("Month needs to be two characters to encode " + month);
+                }
+                int nMonth = Integer.valueOf(month.charAt(1));
+                
+                if (month.charAt(0) == '1')
+                    nMonth += 10;
+                
+                return (byte) nMonth;
+                
             }
             
             public String decode(byte month) {
-                String decodeMonth = "01";
+                if ((int) month < 1 || (int) month > 12) {
+                    log.error("Byte code for month is out of range");
+                    return "01";
+                }
+                
+                String decodeMonth = String.valueOf((int) month);
+                if ((int) month < 10)
+                    decodeMonth = "0" + decodeMonth;
+                
                 return decodeMonth;
             }
             
@@ -227,7 +302,7 @@ public class DateFrequencyValue {
         }
         
         private class Base127Year {
-            private byte year;
+            private byte yearByte;
             private String yearStr = null;
             private boolean compressed = false;
             
@@ -236,22 +311,26 @@ public class DateFrequencyValue {
             public Base127Year(byte compressedYear, boolean compress) {
                 if (compressedYear == '\u0000')
                     log.error("Date value can't be set to null byte");
-                year = compressedYear;
+                yearByte = compressedYear;
                 compressed = compress;
                 if (compressed)
-                    yearStr = decode(year);
+                    yearStr = decode(yearByte);
             }
             
             public Base127Year(String uncompressedYear, boolean compress) {
                 yearStr = uncompressedYear;
                 if (compress)
-                    this.year = encode(yearStr);
+                    yearByte = encode(yearStr);
                 compressed = compress;
             }
             
             public byte encode(String year) {
-                if (year == null)
+                
+                if (year == null || year.length() != 4) {
+                    log.error("Need a four digit year. Encoding " + year + "failed.");
                     return '\u0001';
+                    
+                }
                 int intYear = Integer.parseInt(year) - BASE_YEAR;
                 if (intYear < 1 || intYear > 127)
                     log.error("Year is out of range and can't be encoded in a single byte");

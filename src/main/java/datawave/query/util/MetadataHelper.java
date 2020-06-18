@@ -1098,7 +1098,7 @@ public class MetadataHelper {
             
             dateFreqMap.initialize(aggregatedValue);
             
-            for (Entry<String,Long> dateFrequency : dateFreqMap.getDateToFrequencyValueMap().entrySet()) {
+            for (Entry<String,Integer> dateFrequency : dateFreqMap.getDateToFrequencyValueMap().entrySet()) {
                 // If we were given a non-null datatype
                 // Ensure that we process records only on that type
                 if (null != datatype && !cq.isEmpty()) {
