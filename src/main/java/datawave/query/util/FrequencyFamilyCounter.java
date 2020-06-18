@@ -10,7 +10,7 @@ import java.util.Map;
 public class FrequencyFamilyCounter {
     
     private long total = 0L;
-    private HashMap<String,Long> dateToFrequencyValueMap = new HashMap<>();
+    private HashMap<String,Integer> dateToFrequencyValueMap = new HashMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     private DateFrequencyValue serializer = new DateFrequencyValue();
     
@@ -37,7 +37,7 @@ public class FrequencyFamilyCounter {
         return total;
     }
     
-    public HashMap<String,Long> getDateToFrequencyValueMap() {
+    public HashMap<String,Integer> getDateToFrequencyValueMap() {
         return dateToFrequencyValueMap;
     }
     
@@ -56,7 +56,7 @@ public class FrequencyFamilyCounter {
          * 
          * } } log.info("The contents of the frequency map are " + dateToFrequencyValueMap.toString());
          */
-        HashMap<String,Long> uncompressedValueMap = serializer.deserialize(oldValue);
+        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue);
         dateToFrequencyValueMap.clear();
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
@@ -73,7 +73,7 @@ public class FrequencyFamilyCounter {
      * @param value
      */
     public void insertIntoMap(String key, String value, boolean compressKey) {
-        long parsedLong;
+        int parsedLong;
         String cleanKey = "null";
         
         // Assuming that as SimpleDate is at the end of the key passed in. yyyyMMdd
@@ -91,13 +91,13 @@ public class FrequencyFamilyCounter {
             return;
         
         try {
-            parsedLong = Long.parseLong(value);
+            parsedLong = Integer.parseUnsignedInt(value);
             total += parsedLong;
         } catch (Exception e) {
             try {
                 log.info("Long.parseLong could not parse " + value + " to long for this key " + cleanKey, e);
                 log.info("Trying to use Long.decode");
-                parsedLong = Long.decode(value);
+                parsedLong = Integer.decode(value);
                 total += parsedLong;
             } catch (Exception e2) {
                 log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, e2);
@@ -112,7 +112,7 @@ public class FrequencyFamilyCounter {
                 dateToFrequencyValueMap.put(cleanKey, parsedLong);
             else {
                 
-                long lastValue = dateToFrequencyValueMap.get(cleanKey);
+                int lastValue = dateToFrequencyValueMap.get(cleanKey);
                 dateToFrequencyValueMap.put(cleanKey, lastValue + parsedLong);
             }
         } catch (Exception e) {
