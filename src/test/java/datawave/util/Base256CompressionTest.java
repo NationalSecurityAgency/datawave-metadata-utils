@@ -19,6 +19,13 @@ public class Base256CompressionTest {
         
     }
     
+    @Test
+    public void nullBytePrefixedByteArrayTest() {
+        byte[] testArray = {'\u0000', '\u0000', '\u0001', '\u0001'};
+        int result = DateFrequencyValue.Base256Compression.bytesToLong(testArray);
+        Assert.assertTrue(result == 257);
+    }
+    
     private void encodeThenDecode(int example, boolean verbose) {
         byte[] result;
         result = DateFrequencyValue.Base256Compression.numToBytes(example);
