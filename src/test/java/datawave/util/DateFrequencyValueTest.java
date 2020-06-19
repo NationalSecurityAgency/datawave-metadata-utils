@@ -24,7 +24,7 @@ public class DateFrequencyValueTest {
     @Test
     public void DateFrequencyValueTest() {
         dateFrequencyValue.serialize(dateFrequencyUncompressed, true);
-
+        
     }
     
 }

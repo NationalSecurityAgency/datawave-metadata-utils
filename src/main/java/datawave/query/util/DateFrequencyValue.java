@@ -22,8 +22,11 @@ import java.util.Map;
 public class DateFrequencyValue {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
-    
+
+    //An intermediate data structure build up by iterating through uncompressDateFrequencies
     private HashMap<CompressedMapKey,byte[]> compressedDateFrequencies = new HashMap<>();
+    //The mapping of SimpleDateFormat strings to frequency counts.  This is passed in by the
+    //FrequencyFamilyCounter object to this classes serialize function
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
     private static int BADORDINAL = 367;
     
@@ -175,7 +178,8 @@ public class DateFrequencyValue {
         public byte[] getYear() {
             int year = '\u0000';
             try {
-                year = Integer.parseUnsignedInt(keyValue.substring(0, 4));
+                String yearStr = keyValue.substring(4);
+                year = Integer.parseUnsignedInt(yearStr);
                 
             } catch (NumberFormatException numberFormatException) {
                 log.error("the year could not be extract from ", keyValue, numberFormatException);
@@ -201,7 +205,7 @@ public class DateFrequencyValue {
         
         private int calculateOrdinal() {
             // TODO implement
-            return 100;
+            return 20;
         }
         
     }
