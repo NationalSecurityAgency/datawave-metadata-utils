@@ -13,23 +13,21 @@ import java.util.Map;
 /**
  * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
  * a column qualifier that is prefixed with the string "compressed-" like "compressed-csv" for example. This is a class used to help compress the date and
- * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter The main idea is to compress
- * date/frequency pairs of the form yyyyMMdd,Frequency like 201906190x20. The year can be represented by a single base 127 digit that will only need one byte of
- * storage - there will be a base year (1970) that the the byte value can be added to re-create the year. The month can be encoded in one byte and so can the
- * day of the month. So we only to store 3 bytes in the Accumulo value to store the yyyyMMdd format. 3/8 the original size is better than the compression ratio
- * for run length encoding. By tranforming the frequency count corresponding to the date to a Base127 representation whe can get all counts below 128 to
- * compress to a single byte instead of 3 bytes. All counts from 128 to 1270 can be collapsed into only 2 base127 chars.
+ * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter The byte array really only
+ * has to be like this in regular expression format (YEAR(4BYTE-FREQUENCY){365,366})(\x00))* . Explained verbally a one byte representation of Year followed by
+ * 365 or 366 (Leap year) 4 byte holders for frequency then Null terminated. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 1 + (365 x
+ * 4) + 1) bytes long for a 10 year capture: 14620 bytes.
  */
 
 public class DateFrequencyValue {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
     
-    public DateFrequencyValue() {}
+    private HashMap<CompressedMapKey,byte[]> compressedDateFrequencies = new HashMap<>();
+    private HashMap<String,Integer> uncompressedDateFrequencies = null;
+    private static int BADORDINAL = 367;
     
-    public DateFrequencyValue(String content) {
-        
-    }
+    public DateFrequencyValue() {}
     
     /**
      *
@@ -40,31 +38,43 @@ public class DateFrequencyValue {
     public Value serialize(HashMap<String,Integer> dateToFrequencyValueMap, boolean compress) {
         
         Value serializedMap;
+        uncompressedDateFrequencies = dateToFrequencyValueMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.reset();
         
         if (compress) {
-            for (Map.Entry<String,Integer> entry : dateToFrequencyValueMap.entrySet()) {
-                Base256Compression keyContent = new Base256Compression(entry.getKey(), true);
-                try {
-                    baos.write(keyContent.getCompressedYear());
-                    baos.write(keyContent.getCompressedMonth());
-                    baos.write(keyContent.getCompressedDay());
-                } catch (StringIndexOutOfBoundsException exception) {
-                    writeUncompressedKey(baos, entry);
-                    log.error("We wrote this key uncompressed when compressed was specified " + entry.getKey(), exception);
-                }
-                if (entry.getValue() != null || entry.getValue().toString().isEmpty())
-                    try {
-                        baos.write(String.valueOf(entry.getValue()).getBytes(Charset.defaultCharset()));
-                    } catch (IOException ioe) {
-                        log.error("could not write out the Long value for frequency");
-                    }
+            for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
+                if (entry.getKey() == null || entry.getKey().isEmpty())
+                    continue;
                 
-                else
-                    baos.write('0');
-                baos.write('\u0000'); // null byte terminator
+                KeyValueParser parser = new KeyValueParser(entry.getKey());
+                byte[] yearBytes = parser.getYear();
+                CompressedMapKey compressedMapKey = new CompressedMapKey(entry.getKey(), yearBytes);
+                byte[] dayFrequencies;
+                // Build the compressedDateFrequencies object
+                if (compressedDateFrequencies.containsKey(compressedMapKey)) {
+                    dayFrequencies = compressedDateFrequencies.get(compressedMapKey);
+                    // Get the 366 x 4 byte array vector to hold frequencies
+                    // corresponding to the ordinal dates of the year.
+                    putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
+                    compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
+                } else {
+                    dayFrequencies = new byte[366 * 4];
+                    putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
+                    compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
+                }
+                
             }
+            /*
+             * for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) { Base256Compression keyContent = new
+             * Base256Compression(entry.getKey()); try { baos.write(keyContent.getCompressedYear()); baos.write(keyContent.getCompressedMonth());
+             * baos.write(keyContent.getCompressedDay()); } catch (StringIndexOutOfBoundsException exception) { writeUncompressedKey(baos, entry);
+             * log.error("We wrote this key uncompressed when compressed was specified " + entry.getKey(), exception); } if (entry.getValue() != null ||
+             * entry.getValue().toString().isEmpty()) try { baos.write(String.valueOf(entry.getValue()).getBytes(Charset.defaultCharset())); } catch
+             * (IOException ioe) { log.error("could not write out the Long value for frequency"); }
+             * 
+             * else baos.write('0'); baos.write('\u0000'); // null byte terminator }
+             */
         } else {
             for (Map.Entry<String,Integer> entry : dateToFrequencyValueMap.entrySet()) {
                 writeUncompressedKey(baos, entry);
@@ -81,6 +91,29 @@ public class DateFrequencyValue {
         baos.reset();
         
         return serializedMap;
+    }
+    
+    private void putFrequencyBytesInByteArray(KeyValueParser parser, Map.Entry<String,Integer> entry, byte[] dayFrequencies) {
+        byte[] frequency = Base256Compression.numToBytes(entry.getValue());
+        
+        int lenthOfFrequency = 0;
+        if (frequency != null) {
+            lenthOfFrequency = frequency.length;
+            
+        }
+        // null pad the 4 byte frequency slot if frequency size < 4
+        if (lenthOfFrequency < 4) {
+            int endPaddingIndex = 4 - lenthOfFrequency;
+            for (int i = 0; i < endPaddingIndex; i++) {
+                dayFrequencies[parser.ordinalDayOfYear.getDateOrdinal() + i] = '\u0000';
+            }
+        }
+        
+        int index = 0;
+        for (byte frequencyByte : frequency) {
+            dayFrequencies[parser.ordinalDayOfYear.getDateOrdinal() + index] = frequencyByte;
+            index++;
+        }
     }
     
     private void writeUncompressedKey(ByteArrayOutputStream baos, Map.Entry<String,Integer> entry) {
@@ -119,61 +152,69 @@ public class DateFrequencyValue {
         return dateFrequencyMap;
     }
     
+    private class KeyValueParser {
+        
+        private String keyValue;
+        private OrdinalDayOfYear ordinalDayOfYear;
+        
+        public KeyValueParser(String key) {
+            if (key == null) {
+                log.info("The key can't be null", new Exception());
+                keyValue = "1313";
+                ordinalDayOfYear = new OrdinalDayOfYear(keyValue);
+            }
+            keyValue = key;
+            if (keyValue != null) {
+                if (keyValue.length() >= 4)
+                    ordinalDayOfYear = new OrdinalDayOfYear(keyValue.substring(3));
+            } else {
+                ordinalDayOfYear = new OrdinalDayOfYear("1313");
+            }
+        }
+        
+        public byte[] getYear() {
+            int year = '\u0000';
+            try {
+                year = Integer.parseUnsignedInt(keyValue.substring(0, 4));
+                
+            } catch (NumberFormatException numberFormatException) {
+                log.error("the year could not be extract from ", keyValue, numberFormatException);
+            }
+            return Base256Compression.numToBytes(year);
+        }
+        
+    }
+    
+    public class OrdinalDayOfYear {
+        private String mmDD;
+        
+        public OrdinalDayOfYear(String monthDay) {
+            mmDD = monthDay;
+        }
+        
+        public int getDateOrdinal() {
+            if (mmDD.equals("1313")) // dummy date when mmDD was bad
+                return BADORDINAL;
+            else
+                return calculateOrdinal();
+        }
+        
+        private int calculateOrdinal() {
+            // TODO implement
+            return 100;
+        }
+        
+    }
+    
     /**
      * This is a helper class that will compress the yyyyMMdd and the frequency date concatenated to it without a delimiter
      */
     public static class Base256Compression {
         
         private String content;
-        private boolean doCompression = false;
-        private Base127Year year;
-        private Base127Month month;
-        private Base127Day day;
-        private Base127Frequency frequency;
         
-        public Base256Compression(String content, boolean compress) {
+        public Base256Compression(String content) {
             this.content = content;
-            doCompression = compress;
-            
-            if (doCompression) {
-                year = new Base127Year(content.substring(0, 3), doCompression);
-                month = new Base127Month(content.substring(4, 5), doCompression);
-                
-            } else {
-                year = new Base127Year((byte) content.charAt(0), doCompression);
-                month = new Base127Month((byte) content.charAt(1), doCompression);
-            }
-            
-        }
-        
-        public byte getCompressedYear() {
-            
-            byte abyte = year.yearByte;
-            return abyte;
-        }
-        
-        public byte getCompressedMonth() {
-            byte abyte = month.monthCompressed;
-            return abyte;
-        }
-        
-        public byte getCompressedDay() {
-            byte abyte = (byte) content.getBytes(Charset.defaultCharset())[7];
-            return abyte;
-        }
-        
-        public byte[] getCompressedFrequency() {
-            // byte[] tranformedValue = {(byte) (0)};
-            
-            String longValueString = String.valueOf(content).substring(7, content.length());
-            
-            /*
-             * try { if (longValueString != null) tranformedValue = numToBytes(Long.valueOf(longValueString)); } catch (Exception e) {
-             * log.info("DateFrequencyValue.getValue called numToBytes and it didn't work", e); }
-             */
-            
-            return longValueString.getBytes(Charset.defaultCharset());
-            
         }
         
         public static byte[] numToBytes(long num) {
@@ -190,10 +231,10 @@ public class DateFrequencyValue {
             }
         }
         
-        public static long bytesToLong(byte[] byteArray) {
-            long result = 0l;
+        public static int bytesToLong(byte[] byteArray) {
+            int result = 0;
             if (byteArray == null)
-                return 0l;
+                return 0;
             if (byteArray.length > 4)
                 return 2_147_483_647;
             
@@ -229,124 +270,37 @@ public class DateFrequencyValue {
             
             return result;
         }
+    }
+    
+    private class CompressedMapKey {
+        private String key;
         
-        private class Base127Month {
-            public byte monthCompressed;
-            public String monthExpanded;
-            public boolean doCompression;
-            
-            public Base127Month(byte value, boolean compress) {
-                if (value < 1 || value > 12) {
-                    log.error("Month out of Base127 encoded range");
-                }
-                monthCompressed = value;
-                monthExpanded = decode(value);
-                doCompression = compress;
-                
-            }
-            
-            public Base127Month(String value, boolean compress) {
-                if (value.length() != 2) {
-                    log.error("Month needs to be two characters to encode " + value);
-                }
-                monthCompressed = encode(value);
-                monthExpanded = value;
-            }
-            
-            public byte encode(String month) {
-                if (month.length() != 2) {
-                    log.error("Month needs to be two characters to encode " + month);
-                }
-                int nMonth = Integer.valueOf(month.charAt(1));
-                
-                if (month.charAt(0) == '1')
-                    nMonth += 10;
-                
-                return (byte) nMonth;
-                
-            }
-            
-            public String decode(byte month) {
-                if ((int) month < 1 || (int) month > 12) {
-                    log.error("Byte code for month is out of range");
-                    return "01";
-                }
-                
-                String decodeMonth = String.valueOf((int) month);
-                if ((int) month < 10)
-                    decodeMonth = "0" + decodeMonth;
-                
-                return decodeMonth;
-            }
-            
+        public CompressedMapKey(String key, byte[] compressedContent) {
+            this.key = key;
+            this.compressedContent = compressedContent;
         }
         
-        private class Base127Day {
-            public byte day;
-            
-            public Base127Day(byte value) {
-                if (value < 0 || value > 31)
-                    log.error("Day is out of range");
-            }
-            
-            public byte encode(String day) {
-                byte encDay = '\u0001';
-                return encDay;
-            }
-            
-            public String decode(byte day) {
-                String decodeDay = "01";
-                return decodeDay;
-            }
-            
+        private byte[] compressedContent;
+        
+        public String getKey() {
+            return key;
         }
         
-        private class Base127Year {
-            private byte yearByte;
-            private String yearStr = null;
-            private boolean compressed = false;
-            
-            private int BASE_YEAR = 1970;
-            
-            public Base127Year(byte compressedYear, boolean compress) {
-                if (compressedYear == '\u0000')
-                    log.error("Date value can't be set to null byte");
-                yearByte = compressedYear;
-                compressed = compress;
-                if (compressed)
-                    yearStr = decode(yearByte);
-            }
-            
-            public Base127Year(String uncompressedYear, boolean compress) {
-                yearStr = uncompressedYear;
-                if (compress)
-                    yearByte = encode(yearStr);
-                compressed = compress;
-            }
-            
-            public byte encode(String year) {
-                
-                if (year == null || year.length() != 4) {
-                    log.error("Need a four digit year. Encoding " + year + "failed.");
-                    return '\u0001';
-                    
-                }
-                int intYear = Integer.parseInt(year) - BASE_YEAR;
-                if (intYear < 1 || intYear > 127)
-                    log.error("Year is out of range and can't be encoded in a single byte");
-                
-                return (byte) intYear;
-            }
-            
-            public String decode(byte compressedYear) {
-                int year = BASE_YEAR + (int) compressedYear;
-                return String.valueOf(year);
-            }
-            
+        public void setKey(String key) {
+            this.key = key;
         }
         
-        private class Base127Frequency {
-            
+        public byte[] getCompressedContent() {
+            return compressedContent;
+        }
+        
+        public void setCompressedContent(byte[] compressedContent) {
+            this.compressedContent = compressedContent;
+        }
+        
+        @Override
+        public int hashCode() {
+            return key.hashCode();
         }
     }
     
