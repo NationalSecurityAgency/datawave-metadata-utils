@@ -33,7 +33,9 @@ public class DateFrequencyValue {
     // FrequencyFamilyCounter object to this classes serialize function
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
     private static int BADORDINAL = 367;
-    private static int DAYS_IN_LEAP_YEAR = 366;
+    private static int DAYS_IN_LEAP_YEAR = 6;
+    private static int MAX_YEARS = 10;
+    private static int NUM_BYTES_YR = 4;
     
     public DateFrequencyValue() {}
     
@@ -111,28 +113,14 @@ public class DateFrequencyValue {
     }
     
     private void putFrequencyBytesInByteArray(KeyValueParser parser, Map.Entry<String,Integer> entry, byte[] dayFrequencies) {
+        // This will always be 4 bytes now even if null it will get compressed later on.
         byte[] frequency = Base256Compression.numToBytes(entry.getValue());
-        
-        int lenthOfFrequency = 0;
-        if (frequency != null) {
-            lenthOfFrequency = frequency.length;
-            
-        }
-        
         int dateOrdinal = parser.ordinalDayOfYear.getDateOrdinal();
         
         if (dateOrdinal == BADORDINAL) {
             log.error("There is a bad MMDD value in the date " + parser.ordinalDayOfYear.mmDD, new Exception());
             return;
         }
-        // null pad the 4 byte frequency slot if frequency size < 4
-        if (lenthOfFrequency < 4) {
-            int endPaddingIndex = 4 - lenthOfFrequency;
-            for (int i = 0; i < endPaddingIndex; i++) {
-                dayFrequencies[dateOrdinal + i] = '\u0000';
-            }
-        }
-        
         int index = 0;
         for (byte frequencyByte : frequency) {
             dayFrequencies[dateOrdinal + index] = frequencyByte;
@@ -143,7 +131,7 @@ public class DateFrequencyValue {
     public HashMap<String,Integer> deserialize(Value oldValue) {
         
         // 10 years of of frequency counts
-        byte[] readBuffer = new byte[10 * 2 + DAYS_IN_LEAP_YEAR * 10];
+        byte[] readBuffer = new byte[MAX_YEARS * 4 + DAYS_IN_LEAP_YEAR * MAX_YEARS];
         
         HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
@@ -191,11 +179,11 @@ public class DateFrequencyValue {
         try {
             for (int i = 0; i < read; i += (2 + DAYS_IN_LEAP_YEAR * 4)) {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1]};
-                int decodedYear = Base256Compression.bytesToLong(encodedYear);
+                int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 for (int j = 0; j < DAYS_IN_LEAP_YEAR + 1; j += 4) {
                     int k = i + j;
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
-                    int decodedFrequencyOnDay = Base256Compression.bytesToLong(encodedfrequencyOnDay);
+                    int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
                         
                         dateFrequencyMap.put(decodedYear + "-" + j + 1, decodedFrequencyOnDay);
@@ -279,19 +267,19 @@ public class DateFrequencyValue {
         
         public static byte[] numToBytes(long num) {
             if (num == 0) {
-                return new byte[] {};
+                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) '\u0000', (byte) '\u0000'};
             } else if (num < 256) {
-                return new byte[] {(byte) (num)};
+                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) '\u0000', (byte) (num)};
             } else if (num < 65536) {
-                return new byte[] {(byte) (num >>> 8), (byte) num};
+                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) (num >>> 8), (byte) num};
             } else if (num < 16777216) {
-                return new byte[] {(byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
+                return new byte[] {(byte) '\u0000', (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
             } else { // up to 2,147,483,647
                 return new byte[] {(byte) (num >>> 24), (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
             }
         }
         
-        public static int bytesToLong(byte[] byteArray) {
+        public static int bytesToInteger(byte[] byteArray) {
             int result = 0;
             if (byteArray == null)
                 return 0;
@@ -299,8 +287,6 @@ public class DateFrequencyValue {
                 return 2_147_483_647;
             
             if (byteArray.length == 1) {
-                // TODO need to program a tranform from Binary twos complement or this can
-                // be interpreted as a negative number if highest bit is one.
                 if (byteArray[0] > 0 && byteArray[0] < 128)
                     return byteArray[0];
                 else {
