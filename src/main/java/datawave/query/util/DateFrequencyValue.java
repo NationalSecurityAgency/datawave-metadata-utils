@@ -4,11 +4,15 @@ import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
@@ -22,13 +26,14 @@ import java.util.Map;
 public class DateFrequencyValue {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
-
-    //An intermediate data structure build up by iterating through uncompressDateFrequencies
+    
+    // An intermediate data structure build up by iterating through uncompressDateFrequencies
     private HashMap<CompressedMapKey,byte[]> compressedDateFrequencies = new HashMap<>();
-    //The mapping of SimpleDateFormat strings to frequency counts.  This is passed in by the
-    //FrequencyFamilyCounter object to this classes serialize function
+    // The mapping of SimpleDateFormat strings to frequency counts. This is passed in by the
+    // FrequencyFamilyCounter object to this classes serialize function
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
     private static int BADORDINAL = 367;
+    private static int DAYS_IN_LEAP_YEAR = 366;
     
     public DateFrequencyValue() {}
     
@@ -43,7 +48,6 @@ public class DateFrequencyValue {
         Value serializedMap;
         uncompressedDateFrequencies = dateToFrequencyValueMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        baos.reset();
         
         if (compress) {
             for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
@@ -62,36 +66,46 @@ public class DateFrequencyValue {
                     putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                     compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
                 } else {
-                    dayFrequencies = new byte[366 * 4];
+                    dayFrequencies = new byte[DAYS_IN_LEAP_YEAR * 4];
                     putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                     compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
                 }
                 
             }
-            /*
-             * for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) { Base256Compression keyContent = new
-             * Base256Compression(entry.getKey()); try { baos.write(keyContent.getCompressedYear()); baos.write(keyContent.getCompressedMonth());
-             * baos.write(keyContent.getCompressedDay()); } catch (StringIndexOutOfBoundsException exception) { writeUncompressedKey(baos, entry);
-             * log.error("We wrote this key uncompressed when compressed was specified " + entry.getKey(), exception); } if (entry.getValue() != null ||
-             * entry.getValue().toString().isEmpty()) try { baos.write(String.valueOf(entry.getValue()).getBytes(Charset.defaultCharset())); } catch
-             * (IOException ioe) { log.error("could not write out the Long value for frequency"); }
-             * 
-             * else baos.write('0'); baos.write('\u0000'); // null byte terminator }
-             */
-        } else {
-            for (Map.Entry<String,Integer> entry : dateToFrequencyValueMap.entrySet()) {
-                writeUncompressedKey(baos, entry);
-                baos.write(Long.valueOf(entry.getValue()).byteValue());
-                baos.write('\u0000');
+            
+            GZIPOutputStream outputStream;
+            
+            try {
+                outputStream = new GZIPOutputStream(baos);
+            } catch (IOException ioException) {
+                log.info("The zipped output stream could not be created", ioException);
+                return new Value("Error Compressing Value");
                 
+            }
+            
+            // Iterate through the compressed object map and push out to the byte stream
+            for (Map.Entry<CompressedMapKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
+                log.info("Compressing key: " + entry.getKey().key + " value" + entry.getValue() + "Byte array " + entry.getValue());
+                try {
+                    outputStream.write(entry.getKey().compressedContent);
+                    outputStream.write(entry.getValue());
+                    
+                } catch (IOException ioException) {
+                    log.error("There was an error writing compressed map to output stream", new Exception());
+                }
+            }
+            
+            try {
+                outputStream.close();
+            } catch (IOException ioException) {
+                log.info("Could not close Zip output stream - Error compressing DateFrequencyValue", ioException);
+                return new Value("Error closing Zip output stream while compressing DateFrequencyValue");
             }
         }
         
         serializedMap = new Value(baos.toByteArray());
         
         log.info("DateFrequencyValue.serialize compressed date value to byte size of " + baos.toByteArray().length);
-        
-        baos.reset();
         
         return serializedMap;
     }
@@ -104,52 +118,94 @@ public class DateFrequencyValue {
             lenthOfFrequency = frequency.length;
             
         }
+        
+        int dateOrdinal = parser.ordinalDayOfYear.getDateOrdinal();
+        
+        if (dateOrdinal == BADORDINAL) {
+            log.error("There is a bad MMDD value in the date " + parser.ordinalDayOfYear.mmDD, new Exception());
+            return;
+        }
         // null pad the 4 byte frequency slot if frequency size < 4
         if (lenthOfFrequency < 4) {
             int endPaddingIndex = 4 - lenthOfFrequency;
             for (int i = 0; i < endPaddingIndex; i++) {
-                dayFrequencies[parser.ordinalDayOfYear.getDateOrdinal() + i] = '\u0000';
+                dayFrequencies[dateOrdinal + i] = '\u0000';
             }
         }
         
         int index = 0;
         for (byte frequencyByte : frequency) {
-            dayFrequencies[parser.ordinalDayOfYear.getDateOrdinal() + index] = frequencyByte;
+            dayFrequencies[dateOrdinal + index] = frequencyByte;
             index++;
-        }
-    }
-    
-    private void writeUncompressedKey(ByteArrayOutputStream baos, Map.Entry<String,Integer> entry) {
-        try {
-            baos.write(entry.getKey().getBytes(Charset.defaultCharset()));
-        } catch (IOException ioe) {
-            log.error("The key could not be serialized: " + entry.getKey());
         }
     }
     
     public HashMap<String,Integer> deserialize(Value oldValue) {
         
+        // 10 years of of frequency counts
+        byte[] readBuffer = new byte[10 * 2 + DAYS_IN_LEAP_YEAR * 10];
+        
         HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
-        if (oldValue == null || oldValue.toString().isEmpty())
+        if (oldValue == null || oldValue.toString().isEmpty()) {
+            log.error("The datefrequency value was empty");
+            dateFrequencyMap.put("Error", 0);
             return dateFrequencyMap;
+        }
         
-        String[] kvps = oldValue.toString().split("\u0000");
+        ByteArrayInputStream arrayInputStream = new ByteArrayInputStream(oldValue.get());
+        GZIPInputStream inputStream;
+        try {
+            inputStream = new GZIPInputStream(arrayInputStream);
+        } catch (IOException ioException) {
+            log.error("Error creating input stream during deserialization ", ioException);
+            dateFrequencyMap.put("Error", 0);
+            return dateFrequencyMap;
+        }
         
-        for (String kvp : kvps) {
-            Integer deserializedFrequency;
-            
-            try {
-                log.info("deserialize is attempting to cast this value to Long " + kvp.substring(3));
-                deserializedFrequency = Integer.valueOf(kvp.substring(3));
+        int read = 0;
+        try {
+            read = inputStream.read(readBuffer, 0, readBuffer.length);
+        } catch (IOException ioException) {
+            log.error("Error creating input stream during deserialization ", ioException);
+            dateFrequencyMap.put("Error reading compressed input stream", 0);
+            return dateFrequencyMap;
+        }
+        
+        try {
+            inputStream.close();
+        } catch (IOException ioException) {
+            log.info("Error creating input stream during deserialization ", ioException);
+            dateFrequencyMap.put("Error closing compressed input stream", 0);
+        }
+        // Should hold the original (reconstructed) data
+        byte[] expandedData = Arrays.copyOf(readBuffer, read);
+        
+        // Decode the bytes into a String
+        try {
+            String message = new String(expandedData, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            log.error("Error creating input stream during deserialization ", e);
+            dateFrequencyMap.put("Could not decode value to UTF-8", 0);
+        }
+        
+        try {
+            for (int i = 0; i < read; i += (2 + DAYS_IN_LEAP_YEAR * 4)) {
+                byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1]};
+                int decodedYear = Base256Compression.bytesToLong(encodedYear);
+                for (int j = 0; j < DAYS_IN_LEAP_YEAR + 1; j += 4) {
+                    int k = i + j;
+                    byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
+                    int decodedFrequencyOnDay = Base256Compression.bytesToLong(encodedfrequencyOnDay);
+                    if (decodedFrequencyOnDay != 0) {
+                        
+                        dateFrequencyMap.put(decodedYear + "-" + j + 1, decodedFrequencyOnDay);
+                        log.info("put key value pair in SimpleDateFrequency map" + decodedYear + "-" + decodedFrequencyOnDay);
+                    }
+                }
                 
-            } catch (NumberFormatException numberFormatException) {
-                deserializedFrequency = 0;
-                log.info("The frequency for kvp " + kvp + " could not be dertermined by Long.valueof");
-                log.error("The value " + kvp.substring(3) + " could not be deserialized properly", numberFormatException);
             }
-            
-            dateFrequencyMap.put(kvp.substring(0, 2), deserializedFrequency);
-            
+        } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
+            log.error("Error decoding the compressed array of date values.");
         }
         
         return dateFrequencyMap;
@@ -205,7 +261,7 @@ public class DateFrequencyValue {
         
         private int calculateOrdinal() {
             // TODO implement
-            return 20;
+            return 0;
         }
         
     }
@@ -305,6 +361,12 @@ public class DateFrequencyValue {
         @Override
         public int hashCode() {
             return key.hashCode();
+        }
+    }
+    
+    public void dumpCompressedDateFrequencies() {
+        for (Map.Entry<CompressedMapKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
+            System.out.println(entry.getKey().key + ":" + entry.getKey().compressedContent + "Byte array " + entry.getValue());
         }
     }
     
