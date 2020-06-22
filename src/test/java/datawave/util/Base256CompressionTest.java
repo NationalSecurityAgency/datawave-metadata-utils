@@ -22,7 +22,7 @@ public class Base256CompressionTest {
     @Test
     public void nullBytePrefixedByteArrayTest() {
         byte[] testArray = {'\u0000', '\u0000', '\u0001', '\u0001'};
-        int result = DateFrequencyValue.Base256Compression.bytesToLong(testArray);
+        int result = DateFrequencyValue.Base256Compression.bytesToInteger(testArray);
         Assert.assertTrue(result == 257);
     }
     
@@ -40,7 +40,7 @@ public class Base256CompressionTest {
             }
         }
         
-        long inverseResult = DateFrequencyValue.Base256Compression.bytesToLong(result);
+        int inverseResult = DateFrequencyValue.Base256Compression.bytesToInteger(result);
         
         if (inverseResult != example) {
             System.out.println("Decode did not decode example for " + example + " and decoded" + inverseResult);
