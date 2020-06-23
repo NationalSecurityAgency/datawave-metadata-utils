@@ -34,9 +34,10 @@ public class DateFrequencyValue {
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
     private static int BADORDINAL = 367;
     private static int DAYS_IN_LEAP_YEAR = 366;
-    private static int MAX_YEARS = 1;
+    private static int MAX_YEARS = 2;
     private static int NUM_BYTES_YR = 4;
     static int TEST_ORDINAL = 0;
+    private static String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
     private byte[] compressedDateFrequencyMapBytes = null;
     
@@ -72,6 +73,7 @@ public class DateFrequencyValue {
                 putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
             } else {
+                log.info("Allocating and array of byte frequencies for year " + compressedMapKey.getKey());
                 dayFrequencies = new byte[DAYS_IN_LEAP_YEAR * 4];
                 putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
@@ -207,7 +209,7 @@ public class DateFrequencyValue {
     }
     
     private class KeyParser {
-        
+        // Assuming YYYYMMDD SimpleDateFormat
         private String keyValue;
         private OrdinalDayOfYear ordinalDayOfYear;
         
@@ -220,7 +222,7 @@ public class DateFrequencyValue {
             keyValue = key;
             if (keyValue != null) {
                 if (keyValue.length() >= 4)
-                    ordinalDayOfYear = new OrdinalDayOfYear(keyValue.substring(3));
+                    ordinalDayOfYear = new OrdinalDayOfYear(keyValue.substring(0, 4));
             } else {
                 ordinalDayOfYear = new OrdinalDayOfYear("1313");
                 log.error("Bad ordinal mmDD value");
@@ -230,7 +232,7 @@ public class DateFrequencyValue {
         public byte[] getYearBytes() {
             int year = '\u0000';
             try {
-                String yearStr = keyValue.substring(4);
+                String yearStr = keyValue.substring(0, 4);
                 year = Integer.parseUnsignedInt(yearStr);
                 
             } catch (NumberFormatException numberFormatException) {
@@ -240,16 +242,22 @@ public class DateFrequencyValue {
         }
         
         public String getYear() {
-            return keyValue.substring(4);
+            return keyValue.substring(0, 4);
         }
         
     }
     
     public class OrdinalDayOfYear {
         private String mmDD;
+        private boolean isInLeapYear;
+        
+        public boolean isInLeapYear() {
+            return isInLeapYear;
+        }
         
         public OrdinalDayOfYear(String monthDay) {
             mmDD = monthDay;
+            isInLeapYear = isLeapYear(mmDD);
         }
         
         public int getDateOrdinal() {
@@ -358,6 +366,10 @@ public class DateFrequencyValue {
     
     public byte[] getCompressedDateFrequencyMapBytes() {
         return compressedDateFrequencyMapBytes;
+    }
+    
+    private static boolean isLeapYear(String yyyy) {
+        return Arrays.asList(LEAP_YEARS).contains(yyyy);
     }
     
 }
