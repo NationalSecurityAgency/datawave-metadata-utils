@@ -37,6 +37,7 @@ public class DateFrequencyValue {
     private static int DAYS_IN_LEAP_YEAR = 366;
     private static int MAX_YEARS = 1;
     private static int NUM_BYTES_YR = 4;
+    static int TEST_ORDINAL = 0;
     
     private byte[] compressedDateFrequencyMapBytes = null;
     
@@ -53,7 +54,7 @@ public class DateFrequencyValue {
         Value serializedMap;
         uncompressedDateFrequencies = dateToFrequencyValueMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        GZIPOutputStream outputStream = null;
+        GZIPOutputStream outputStream;
         int uncompressedLength = 0;
         
         if (compress) {
@@ -270,17 +271,7 @@ public class DateFrequencyValue {
     public static class Base256Compression {
         
         public static byte[] numToBytes(long num) {
-            if (num == 0) {
-                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) '\u0000', (byte) '\u0000'};
-            } else if (num < 256) {
-                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) '\u0000', (byte) (num)};
-            } else if (num < 65536) {
-                return new byte[] {(byte) '\u0000', (byte) '\u0000', (byte) (num >>> 8), (byte) num};
-            } else if (num < 16777216) {
-                return new byte[] {(byte) '\u0000', (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
-            } else { // up to 2,147,483,647
-                return new byte[] {(byte) (num >>> 24), (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
-            }
+            return new byte[] {(byte) (num >>> 24), (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
         }
         
         public static int bytesToInteger(byte[] byteArray) {

@@ -11,7 +11,7 @@ public class Base256CompressionTest {
     @Test
     public void encodeThenDecodeTest() {
         
-        for (int example = 1_950_000_000; example < 2_147_483_647; example++) {
+        for (int example = 0; example < 2_147_483_647; example++) {
             encodeThenDecode(example, false);
         }
         
