@@ -62,8 +62,7 @@ public class DateFrequencyValue {
                 continue;
             
             KeyParser parser = new KeyParser(entry.getKey());
-            byte[] yearBytes = parser.getYearBytes();
-            YearKey compressedMapKey = new YearKey(parser.getYear(), yearBytes);
+            YearKey compressedMapKey = new YearKey(parser.getYear(), parser.getYearBytes());
             byte[] dayFrequencies;
             // Build the compressedDateFrequencies object
             if (compressedDateFrequencies.containsKey(compressedMapKey)) {
@@ -139,7 +138,7 @@ public class DateFrequencyValue {
     public HashMap<String,Integer> deserialize(Value oldValue) {
         
         // 10 years of of frequency counts
-        byte[] readBuffer = new byte[MAX_YEARS * NUM_BYTES_YR + DAYS_IN_LEAP_YEAR * MAX_YEARS];
+        byte[] readBuffer = new byte[MAX_YEARS * NUM_BYTES_YR * 4 + DAYS_IN_LEAP_YEAR * MAX_YEARS * 4];
         
         HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
