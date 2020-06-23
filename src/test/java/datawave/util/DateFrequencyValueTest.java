@@ -1,11 +1,13 @@
 package datawave.util;
 
 import datawave.query.util.DateFrequencyValue;
+import org.apache.accumulo.core.data.Value;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class DateFrequencyValueTest {
     DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
@@ -25,6 +27,12 @@ public class DateFrequencyValueTest {
     public void DateFrequencyValueTest() {
         dateFrequencyValue.serialize(dateFrequencyUncompressed, true);
         dateFrequencyValue.dumpCompressedDateFrequencies();
+        byte[] compressedMapBytes = dateFrequencyValue.getCompressedDateFrequencyMapBytes();
+        Value accumlo_value = new Value(compressedMapBytes);
+        HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value);
+        for (Map.Entry<String,Integer> entry : restored.entrySet()) {
+            System.out.println("key is: " + entry.getKey() + " value is: " + entry.getValue());
+        }
         
     }
     
