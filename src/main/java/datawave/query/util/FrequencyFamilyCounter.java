@@ -61,9 +61,9 @@ public class FrequencyFamilyCounter {
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
     
-    public void aggregateRecord(String key, String value, boolean compressKey) {
+    public void aggregateRecord(String key, String value) {
         
-        insertIntoMap(key, value, compressKey);
+        insertIntoMap(key, value);
     }
     
     /**
@@ -72,7 +72,7 @@ public class FrequencyFamilyCounter {
      * @param key
      * @param value
      */
-    public void insertIntoMap(String key, String value, boolean compressKey) {
+    public void insertIntoMap(String key, String value) {
         int parsedLong;
         String cleanKey = "null";
         

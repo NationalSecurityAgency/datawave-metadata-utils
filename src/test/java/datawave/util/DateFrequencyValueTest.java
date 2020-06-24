@@ -20,14 +20,14 @@ public class DateFrequencyValueTest {
     @Before
     public void initialize() {
         dateFrequencyUncompressed = new HashMap<>();
-        dateFrequencyUncompressed.put("20190120", 1192919929);
-        dateFrequencyUncompressed.put("20190121", Integer.MAX_VALUE);
+        dateFrequencyUncompressed.put("20190102", 1192919929);
+        dateFrequencyUncompressed.put("20190109", Integer.MAX_VALUE);
         dateFrequencyUncompressed.put("20190122", 2_000_000_000);
         dateFrequencyUncompressed.put("20190123", 255);
-        dateFrequencyUncompressed.put("20200120", 1192919929);
-        dateFrequencyUncompressed.put("20200121", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20200122", 2_000_000_000);
-        dateFrequencyUncompressed.put("20200123", 255);
+        dateFrequencyUncompressed.put("20200202", 1192919929);
+        dateFrequencyUncompressed.put("20200209", Integer.MAX_VALUE);
+        dateFrequencyUncompressed.put("20200222", 2_000_000_000);
+        dateFrequencyUncompressed.put("20200223", 255);
         
     }
     
@@ -36,11 +36,15 @@ public class DateFrequencyValueTest {
         dateFrequencyValue.serialize(dateFrequencyUncompressed, true);
         dateFrequencyValue.dumpCompressedDateFrequencies();
         byte[] compressedMapBytes = dateFrequencyValue.getCompressedDateFrequencyMapBytes();
+        Assert.assertTrue(compressedMapBytes != null);
         Value accumlo_value = new Value(compressedMapBytes);
         HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value);
         for (Map.Entry<String,Integer> entry : restored.entrySet()) {
             log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
+        
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 8);
+        Assert.assertTrue(restored.size() == 8);
         
     }
     

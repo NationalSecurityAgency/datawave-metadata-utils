@@ -32,12 +32,10 @@ public class DateFrequencyValue {
     // The mapping of SimpleDateFormat strings to frequency counts. This is passed in by the
     // FrequencyFamilyCounter object to this classes serialize function
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
-    private static int BADORDINAL = 367;
-    private static int DAYS_IN_LEAP_YEAR = 366;
+    
+    public static final int DAYS_IN_LEAP_YEAR = 366;
     private static int MAX_YEARS = 2;
     private static int NUM_BYTES_YR = 4;
-    static int TEST_ORDINAL = 0;
-    private static String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
     private byte[] compressedDateFrequencyMapBytes = null;
     
@@ -122,10 +120,11 @@ public class DateFrequencyValue {
     private void putFrequencyBytesInByteArray(KeyParser parser, Map.Entry<String,Integer> entry, byte[] dayFrequencies) {
         // This will always be 4 bytes now even if null it will get compressed later on.
         byte[] frequency = Base256Compression.numToBytes(entry.getValue());
-        int dateOrdinal = parser.ordinalDayOfYear.getDateOrdinal();
+        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(parser.keyValue.substring(4), parser.getYear());
+        int dateOrdinal = ordinalDayOfYear.getOrdinalDay();
         
-        if (dateOrdinal == BADORDINAL) {
-            log.error("There is a bad MMDD value in the date " + parser.ordinalDayOfYear.mmDD, new Exception());
+        if (dateOrdinal > DAYS_IN_LEAP_YEAR) {
+            log.error("There is a bad MMDD value in the date " + ordinalDayOfYear.getMmDD(), new Exception());
             return;
         }
         int index = 0;
@@ -193,8 +192,8 @@ public class DateFrequencyValue {
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
-                        
-                        dateFrequencyMap.put(decodedYear + "-" + j + 1, decodedFrequencyOnDay);
+                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / 4 - 1, decodedYear);
+                        dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
                         log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + "-" + decodedFrequencyOnDay);
                     }
                 }
@@ -210,22 +209,14 @@ public class DateFrequencyValue {
     private class KeyParser {
         // Assuming YYYYMMDD SimpleDateFormat
         private String keyValue;
-        private OrdinalDayOfYear ordinalDayOfYear;
         
         public KeyParser(String key) {
             if (key == null) {
                 log.info("The key can't be null", new Exception());
                 keyValue = "1313";
-                ordinalDayOfYear = new OrdinalDayOfYear(keyValue);
             }
             keyValue = key;
-            if (keyValue != null) {
-                if (keyValue.length() >= 4)
-                    ordinalDayOfYear = new OrdinalDayOfYear(keyValue.substring(0, 4));
-            } else {
-                ordinalDayOfYear = new OrdinalDayOfYear("1313");
-                log.error("Bad ordinal mmDD value");
-            }
+            
         }
         
         public byte[] getYearBytes() {
@@ -242,33 +233,6 @@ public class DateFrequencyValue {
         
         public String getYear() {
             return keyValue.substring(0, 4);
-        }
-        
-    }
-    
-    public class OrdinalDayOfYear {
-        private String mmDD;
-        private boolean isInLeapYear;
-        
-        public boolean isInLeapYear() {
-            return isInLeapYear;
-        }
-        
-        public OrdinalDayOfYear(String monthDay) {
-            mmDD = monthDay;
-            isInLeapYear = isLeapYear(mmDD);
-        }
-        
-        public int getDateOrdinal() {
-            if (mmDD.equals("1313")) // dummy date when mmDD was bad
-                return BADORDINAL;
-            else
-                return calculateOrdinal();
-        }
-        
-        private int calculateOrdinal() {
-            // TODO implement
-            return TEST_ORDINAL++;
         }
         
     }
@@ -365,10 +329,6 @@ public class DateFrequencyValue {
     
     public byte[] getCompressedDateFrequencyMapBytes() {
         return compressedDateFrequencyMapBytes;
-    }
-    
-    private static boolean isLeapYear(String yyyy) {
-        return Arrays.asList(LEAP_YEARS).contains(yyyy);
     }
     
 }
