@@ -247,42 +247,9 @@ public class DateFrequencyValue {
         }
         
         public static int bytesToInteger(byte[] byteArray) {
-            int result = 0;
-            if (byteArray == null)
-                return 0;
-            if (byteArray.length > 4)
-                return 2_147_483_647;
-            
-            if (byteArray.length == 1) {
-                if (byteArray[0] > 0 && byteArray[0] < 128)
-                    return byteArray[0];
-                else {
-                    return byteArray[0] & 0xFF;
-                }
-                
-            }
-            
-            int numBytes = byteArray.length;
-            int bitShifts = numBytes * 8 - 8;
-            long addToResult;
-            
-            for (byte aByte : byteArray) {
-                
-                if (aByte < 0)
-                    aByte = (byte) (256 + aByte);
-                
-                addToResult = ((long) aByte & 0xFF) << bitShifts;
-                
-                if (addToResult < 0)
-                    addToResult = -addToResult;
-                
-                result += (addToResult);
-                bitShifts -= 8;
-                
-            }
-            
-            return result;
+            return ((int) byteArray[0] & 0xff) << 24 | ((int) byteArray[1] & 0xff) << 16 | ((int) byteArray[2] & 0xff) << 8 | ((int) byteArray[3] & 0xff);
         }
+        
     }
     
     private class YearKey {
