@@ -22,10 +22,13 @@ public class DateFrequencyValueTest {
         dateFrequencyUncompressed = new HashMap<>();
         
         dateFrequencyUncompressed.put("20200101", 1);
+        dateFrequencyUncompressed.put("20200102", 2);
         dateFrequencyUncompressed.put("20200131", 31);
         dateFrequencyUncompressed.put("20200229", Integer.MAX_VALUE);
         dateFrequencyUncompressed.put("20200301", 1000);
+        
         dateFrequencyUncompressed.put("20190101", 1);
+        dateFrequencyUncompressed.put("20190102", 2);
         dateFrequencyUncompressed.put("20190131", 31);
         dateFrequencyUncompressed.put("20190228", 2000);
         dateFrequencyUncompressed.put("20190301", 3000);
@@ -48,8 +51,8 @@ public class DateFrequencyValueTest {
             log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 8);
-        Assert.assertTrue(restored.size() == 8);
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 10);
+        Assert.assertTrue(restored.size() == 10);
         
     }
     
