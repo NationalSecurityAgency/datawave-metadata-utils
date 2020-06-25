@@ -9,7 +9,6 @@ public class OrdinalDayOfYear {
     private String mmDD;
     private boolean isInLeapYear;
     private int ordinalDay;
-    public static int TEST_ORDINAL = 0;
     public static String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
     private static final Logger log = LoggerFactory.getLogger(OrdinalDayOfYear.class);
@@ -36,7 +35,7 @@ public class OrdinalDayOfYear {
     private int calculateOrdinal() {
         String month = mmDD.substring(0, 2);
         String day = mmDD.substring(2);
-        Integer ordinal = 0;
+        Integer ordinal = 1;
         if (month.equals("01")) {
             ordinal += dayOfMonthToInteger(day);
             return ordinal;
@@ -48,10 +47,7 @@ public class OrdinalDayOfYear {
             ordinal += dayOfMonthToInteger(day);
             return ordinal;
         }
-        ordinal += 28; // Add all the days in non leap Feb
-        
-        if (isInLeapYear) // Add another if Leap year
-            ordinal++;
+        ordinal += 29; // Add all the days in non leap Feb
         
         if (month.equals("03")) {
             ordinal += dayOfMonthToInteger(day);
@@ -145,13 +141,12 @@ public class OrdinalDayOfYear {
     }
     
     private String calculateMMDD(int ordinal) {
-        if ((ordinal > 366 && isInLeapYear) || (ordinal > 365 && !isInLeapYear))
+        if (ordinal > 366)
             log.error("The ordinal is out of range" + ordinal);
         
         int remainingPossibleOrdinals = ordinal;
-        String monthAndDay;
         
-        if (ordinal - 31 < 0) // You are in January
+        if (ordinal - 31 <= 0) // You are in January
         {
             String month = "01";
             buildMMDD(ordinal, month);
@@ -161,7 +156,7 @@ public class OrdinalDayOfYear {
         remainingPossibleOrdinals -= 31;
         
         if (!isInLeapYear) {
-            if (remainingPossibleOrdinals - 28 < 0) // Ordinal is in February
+            if (remainingPossibleOrdinals - 28 <= 0) // Ordinal is in February
             {
                 String month = "02";
                 buildMMDD(remainingPossibleOrdinals, month);
@@ -169,7 +164,7 @@ public class OrdinalDayOfYear {
                 
             }
         } else {
-            if (remainingPossibleOrdinals - 29 < 0) // Ordinal is in February
+            if (remainingPossibleOrdinals - 29 <= 0) // Ordinal is in February
             {
                 String month = "02";
                 buildMMDD(remainingPossibleOrdinals, month);
@@ -177,12 +172,9 @@ public class OrdinalDayOfYear {
             }
         }
         
-        remainingPossibleOrdinals -= 28;
+        remainingPossibleOrdinals -= 29;
         
-        if (isInLeapYear)
-            remainingPossibleOrdinals--;
-        
-        if (remainingPossibleOrdinals - 31 < 0) // You are in March
+        if (remainingPossibleOrdinals - 31 <= 0) // You are in March
         {
             String month = "03";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -191,7 +183,7 @@ public class OrdinalDayOfYear {
         }
         remainingPossibleOrdinals -= 31;
         
-        if (remainingPossibleOrdinals - 30 < 0) // You are in April
+        if (remainingPossibleOrdinals - 30 <= 0) // You are in April
         {
             String month = "04";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -200,7 +192,7 @@ public class OrdinalDayOfYear {
         }
         remainingPossibleOrdinals -= 30;
         
-        if (remainingPossibleOrdinals - 31 < 0) // You are in May
+        if (remainingPossibleOrdinals - 31 <= 0) // You are in May
         {
             String month = "05";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -210,7 +202,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 31;
         
-        if (remainingPossibleOrdinals - 30 < 0) // You are in June
+        if (remainingPossibleOrdinals - 30 <= 0) // You are in June
         {
             String month = "06";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -219,7 +211,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 30;
         
-        if (remainingPossibleOrdinals - 31 < 0) // You are in July
+        if (remainingPossibleOrdinals - 31 <= 0) // You are in July
         {
             String month = "07";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -228,7 +220,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 31;
         
-        if (remainingPossibleOrdinals - 30 < 0) // You are in August
+        if (remainingPossibleOrdinals - 30 <= 0) // You are in August
         {
             String month = "08";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -237,7 +229,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 30;
         
-        if (remainingPossibleOrdinals - 30 < 0) // You are in Sept
+        if (remainingPossibleOrdinals - 30 <= 0) // You are in Sept
         {
             String month = "09";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -246,7 +238,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 30;
         
-        if (remainingPossibleOrdinals - 31 < 0) // You are in Oct
+        if (remainingPossibleOrdinals - 31 <= 0) // You are in Oct
         {
             String month = "10";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -255,7 +247,7 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 31;
         
-        if (remainingPossibleOrdinals - 30 < 0) // You are in Nov
+        if (remainingPossibleOrdinals - 30 <= 0) // You are in Nov
         {
             String month = "11";
             buildMMDD(remainingPossibleOrdinals, month);
@@ -264,9 +256,9 @@ public class OrdinalDayOfYear {
         
         remainingPossibleOrdinals -= 30;
         
-        if (remainingPossibleOrdinals - 31 < 0) // You are in Dec
+        if (remainingPossibleOrdinals - 31 <= 0) // You are in Dec
         {
-            String month = "11";
+            String month = "12";
             buildMMDD(remainingPossibleOrdinals, month);
             return mmDD;
         }
