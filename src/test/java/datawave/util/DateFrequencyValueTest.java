@@ -20,14 +20,19 @@ public class DateFrequencyValueTest {
     @Before
     public void initialize() {
         dateFrequencyUncompressed = new HashMap<>();
-        dateFrequencyUncompressed.put("20190102", 1192919929);
-        dateFrequencyUncompressed.put("20190109", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20190122", 2_000_000_000);
-        dateFrequencyUncompressed.put("20190123", 255);
-        dateFrequencyUncompressed.put("20200202", 1192919929);
-        dateFrequencyUncompressed.put("20200209", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20200222", 2_000_000_000);
-        dateFrequencyUncompressed.put("20200223", 255);
+        
+        dateFrequencyUncompressed.put("20200101", 1);
+        dateFrequencyUncompressed.put("20200131", 31);
+        dateFrequencyUncompressed.put("20200229", Integer.MAX_VALUE);
+        dateFrequencyUncompressed.put("20200301", 1000);
+        dateFrequencyUncompressed.put("20190101", 1);
+        dateFrequencyUncompressed.put("20190131", 31);
+        dateFrequencyUncompressed.put("20190228", 2000);
+        dateFrequencyUncompressed.put("20190301", 3000);
+        // dateFrequencyUncompressed.put("20190330", 1130);
+        // dateFrequencyUncompressed.put("20200330", 1130);
+        // dateFrequencyUncompressed.put("20191231", 365);
+        // dateFrequencyUncompressed.put("20201231", 366);
         
     }
     

@@ -35,7 +35,8 @@ public class DateFrequencyValue {
     
     public static final int DAYS_IN_LEAP_YEAR = 366;
     private static int MAX_YEARS = 2;
-    private static int NUM_BYTES_YR = 4;
+    private static int NUM_YEAR_BYTES = 4;
+    private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * 4;
     
     private byte[] compressedDateFrequencyMapBytes = null;
     
@@ -71,7 +72,7 @@ public class DateFrequencyValue {
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
             } else {
                 log.info("Allocating and array of byte frequencies for year " + compressedMapKey.getKey());
-                dayFrequencies = new byte[DAYS_IN_LEAP_YEAR * 4];
+                dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
                 putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
             }
@@ -128,16 +129,20 @@ public class DateFrequencyValue {
             return;
         }
         int index = 0;
-        for (byte frequencyByte : frequency) {
-            dayFrequencies[dateOrdinal * 4 + index] = frequencyByte;
-            index++;
+        try {
+            for (byte frequencyByte : frequency) {
+                dayFrequencies[dateOrdinal * 4 + index] = frequencyByte;
+                index++;
+            }
+        } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {
+            log.error("The ordinal " + dateOrdinal + " causes an index out of bounds excepton", arrayIndexOutOfBoundsException);
         }
     }
     
     public HashMap<String,Integer> deserialize(Value oldValue) {
         
         // 10 years of of frequency counts
-        byte[] readBuffer = new byte[MAX_YEARS * NUM_BYTES_YR * 4 + DAYS_IN_LEAP_YEAR * MAX_YEARS * 4];
+        byte[] readBuffer = new byte[MAX_YEARS * (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)];
         
         HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
@@ -183,7 +188,7 @@ public class DateFrequencyValue {
         }
         
         try {
-            for (int i = 0; i < read; i += (4 + DAYS_IN_LEAP_YEAR * 4)) {
+            for (int i = 0; i < read; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.info("Deserialize decoded the year " + decodedYear);
