@@ -35,7 +35,7 @@ public class OrdinalDayOfYear {
     private int calculateOrdinal() {
         String month = mmDD.substring(0, 2);
         String day = mmDD.substring(2);
-        Integer ordinal = 1;
+        Integer ordinal = 0;
         if (month.equals("01")) {
             ordinal += dayOfMonthToInteger(day);
             return ordinal;
@@ -48,6 +48,7 @@ public class OrdinalDayOfYear {
             return ordinal;
         }
         ordinal += 29; // Add all the days in non leap Feb
+        // Every ordinal is shifted by one after this point. Ex. December 31 will be 366 Always.
         
         if (month.equals("03")) {
             ordinal += dayOfMonthToInteger(day);
@@ -170,9 +171,10 @@ public class OrdinalDayOfYear {
                 buildMMDD(remainingPossibleOrdinals, month);
                 return mmDD;
             }
+            remainingPossibleOrdinals--;
         }
         
-        remainingPossibleOrdinals -= 29;
+        remainingPossibleOrdinals -= 28;
         
         if (remainingPossibleOrdinals - 31 <= 0) // You are in March
         {
@@ -276,6 +278,9 @@ public class OrdinalDayOfYear {
             mmDD = month + "0" + ordinal;
         else
             mmDD = month + ordinal;
+        
+        if (ordinal > 31)
+            log.error("Ordinal is over 31 - not correct :" + ordinal);
     }
     
     public int getOrdinalDay() {

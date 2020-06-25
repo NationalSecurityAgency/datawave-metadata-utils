@@ -199,7 +199,7 @@ public class DateFrequencyValue {
                     if (decodedFrequencyOnDay != 0) {
                         OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / 4 - 1, decodedYear);
                         dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
-                        log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + "-" + decodedFrequencyOnDay);
+                        log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
                     }
                 }
                 
