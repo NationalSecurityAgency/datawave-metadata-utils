@@ -9,6 +9,7 @@ public class OrdinalDayOfYear {
     private String mmDD;
     private boolean isInLeapYear;
     private int ordinalDay;
+    private String year;
     public static String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
     private static final Logger log = LoggerFactory.getLogger(OrdinalDayOfYear.class);
@@ -16,8 +17,9 @@ public class OrdinalDayOfYear {
     /*
      * Used during serialization n DateFrequencyValue
      */
-    public OrdinalDayOfYear(String monthDay, String year) {
+    public OrdinalDayOfYear(String monthDay, String theYear) {
         mmDD = monthDay;
+        year = theYear;
         isInLeapYear = isLeapYear(year);
         ordinalDay = calculateOrdinal();
     }
@@ -171,10 +173,10 @@ public class OrdinalDayOfYear {
                 buildMMDD(remainingPossibleOrdinals, month);
                 return mmDD;
             }
-            remainingPossibleOrdinals--;
+            // remainingPossibleOrdinals--;
         }
         
-        remainingPossibleOrdinals -= 28;
+        remainingPossibleOrdinals -= 29; // From this point on all ordinals are
         
         if (remainingPossibleOrdinals - 31 <= 0) // You are in March
         {

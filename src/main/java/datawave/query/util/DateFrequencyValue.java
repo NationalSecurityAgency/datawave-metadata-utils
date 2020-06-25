@@ -179,20 +179,12 @@ public class DateFrequencyValue {
         // Should hold the original (reconstructed) data
         byte[] expandedData = Arrays.copyOf(readBuffer, read);
         
-        // Decode the bytes into a String
-        try {
-            String message = new String(expandedData, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            log.error("Error creating input stream during deserialization ", e);
-            dateFrequencyMap.put("Could not decode value to UTF-8", 0);
-        }
-        
         try {
             for (int i = 0; i < read; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.info("Deserialize decoded the year " + decodedYear);
-                for (int j = 4; j < DAYS_IN_LEAP_YEAR; j += 4) {
+                for (int j = 4; j < DAYS_IN_LEAP_YEAR * 4 + 4; j += 4) {
                     int k = i + j;
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
@@ -206,6 +198,8 @@ public class DateFrequencyValue {
             }
         } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
             log.error("Error decoding the compressed array of date values.", indexOutOfBoundsException);
+            System.out.println("There was an index exception");
+            
         }
         
         return dateFrequencyMap;

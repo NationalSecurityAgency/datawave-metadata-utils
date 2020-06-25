@@ -20,22 +20,24 @@ public class DateFrequencyValueTest {
     @Before
     public void initialize() {
         dateFrequencyUncompressed = new HashMap<>();
+        // TODO Build a loop that does an entry every day for two years
+        dateFrequencyUncompressed.put("20190101", 1);
+        dateFrequencyUncompressed.put("20190102", 2);
+        dateFrequencyUncompressed.put("20190131", 31);
+        dateFrequencyUncompressed.put("20190228", Integer.MAX_VALUE);
+        dateFrequencyUncompressed.put("20190301", 3000);
+        dateFrequencyUncompressed.put("20190330", 330);
+        dateFrequencyUncompressed.put("20191220", 1220);
+        dateFrequencyUncompressed.put("20191231", 1231);
         
         dateFrequencyUncompressed.put("20200101", 1);
         dateFrequencyUncompressed.put("20200102", 2);
         dateFrequencyUncompressed.put("20200131", 31);
         dateFrequencyUncompressed.put("20200229", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20200301", 1000);
-        
-        dateFrequencyUncompressed.put("20190101", 1);
-        dateFrequencyUncompressed.put("20190102", 2);
-        dateFrequencyUncompressed.put("20190131", 31);
-        dateFrequencyUncompressed.put("20190228", 2000);
-        dateFrequencyUncompressed.put("20190301", 3000);
-        // dateFrequencyUncompressed.put("20190330", 1130);
-        // dateFrequencyUncompressed.put("20200330", 1130);
-        // dateFrequencyUncompressed.put("20191231", 365);
-        // dateFrequencyUncompressed.put("20201231", 366);
+        dateFrequencyUncompressed.put("20200301", 3000);
+        dateFrequencyUncompressed.put("20200330", 330);
+        dateFrequencyUncompressed.put("20201220", 1220);
+        dateFrequencyUncompressed.put("20201231", 1231);
         
     }
     
@@ -47,12 +49,14 @@ public class DateFrequencyValueTest {
         Assert.assertTrue(compressedMapBytes != null);
         Value accumlo_value = new Value(compressedMapBytes);
         HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value);
+        
         for (Map.Entry<String,Integer> entry : restored.entrySet()) {
             log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
-        
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 10);
-        Assert.assertTrue(restored.size() == 10);
+        log.info("The restored size is " + restored.size());
+        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 16);
+        Assert.assertTrue(restored.size() == 16);
         
     }
     
