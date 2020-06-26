@@ -24,7 +24,7 @@ public class FrequencyFamilyCounter {
     }
     
     public void initialize(Value value) {
-        deserializeCompressedValue(value, usesGZipCompression);
+        deserializeCompressedValue(value);
     }
     
     public void clear() {
@@ -41,9 +41,9 @@ public class FrequencyFamilyCounter {
      *
      * @param oldValue
      */
-    public void deserializeCompressedValue(Value oldValue, boolean usesGzip) {
+    public void deserializeCompressedValue(Value oldValue) {
         
-        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue, usesGzip);
+        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue, usesGZipCompression);
         dateToFrequencyValueMap.clear();
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
@@ -119,8 +119,8 @@ public class FrequencyFamilyCounter {
      * 
      * @return Value
      */
-    public Value serialize(boolean compress) {
-        return serializer.serialize(dateToFrequencyValueMap, compress);
+    public Value serialize() {
+        return serializer.serialize(dateToFrequencyValueMap, usesGZipCompression);
     }
     
 }
