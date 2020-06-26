@@ -1073,10 +1073,10 @@ public class MetadataHelper {
     public long getCardinalityForField(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
         log.trace("getCardinalityForField from table: " + metadataTableName);
         Text row = new Text(fieldName.toUpperCase());
-        FrequencyFamilyCounter dateFreqMap = new FrequencyFamilyCounter();
+        FrequencyFamilyCounter dateFreqMap = new FrequencyFamilyCounter(false);
         
         // Get all the rows in DatawaveMetadata for the field, only in the 'f'
-        // colfam
+        // colfamily
         Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
         
         Key startKey = new Key(row);
