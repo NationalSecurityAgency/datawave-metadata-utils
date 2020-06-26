@@ -4,10 +4,7 @@ import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,9 +31,10 @@ public class DateFrequencyValue {
     private HashMap<String,Integer> uncompressedDateFrequencies = null;
     
     public static final int DAYS_IN_LEAP_YEAR = 366;
-    private static int MAX_YEARS = 2;
+    private static int MAX_YEARS = 10;
     private static int NUM_YEAR_BYTES = 4;
     private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * 4;
+    private static int NUM_BYTES_PER_FREQ_VALUE = 4;
     
     private byte[] compressedDateFrequencyMapBytes = null;
     
@@ -48,12 +46,12 @@ public class DateFrequencyValue {
      *            the keys should be dates in yyyyMMdd format
      * @return Value the value to store in accumulo
      */
-    public Value serialize(HashMap<String,Integer> dateToFrequencyValueMap, boolean doGzip) {
+    public Value serialize(HashMap<String,Integer> dateToFrequencyValueMap, boolean compressWithGzip) {
         
         Value serializedMap;
         uncompressedDateFrequencies = dateToFrequencyValueMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        GZIPOutputStream outputStream;
+        OutputStream theOutputstreamInUse;
         int uncompressedLength = 0;
         
         for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
@@ -79,20 +77,24 @@ public class DateFrequencyValue {
             
         }
         
-        try {
-            outputStream = new GZIPOutputStream(baos);
-        } catch (IOException ioException) {
-            log.info("The zipped output stream could not be created", ioException);
-            return new Value("Error Compressing Value");
-            
+        if (compressWithGzip) {
+            try {
+                theOutputstreamInUse = new GZIPOutputStream(baos);
+            } catch (IOException ioException) {
+                log.info("The zipped output stream could not be created", ioException);
+                return new Value("Error Compressing Value");
+                
+            }
+        } else {
+            theOutputstreamInUse = baos;
         }
         
         // Iterate through the compressed object map and push out to the byte stream
         for (Map.Entry<YearKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
             log.info("Compressing key: " + entry.getKey().key + " value" + entry.getValue() + "Byte array " + entry.getValue());
             try {
-                outputStream.write(entry.getKey().compressedContent);
-                outputStream.write(entry.getValue());
+                theOutputstreamInUse.write(entry.getKey().compressedContent);
+                theOutputstreamInUse.write(entry.getValue());
                 uncompressedLength += entry.getKey().compressedContent.length;
                 uncompressedLength += entry.getValue().length;
             } catch (IOException ioException) {
@@ -101,13 +103,14 @@ public class DateFrequencyValue {
         }
         
         try {
-            outputStream.close();
+            theOutputstreamInUse.close();
         } catch (IOException ioException) {
             log.info("Could not close Zip output stream - Error compressing DateFrequencyValue", ioException);
             return new Value("Error closing Zip output stream while compressing DateFrequencyValue");
         }
         
-        log.info("Serialized length is " + baos.toByteArray().length + " uncompressed length was " + uncompressedLength);
+        if (compressWithGzip)
+            log.info("Serialized length is " + baos.toByteArray().length + " uncompressed length was " + uncompressedLength);
         
         serializedMap = new Value(baos.toByteArray());
         
@@ -139,10 +142,11 @@ public class DateFrequencyValue {
         }
     }
     
-    public HashMap<String,Integer> deserialize(Value oldValue) {
+    public HashMap<String,Integer> deserialize(Value oldValue, boolean usesGzip) {
         
         // 10 years of of frequency counts
         byte[] readBuffer = new byte[MAX_YEARS * (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)];
+        InputStream theInputStreamUsed;
         
         HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
@@ -151,19 +155,22 @@ public class DateFrequencyValue {
             return dateFrequencyMap;
         }
         
-        ByteArrayInputStream arrayInputStream = new ByteArrayInputStream(oldValue.get());
-        GZIPInputStream inputStream;
-        try {
-            inputStream = new GZIPInputStream(arrayInputStream);
-        } catch (IOException ioException) {
-            log.error("Error creating input stream during deserialization ", ioException);
-            dateFrequencyMap.put("Error", 0);
-            return dateFrequencyMap;
+        if (usesGzip) {
+            try {
+                ByteArrayInputStream arrayInputStream = new ByteArrayInputStream(oldValue.get());
+                theInputStreamUsed = new GZIPInputStream(arrayInputStream);
+            } catch (IOException ioException) {
+                log.error("Error creating input stream during deserialization ", ioException);
+                dateFrequencyMap.put("Error", 0);
+                return dateFrequencyMap;
+            }
+        } else {
+            theInputStreamUsed = new ByteArrayInputStream(oldValue.get());
         }
         
         int read = 0;
         try {
-            read = inputStream.read(readBuffer, 0, readBuffer.length);
+            read = theInputStreamUsed.read(readBuffer, 0, readBuffer.length);
         } catch (IOException ioException) {
             log.error("Error creating input stream during deserialization ", ioException);
             dateFrequencyMap.put("Error reading compressed input stream", 0);
@@ -171,7 +178,7 @@ public class DateFrequencyValue {
         }
         
         try {
-            inputStream.close();
+            theInputStreamUsed.close();
         } catch (IOException ioException) {
             log.info("Error creating input stream during deserialization ", ioException);
             dateFrequencyMap.put("Error closing compressed input stream", 0);
@@ -184,12 +191,12 @@ public class DateFrequencyValue {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.info("Deserialize decoded the year " + decodedYear);
-                for (int j = 4; j < DAYS_IN_LEAP_YEAR * 4 + 4; j += 4) {
+                for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
                     int k = i + j;
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
-                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / 4 - 1, decodedYear);
+                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE - 1, decodedYear);
                         dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
                         log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
                     }
@@ -198,7 +205,6 @@ public class DateFrequencyValue {
             }
         } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
             log.error("Error decoding the compressed array of date values.", indexOutOfBoundsException);
-            System.out.println("There was an index exception");
             
         }
         

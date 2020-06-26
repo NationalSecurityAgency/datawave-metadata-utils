@@ -6,7 +6,7 @@ import org.junit.Test;
 
 public class FrequencyFamilyCounterTest {
     
-    private FrequencyFamilyCounter counter = new FrequencyFamilyCounter();
+    private FrequencyFamilyCounter counter = new FrequencyFamilyCounter(false);
     
     @Test
     public void testCounter() {

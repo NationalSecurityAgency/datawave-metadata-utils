@@ -13,28 +13,22 @@ public class FrequencyFamilyCounter {
     private HashMap<String,Integer> dateToFrequencyValueMap = new HashMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     private DateFrequencyValue serializer = new DateFrequencyValue();
+    private boolean usesGZipCompression;
     
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
     
-    public FrequencyFamilyCounter() {}
+    public FrequencyFamilyCounter(boolean usesGZip) {
+        usesGZipCompression = usesGZip;
+    }
     
     public void initialize(Value value) {
-        deserializeCompressedValue(value);
+        deserializeCompressedValue(value, usesGZipCompression);
     }
     
     public void clear() {
         dateToFrequencyValueMap.clear();
-        total = 0;
-    }
-    
-    public void add(long newCounts) {
-        total += newCounts;
-    }
-    
-    public long getTotal() {
-        return total;
     }
     
     public HashMap<String,Integer> getDateToFrequencyValueMap() {
@@ -47,16 +41,9 @@ public class FrequencyFamilyCounter {
      *
      * @param oldValue
      */
-    public void deserializeCompressedValue(Value oldValue) {
-        /*
-         * String[] kvps = oldValue.toString().split("\\|"); log.info("deserializeCompressedValue: there are " + kvps.length + " key value pairs."); for (String
-         * kvp : kvps) { String[] pair = kvp.split("^"); if (pair.length == 2) { log.info("deserializeCompressedValue -- cq: " + pair[0] + " value: " +
-         * pair[1]); String key = pair[0]; String value = pair[1]; log.info("deserializeCompressedValue key: " + pair[0] + " value: " + pair[2]);
-         * insertIntoMap(key, value);
-         * 
-         * } } log.info("The contents of the frequency map are " + dateToFrequencyValueMap.toString());
-         */
-        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue);
+    public void deserializeCompressedValue(Value oldValue, boolean usesGzip) {
+        
+        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue, usesGzip);
         dateToFrequencyValueMap.clear();
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
@@ -70,17 +57,22 @@ public class FrequencyFamilyCounter {
      * Inserts a key and value into the qualifiedToFrequencyValueMap and converts the string value to a long
      * 
      * @param key
+     *            The value for "key" is the old style ColumnQualifier of this format: csv\x0020160426
      * @param value
+     *            value is a an Integer in string format that might be hexadecimal, decimal or octal
      */
     public void insertIntoMap(String key, String value) {
         int parsedLong;
-        String cleanKey = "null";
+        String cleanKey;
         
         // Assuming that as SimpleDate is at the end of the key passed in. yyyyMMdd
+        // The value for "key" is the old style ColumnQualifier of this format:
+        // csv\x0020160426 and the value is a an Integer in string format that
+        // might be hexadecimal, decimal or octal
         if (key != null) {
             if (key.length() > SIMPLEDATE_LENGTH) {
                 cleanKey = key.substring(key.length() - SIMPLEDATE_LENGTH);
-            } else if (key.length() <= SIMPLEDATE_LENGTH) {
+            } else {
                 cleanKey = key;
             }
         } else
@@ -93,14 +85,15 @@ public class FrequencyFamilyCounter {
         try {
             parsedLong = Integer.parseUnsignedInt(value);
             total += parsedLong;
-        } catch (Exception e) {
+        } catch (NumberFormatException nfe) {
             try {
-                log.info("Long.parseLong could not parse " + value + " to long for this key " + cleanKey, e);
+                log.info("Long.parseLong could not parse " + value + " to long for this key " + cleanKey, nfe);
                 log.info("Trying to use Long.decode");
                 parsedLong = Integer.decode(value);
                 total += parsedLong;
-            } catch (Exception e2) {
-                log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, e2);
+            } catch (NumberFormatException nfe2) {
+                log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
+                log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
                 return;
             }
             
@@ -116,7 +109,7 @@ public class FrequencyFamilyCounter {
                 dateToFrequencyValueMap.put(cleanKey, lastValue + parsedLong);
             }
         } catch (Exception e) {
-            log.error("Error inserting into map", e);
+            log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
         }
     }
     
@@ -127,11 +120,6 @@ public class FrequencyFamilyCounter {
      * @return Value
      */
     public Value serialize(boolean compress) {
-        /*
-         * StringBuilder sb = new StringBuilder(); for (Map.Entry<String,Long> entry : dateToFrequencyValueMap.entrySet()) {
-         * sb.append(entry.getKey()).append("^").append(entry.getValue()).append("|"); }
-         */
-        
         return serializer.serialize(dateToFrequencyValueMap, compress);
     }
     

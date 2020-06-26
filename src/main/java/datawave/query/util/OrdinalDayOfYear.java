@@ -290,7 +290,7 @@ public class OrdinalDayOfYear {
         return ordinalDay;
     }
     
-    private static boolean isLeapYear(String yyyy) {
+    public static boolean isLeapYear(String yyyy) {
         return Arrays.asList(LEAP_YEARS).contains(yyyy);
     }
     

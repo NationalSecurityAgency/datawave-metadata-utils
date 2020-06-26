@@ -1,6 +1,7 @@
 package datawave.util;
 
 import datawave.query.util.DateFrequencyValue;
+import datawave.query.util.OrdinalDayOfYear;
 import org.apache.accumulo.core.data.Value;
 import org.junit.Assert;
 import org.junit.Before;
@@ -10,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 public class DateFrequencyValueTest {
     DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
@@ -17,46 +19,72 @@ public class DateFrequencyValueTest {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValueTest.class);
     
+    public static String[] YEARS = new String[] {"2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"};
+    public static String[] MONTHS = new String[] {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
+    
     @Before
     public void initialize() {
         dateFrequencyUncompressed = new HashMap<>();
-        // TODO Build a loop that does an entry every day for two years
-        dateFrequencyUncompressed.put("20190101", 1);
-        dateFrequencyUncompressed.put("20190102", 2);
-        dateFrequencyUncompressed.put("20190131", 31);
-        dateFrequencyUncompressed.put("20190228", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20190301", 3000);
-        dateFrequencyUncompressed.put("20190330", 330);
-        dateFrequencyUncompressed.put("20191220", 1220);
-        dateFrequencyUncompressed.put("20191231", 1231);
-        
-        dateFrequencyUncompressed.put("20200101", 1);
-        dateFrequencyUncompressed.put("20200102", 2);
-        dateFrequencyUncompressed.put("20200131", 31);
-        dateFrequencyUncompressed.put("20200229", Integer.MAX_VALUE);
-        dateFrequencyUncompressed.put("20200301", 3000);
-        dateFrequencyUncompressed.put("20200330", 330);
-        dateFrequencyUncompressed.put("20201220", 1220);
-        dateFrequencyUncompressed.put("20201231", 1231);
+        Random random = new Random();
+        int frequencyValue;
+        String dayString;
+        // TODO Build a loop that does an on everydate but the 29, 30, 31st for 10 years
+        for (String year : YEARS) {
+            for (String month : MONTHS) {
+                for (int day = 1; day < 29; day++) {
+                    frequencyValue = random.nextInt(Integer.MAX_VALUE);
+                    
+                    if (day < 10)
+                        dayString = "0" + day;
+                    else
+                        dayString = String.valueOf(day);
+                    
+                    dateFrequencyUncompressed.put(year + month + dayString, frequencyValue < 0 ? -frequencyValue : frequencyValue);
+                }
+            }
+            
+            if (OrdinalDayOfYear.isLeapYear(year))
+                dateFrequencyUncompressed.put(year + "0229", Integer.MAX_VALUE);
+                
+            // dateFrequencyUncompressed.put(year + "1231", 1231);
+            // dateFrequencyUncompressed.put(year + "0131", 31);
+            
+        }
         
     }
     
     @Test
     public void DateFrequencyValueTest() {
-        dateFrequencyValue.serialize(dateFrequencyUncompressed, true);
+        dateFrequencyValue.serialize(dateFrequencyUncompressed, false);
         dateFrequencyValue.dumpCompressedDateFrequencies();
         byte[] compressedMapBytes = dateFrequencyValue.getCompressedDateFrequencyMapBytes();
         Assert.assertTrue(compressedMapBytes != null);
         Value accumlo_value = new Value(compressedMapBytes);
-        HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value);
+        HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value, false);
         
         for (Map.Entry<String,Integer> entry : restored.entrySet()) {
             log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 16);
-        Assert.assertTrue(restored.size() == 16);
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3360);
+        Assert.assertTrue(restored.size() == 3360);
+        
+        // Verify accurate restoration
+        for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
+            if (restored.containsKey(entry.getKey())) {
+                if (!(restored.get(entry.getKey()).intValue() == entry.getValue().intValue())) {
+                    log.info("The original entry is: " + entry.getValue());
+                    log.info("The restored value is: " + restored.get(entry.getKey()));
+                    Assert.fail("The key: " + entry.getKey() + " was not restored with the original value ");
+                }
+                
+            } else {
+                Assert.fail("The key: " + entry.getKey() + " with value: " + entry.getValue() + " was not restored");
+            }
+        }
+        
+        log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
     
