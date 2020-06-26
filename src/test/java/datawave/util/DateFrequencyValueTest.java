@@ -9,6 +9,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -45,9 +48,9 @@ public class DateFrequencyValueTest {
             
             if (OrdinalDayOfYear.isLeapYear(year))
                 dateFrequencyUncompressed.put(year + "0229", Integer.MAX_VALUE);
-                
-            // dateFrequencyUncompressed.put(year + "1231", 1231);
-            // dateFrequencyUncompressed.put(year + "0131", 31);
+            
+            dateFrequencyUncompressed.put(year + "1231", 1231);
+            dateFrequencyUncompressed.put(year + "0131", 31);
             
         }
         
@@ -67,8 +70,8 @@ public class DateFrequencyValueTest {
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3360);
-        Assert.assertTrue(restored.size() == 3360);
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3380);
+        Assert.assertTrue(restored.size() == 3380);
         
         // Verify accurate restoration
         for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
@@ -86,6 +89,25 @@ public class DateFrequencyValueTest {
         
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
+    }
+    
+    @Test
+    public void GenerateAccumuloShellScript() {
+        
+        try {
+            PrintWriter printWriter = new PrintWriter(new FileWriter("/var/tmp/dw_716_accumulo_script.txt"));
+            
+            for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
+                String command = "insert BAR_FIELD f csv\\x00" + entry.getKey() + "  " + entry.getValue();
+                log.info(command);
+                printWriter.println(command);
+                
+            }
+            printWriter.close();
+        } catch (IOException ioException) {
+            Assert.fail("There was an error creating test script");
+            log.info("Here is the problem:", ioException);
+        }
     }
     
 }
