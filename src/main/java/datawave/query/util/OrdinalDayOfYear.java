@@ -10,7 +10,22 @@ public class OrdinalDayOfYear {
     private boolean isInLeapYear;
     private int ordinalDay;
     private String year;
-    public static String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
+    public static final String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
+    
+    enum DAYSINMONTH {
+        JAN(31), FEB(29), MAR(31), APR(30), MAY(31), JUN(30), JUL(31), AUG(30), SEP(30), OCT(31), NOV(30), DEC(31);
+        DAYSINMONTH(int i) {
+            numdays = i;
+        }
+        
+        private int numdays = 0;
+        
+        private int getNumdays() {
+            return numdays;
+        }
+    }
+    
+    public static final String[] MONTHSTRINGS = new String[] {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
     
     private static final Logger log = LoggerFactory.getLogger(OrdinalDayOfYear.class);
     
@@ -38,86 +53,25 @@ public class OrdinalDayOfYear {
         String month = mmDD.substring(0, 2);
         String day = mmDD.substring(2);
         Integer ordinal = 0;
-        if (month.equals("01")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
         
-        ordinal += 31; // Add all the days in January whether or not leap year. The mmDD is Feb or later.
-        
-        if (month.equals("02")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        ordinal += 29; // Add all the days in non leap Feb
-        // Every ordinal is shifted by one after this point. Ex. December 31 will be 366 Always.
-        
-        if (month.equals("03")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 31;
-        
-        if (month.equals("04")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 30;
-        
-        if (month.equals("05")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 31;
-        
-        if (month.equals("06")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 30;
-        
-        if (month.equals("07")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 31;
-        
-        if (month.equals("08")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 30;
-        
-        if (month.equals("09")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 30;
-        
-        if (month.equals("10")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 31;
-        
-        if (month.equals("11")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
-        }
-        
-        ordinal += 30;
-        
-        if (month.equals("12")) {
-            ordinal += dayOfMonthToInteger(day);
-            return ordinal;
+        int daysInMonthIndex = 0;
+        try {
+            while (daysInMonthIndex < 12) {
+                
+                for (String checkMonth : MONTHSTRINGS) {
+                    
+                    if (month.equals(checkMonth)) {
+                        ordinal += dayOfMonthToInteger(day);
+                        return ordinal;
+                    }
+                    
+                    ordinal += DAYSINMONTH.values()[daysInMonthIndex].numdays;
+                    daysInMonthIndex++;
+                }
+                
+            }
+        } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {
+            log.error("Could not create the ordinal right", arrayIndexOutOfBoundsException);
         }
         
         log.error("The ordinal from the MMDD string could not be calculated for " + mmDD);
@@ -126,13 +80,13 @@ public class OrdinalDayOfYear {
     }
     
     private Integer dayOfMonthToInteger(String day) {
-        Integer ordinal;
+        Integer ordinalInsideMonth;
         if (day.substring(0, 1).equals("0")) {
             String daySubstring = day.substring(1);
-            ordinal = Integer.parseInt(daySubstring);
+            ordinalInsideMonth = Integer.parseInt(daySubstring);
         } else
-            ordinal = Integer.parseInt(day);
-        return ordinal;
+            ordinalInsideMonth = Integer.parseInt(day);
+        return ordinalInsideMonth;
     }
     
     public String getMmDD() {
@@ -148,126 +102,21 @@ public class OrdinalDayOfYear {
             log.error("The ordinal is out of range" + ordinal);
         
         int remainingPossibleOrdinals = ordinal;
+        int daysInMonthIndex = 0;
         
-        if (ordinal - 31 <= 0) // You are in January
-        {
-            String month = "01";
-            buildMMDD(ordinal, month);
-            return mmDD;
-            
-        }
-        remainingPossibleOrdinals -= 31;
-        
-        if (!isInLeapYear) {
-            if (remainingPossibleOrdinals - 28 <= 0) // Ordinal is in February
-            {
-                String month = "02";
-                buildMMDD(remainingPossibleOrdinals, month);
-                return mmDD;
+        while (daysInMonthIndex < 12) {
+            for (String checkMonth : MONTHSTRINGS) {
                 
+                if (remainingPossibleOrdinals - DAYSINMONTH.values()[daysInMonthIndex].numdays <= 0) {
+                    buildMMDD(remainingPossibleOrdinals, checkMonth);
+                    return mmDD;
+                }
+                
+                remainingPossibleOrdinals -= DAYSINMONTH.values()[daysInMonthIndex].numdays;
+                daysInMonthIndex++;
             }
-        } else {
-            if (remainingPossibleOrdinals - 29 <= 0) // Ordinal is in February
-            {
-                String month = "02";
-                buildMMDD(remainingPossibleOrdinals, month);
-                return mmDD;
-            }
-            // remainingPossibleOrdinals--;
-        }
-        
-        remainingPossibleOrdinals -= 29; // From this point on all ordinals are
-        
-        if (remainingPossibleOrdinals - 31 <= 0) // You are in March
-        {
-            String month = "03";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
             
         }
-        remainingPossibleOrdinals -= 31;
-        
-        if (remainingPossibleOrdinals - 30 <= 0) // You are in April
-        {
-            String month = "04";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-            
-        }
-        remainingPossibleOrdinals -= 30;
-        
-        if (remainingPossibleOrdinals - 31 <= 0) // You are in May
-        {
-            String month = "05";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-            
-        }
-        
-        remainingPossibleOrdinals -= 31;
-        
-        if (remainingPossibleOrdinals - 30 <= 0) // You are in June
-        {
-            String month = "06";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 30;
-        
-        if (remainingPossibleOrdinals - 31 <= 0) // You are in July
-        {
-            String month = "07";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 31;
-        
-        if (remainingPossibleOrdinals - 30 <= 0) // You are in August
-        {
-            String month = "08";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 30;
-        
-        if (remainingPossibleOrdinals - 30 <= 0) // You are in Sept
-        {
-            String month = "09";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 30;
-        
-        if (remainingPossibleOrdinals - 31 <= 0) // You are in Oct
-        {
-            String month = "10";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 31;
-        
-        if (remainingPossibleOrdinals - 30 <= 0) // You are in Nov
-        {
-            String month = "11";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 30;
-        
-        if (remainingPossibleOrdinals - 31 <= 0) // You are in Dec
-        {
-            String month = "12";
-            buildMMDD(remainingPossibleOrdinals, month);
-            return mmDD;
-        }
-        
-        remainingPossibleOrdinals -= 31;
         
         if (remainingPossibleOrdinals < 0)
             log.error("counld not transform ordinal " + ordinal + " to yyyyMMdd format");

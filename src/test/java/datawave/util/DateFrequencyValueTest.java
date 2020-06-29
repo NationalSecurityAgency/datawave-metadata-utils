@@ -77,8 +77,6 @@ public class DateFrequencyValueTest {
         for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
             if (restored.containsKey(entry.getKey())) {
                 if (!(restored.get(entry.getKey()).intValue() == entry.getValue().intValue())) {
-                    log.info("The original entry is: " + entry.getValue());
-                    log.info("The restored value is: " + restored.get(entry.getKey()));
                     Assert.fail("The key: " + entry.getKey() + " was not restored with the original value ");
                 }
                 
@@ -99,7 +97,6 @@ public class DateFrequencyValueTest {
             
             for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
                 String command = "insert BAR_FIELD f csv\\x00" + entry.getKey() + "  " + entry.getValue();
-                log.info(command);
                 printWriter.println(command);
                 
             }
