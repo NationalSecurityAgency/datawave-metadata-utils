@@ -134,7 +134,7 @@ public class DateFrequencyValue {
         int index = 0;
         try {
             for (byte frequencyByte : frequency) {
-                dayFrequencies[dateOrdinal * 4 + index] = frequencyByte;
+                dayFrequencies[(dateOrdinal - 1) * 4 + index] = frequencyByte;
                 index++;
             }
         } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {
@@ -191,12 +191,15 @@ public class DateFrequencyValue {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.info("Deserialize decoded the year " + decodedYear);
+                /*
+                 * Decode the frequencies for each day of the year.
+                 */
                 for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
                     int k = i + j;
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
-                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE - 1, decodedYear);
+                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear);
                         dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
                         log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
                     }

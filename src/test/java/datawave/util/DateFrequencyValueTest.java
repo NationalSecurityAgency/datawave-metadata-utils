@@ -77,7 +77,7 @@ public class DateFrequencyValueTest {
             dateFrequencyUncompressed.put(year + "1130", 1130);
             dateFrequencyUncompressed.put(year + "1229", 1229);
             dateFrequencyUncompressed.put(year + "1230", 1230);
-            // dateFrequencyUncompressed.put(year + "1231", 1231);
+            dateFrequencyUncompressed.put(year + "1231", 1231);
             
         }
         
@@ -97,8 +97,8 @@ public class DateFrequencyValueTest {
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3640);
-        Assert.assertTrue(restored.size() == 3640);
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3652);
+        Assert.assertTrue(restored.size() == 3652);
         
         // Verify accurate restoration
         for (Map.Entry<String,Integer> entry : dateFrequencyUncompressed.entrySet()) {
