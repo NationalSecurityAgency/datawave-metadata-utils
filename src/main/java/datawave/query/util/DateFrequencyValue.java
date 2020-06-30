@@ -15,7 +15,7 @@ import java.util.zip.GZIPOutputStream;
  * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
  * a column qualifier that is prefixed with the string "compressed-" like "compressed-csv" for example. This is a class used to help compress the date and
  * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter The byte array really only
- * has to be like this in regular expression format (YEAR(4BYTE-FREQUENCY){365,366})(\x00))* . Explained verbally a one byte representation of Year followed by
+ * has to be like this in regular expression format (YEAR(4BYTE-FREQUENCY){366}))* . Explained verbally a one byte representation of Year followed by
  * 365 or 366 (Leap year) 4 byte holders for frequency then Null terminated. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 1 + (365 x
  * 4) + 1) bytes long for a 10 year capture: 14620 bytes.
  */
