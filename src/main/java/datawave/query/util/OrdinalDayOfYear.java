@@ -10,7 +10,7 @@ public class OrdinalDayOfYear {
     private boolean isInLeapYear;
     private int ordinalDay;
     private String year;
-    public static final String[] LEAP_YEARS = new String[] {"2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
+    public static final String[] LEAP_YEARS = new String[] {"2008", "2012", "2016", "2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
     enum DAYSINMONTH {
         JAN(31), FEB(29), MAR(31), APR(30), MAY(31), JUN(30), JUL(31), AUG(31), SEP(30), OCT(31), NOV(30), DEC(31);
@@ -18,11 +18,8 @@ public class OrdinalDayOfYear {
             numdays = i;
         }
         
-        private int numdays = 0;
+        private int numdays;
         
-        private int getNumdays() {
-            return numdays;
-        }
     }
     
     public static final String[] MONTHSTRINGS = new String[] {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
