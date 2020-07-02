@@ -12,13 +12,13 @@ public class OrdinalDayOfYear {
     private String year;
     public static final String[] LEAP_YEARS = new String[] {"2008", "2012", "2016", "2020", "2024", "2028", "2032", "2036", "2040", "2044", "2048"};
     
-    enum DAYSINMONTH {
+    public enum DAYSINMONTH {
         JAN(31), FEB(29), MAR(31), APR(30), MAY(31), JUN(30), JUL(31), AUG(31), SEP(30), OCT(31), NOV(30), DEC(31);
         DAYSINMONTH(int i) {
             numdays = i;
         }
         
-        private int numdays;
+        public int numdays;
         
     }
     
