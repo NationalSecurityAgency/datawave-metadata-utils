@@ -12,15 +12,12 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata
- * table that has a column family of "f" and a column qualifier that is prefixed with the string "compressed-" like
- * "compressed-csv" for example. This is a class used to help compress the date and frequency values that
- * are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter. The byte array
- * is in regular expression format (YEAR(4BYTE-FREQUENCY){366}))* . Explained verbally a four byte representation of Year followed by
- * 366 (Leap year) 4 byte holders for frequency. In this version all the arrays have a slot for the Feb 29 leap year
- * frequency whether it is there or not.
- * There aren't any delimiters between years and frequencies which adds to the compression.
- * Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + (366 x * 4) ) bytes long for
+ * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
+ * a column qualifier that is prefixed with the string "compressed-" like "compressed-csv" for example. This is a class used to help compress the date and
+ * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter. The byte array is in
+ * regular expression format (YEAR(4BYTE-FREQUENCY){366}))* . Explained verbally a four byte representation of Year followed by 366 (Leap year) 4 byte holders
+ * for frequency. In this version all the arrays have a slot for the Feb 29 leap year frequency whether it is there or not. There aren't any delimiters between
+ * years and frequencies which adds to the compression. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + (366 x * 4) ) bytes long for
  * a 10 year capture: 14620 bytes.
  */
 
