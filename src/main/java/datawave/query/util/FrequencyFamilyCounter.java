@@ -13,14 +13,13 @@ public class FrequencyFamilyCounter {
     private HashMap<String,Integer> dateToFrequencyValueMap = new HashMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     private DateFrequencyValue serializer = new DateFrequencyValue();
-    private boolean usesGZipCompression;
     
     // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
     
-    public FrequencyFamilyCounter(boolean usesGZip) {
-        usesGZipCompression = usesGZip;
+    public FrequencyFamilyCounter() {
+        
     }
     
     public void initialize(Value value) {
@@ -43,7 +42,7 @@ public class FrequencyFamilyCounter {
      */
     public void deserializeCompressedValue(Value oldValue) {
         
-        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue, usesGZipCompression);
+        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue);
         dateToFrequencyValueMap.clear();
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
@@ -120,7 +119,7 @@ public class FrequencyFamilyCounter {
      * @return Value
      */
     public Value serialize() {
-        return serializer.serialize(dateToFrequencyValueMap, usesGZipCompression);
+        return serializer.serialize(dateToFrequencyValueMap);
     }
     
 }

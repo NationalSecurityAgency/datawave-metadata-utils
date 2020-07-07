@@ -36,7 +36,8 @@ public class DateFrequencyValueTest {
         for (String year : YEARS) {
             for (String month : MONTHS) {
                 for (int day = 1; day <= OrdinalDayOfYear.DAYSINMONTH.values()[monthIndex].numdays; day++) {
-                    frequencyValue = random.nextInt(Integer.MAX_VALUE);
+                    // frequencyValue = random.nextInt(Integer.MAX_VALUE);
+                    frequencyValue = 255;
                     dayString = makeDayString(day);
                     dateFrequencyUncompressed.put(year + month + dayString, frequencyValue < 0 ? -frequencyValue : frequencyValue);
                 }
@@ -78,12 +79,12 @@ public class DateFrequencyValueTest {
     
     @Test
     public void DateFrequencyValueTest() {
-        dateFrequencyValue.serialize(dateFrequencyUncompressed, false);
+        dateFrequencyValue.serialize(dateFrequencyUncompressed);
         dateFrequencyValue.dumpCompressedDateFrequencies();
         byte[] compressedMapBytes = dateFrequencyValue.getCompressedDateFrequencyMapBytes();
         Assert.assertTrue(compressedMapBytes != null);
         Value accumlo_value = new Value(compressedMapBytes);
-        HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value, false);
+        HashMap<String,Integer> restored = dateFrequencyValue.deserialize(accumlo_value);
         
         for (Map.Entry<String,Integer> entry : restored.entrySet()) {
             log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
