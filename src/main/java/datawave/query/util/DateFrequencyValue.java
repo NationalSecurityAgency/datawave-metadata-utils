@@ -58,7 +58,7 @@ public class DateFrequencyValue {
         for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
             if (entry.getKey() == null || entry.getKey().isEmpty())
                 continue;
-
+            
             log.info("Serializing the key/value " + entry.getKey() + " value: " + entry.getValue());
             
             KeyParser parser = new KeyParser(entry.getKey());
@@ -153,7 +153,7 @@ public class DateFrequencyValue {
         try {
             theInputStreamUsed.close();
         } catch (IOException ioException) {
-            log.info("Error creating input stream during deserialization ", ioException);
+            log.error("Error creating input stream during deserialization ", ioException);
             dateFrequencyMap.put("Error closing compressed input stream", 0);
         }
         // Should hold the original (reconstructed) data
@@ -163,7 +163,7 @@ public class DateFrequencyValue {
             for (int i = 0; i < read; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
-                log.info("Deserialize decoded the year " + decodedYear);
+                log.debug("Deserialize decoded the year " + decodedYear);
                 /*
                  * Decode the frequencies for each day of the year.
                  */
@@ -174,7 +174,7 @@ public class DateFrequencyValue {
                     if (decodedFrequencyOnDay != 0) {
                         OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear);
                         dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
-                        log.info("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
+                        log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
                     }
                     
                 }
