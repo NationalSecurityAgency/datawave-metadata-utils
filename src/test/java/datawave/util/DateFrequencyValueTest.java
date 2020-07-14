@@ -31,7 +31,6 @@ public class DateFrequencyValueTest {
         Random random = new Random();
         int frequencyValue;
         String dayString;
-        // TODO Build a loop that does an on everydate but the 29, 30, 31st for 10 years
         int monthIndex = 0;
         for (String year : YEARS) {
             for (String month : MONTHS) {
@@ -48,21 +47,6 @@ public class DateFrequencyValueTest {
                 dateFrequencyUncompressed.remove(year + "0229");
             
             monthIndex = 0;
-            
-            /*
-             * dateFrequencyUncompressed.put(year + "0129", 129); dateFrequencyUncompressed.put(year + "0130", 130); dateFrequencyUncompressed.put(year +
-             * "0131", 131); dateFrequencyUncompressed.put(year + "0329", 329); dateFrequencyUncompressed.put(year + "0330", 330);
-             * dateFrequencyUncompressed.put(year + "0331", 331); dateFrequencyUncompressed.put(year + "0429", 429); dateFrequencyUncompressed.put(year +
-             * "0430", 430); dateFrequencyUncompressed.put(year + "0529", 529); dateFrequencyUncompressed.put(year + "0530", 530);
-             * dateFrequencyUncompressed.put(year + "0531", 531); dateFrequencyUncompressed.put(year + "0629", 629); dateFrequencyUncompressed.put(year +
-             * "0630", 630); dateFrequencyUncompressed.put(year + "0729", 729); dateFrequencyUncompressed.put(year + "0730", 730);
-             * dateFrequencyUncompressed.put(year + "0731", 731); dateFrequencyUncompressed.put(year + "0829", 829); dateFrequencyUncompressed.put(year +
-             * "0830", 830); dateFrequencyUncompressed.put(year + "0831", 831); dateFrequencyUncompressed.put(year + "0929", 929);
-             * dateFrequencyUncompressed.put(year + "0930", 930); dateFrequencyUncompressed.put(year + "1029", 1029); dateFrequencyUncompressed.put(year +
-             * "1030", 1030); dateFrequencyUncompressed.put(year + "1031", 1031); dateFrequencyUncompressed.put(year + "1129", 1129);
-             * dateFrequencyUncompressed.put(year + "1130", 1130); dateFrequencyUncompressed.put(year + "1229", 1229); dateFrequencyUncompressed.put(year +
-             * "1230", 1230); dateFrequencyUncompressed.put(year + "1231", 1231);
-             */
             
         }
         
