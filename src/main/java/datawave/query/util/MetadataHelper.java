@@ -1233,24 +1233,15 @@ public class MetadataHelper {
         scanner.setRange(Range.exact(fieldName));
         
         IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-        RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
+        RegExFilter.setRegexs(cqRegex, null, null, MetadataHelper.COL_QUAL_PREFIX + ".*", null, false);
         scanner.addScanIterator(cqRegex);
         
-        final Text holder = new Text();
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         for (Entry<Key,Value> countEntry : scanner) {
-            ByteArrayInputStream bais = new ByteArrayInputStream(countEntry.getValue().get());
-            DataInputStream inputStream = new DataInputStream(bais);
-            
-            Long sum = WritableUtils.readVLong(inputStream);
-            
-            countEntry.getKey().getColumnQualifier(holder);
-            int offset = holder.find(NULL_BYTE);
-            
-            Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + countEntry.getKey());
-            
-            String datatype = Text.decode(holder.getBytes(), 0, offset);
-            
+            DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
+            HashMap<String,Integer> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
+            Long sum = Long.valueOf(dateFrequencies.get(date));
+            String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
             datatypeToCounts.put(datatype, sum);
         }
         
