@@ -1,12 +1,12 @@
-table datawave.metadata
-config -t datawave.metadata -s table.iterator.majc.vers.opt.maxVersions=10
-config -t datawave.metadata -s table.iterator.minc.vers.opt.maxVersions=10
-config -t datawave.metadata -s table.iterator.scan.vers.opt.maxVersions=10
-config -t datawave.metadata -s table.compaction.minor.idle=3m
-config -t datawave.metadata -s table.compaction.major.everything.idle=6m
+clonetable datawave.metadata testTable
+table testTable
+config -t testTable -s table.iterator.majc.vers.opt.maxVersions=10
+config -t testTable -s table.iterator.minc.vers.opt.maxVersions=10
+config -t testTable -s table.iterator.scan.vers.opt.maxVersions=10
+config -t testTable -s table.compaction.minor.idle=3m
+config -t testTable -s table.compaction.major.everything.idle=6m
 
 formatter -f datawave.formatters.FrequencyColumnValueFormatter -t datawave.metadata
-#config -t datawave.metadata -s table.file.compress.type=none
 
 insert BAR_FIELD f csv\x0020160426  2
 insert BAR_FIELD f csv\x0020160426  2
