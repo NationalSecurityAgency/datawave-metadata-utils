@@ -1240,9 +1240,12 @@ public class MetadataHelper {
         for (Entry<Key,Value> countEntry : scanner) {
             DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
             HashMap<String,Integer> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
-            Long sum = Long.valueOf(dateFrequencies.get(date));
-            String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
-            datatypeToCounts.put(datatype, sum);
+            Long sum;
+            if (dateFrequencies.size() > 0 && dateFrequencies.get(date) != null) {
+                sum = Long.valueOf(dateFrequencies.get(date));
+                String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
+                datatypeToCounts.put(datatype, sum);
+            }
         }
         
         return datatypeToCounts;
