@@ -35,8 +35,8 @@ public class DateFrequencyValueTest {
         for (String year : YEARS) {
             for (String month : MONTHS) {
                 for (int day = 1; day <= OrdinalDayOfYear.DAYSINMONTH.values()[monthIndex].numdays; day++) {
-                    // frequencyValue = random.nextInt(Integer.MAX_VALUE);
-                    frequencyValue = 255;
+                    frequencyValue = random.nextInt(Integer.MAX_VALUE);
+                    // frequencyValue = 255;
                     dayString = makeDayString(day);
                     dateFrequencyUncompressed.put(year + month + dayString, frequencyValue < 0 ? -frequencyValue : frequencyValue);
                 }
