@@ -77,7 +77,8 @@ public class FrequencyFamilyCounter {
         } else
             return;
         
-        log.info("inserting key: " + cleanKey + " value: " + value);
+        log.trace("inserting key: " + cleanKey + " value: " + value);
+        
         if (value.isEmpty())
             return;
         
@@ -86,11 +87,11 @@ public class FrequencyFamilyCounter {
             total += parsedLong;
         } catch (NumberFormatException nfe) {
             try {
-                log.info("Long.parseLong could not parse " + value + " to long for this key " + cleanKey);
-                log.info("Trying to use Long.decode");
+                log.trace("Long.parseLong could not parse " + value + " to long for this key " + cleanKey);
+                log.trace("Trying to use Long.decode");
                 parsedLong = Integer.decode(value);
                 total += parsedLong;
-                log.info("Long.decode processed " + value);
+                log.trace("Long.decode processed " + value);
             } catch (NumberFormatException nfe2) {
                 log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
                 log.error("Key " + key + " and value: " + value + " could not be inserted into new record");

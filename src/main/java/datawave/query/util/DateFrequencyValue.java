@@ -51,13 +51,12 @@ public class DateFrequencyValue {
         uncompressedDateFrequencies = dateToFrequencyValueMap;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputStream theOutputstreamInUse;
-        int uncompressedLength = 0;
         
         for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
             if (entry.getKey() == null || entry.getKey().isEmpty())
                 continue;
             
-            log.info("Serializing the key/value " + entry.getKey() + " value: " + entry.getValue());
+            log.trace("Serializing the key/value " + entry.getKey() + " value: " + entry.getValue());
             
             KeyParser parser = new KeyParser(entry.getKey());
             YearKey compressedMapKey = new YearKey(parser.getYear(), parser.getYearBytes());
@@ -70,7 +69,7 @@ public class DateFrequencyValue {
                 putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
             } else {
-                log.info("Allocating and array of byte frequencies for year " + compressedMapKey.getKey());
+                log.trace("Allocating and array of byte frequencies for year " + compressedMapKey.getKey());
                 dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
                 putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
                 compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
@@ -82,12 +81,10 @@ public class DateFrequencyValue {
         
         // Iterate through the compressed object map and push out to the byte stream
         for (Map.Entry<YearKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
-            log.info("Compressing key: " + entry.getKey().key + " value" + entry.getValue() + "Byte array " + entry.getValue());
+            log.trace("Compressing key: " + entry.getKey().key + " value" + entry.getValue() + "Byte array " + entry.getValue());
             try {
                 theOutputstreamInUse.write(entry.getKey().compressedContent);
                 theOutputstreamInUse.write(entry.getValue());
-                uncompressedLength += entry.getKey().compressedContent.length;
-                uncompressedLength += entry.getValue().length;
             } catch (IOException ioException) {
                 log.error("There was an error writing compressed map to output stream", new Exception());
             }
@@ -104,7 +101,7 @@ public class DateFrequencyValue {
         
         this.compressedDateFrequencyMapBytes = Arrays.copyOf(baos.toByteArray(), baos.size());
         
-        log.info("DateFrequencyValue.serialize compressed date value to byte size of " + baos.toByteArray().length);
+        log.trace("DateFrequencyValue.serialize compressed date value to byte size of " + baos.toByteArray().length);
         
         return serializedMap;
     }
@@ -192,7 +189,7 @@ public class DateFrequencyValue {
         
         public KeyParser(String key) {
             if (key == null) {
-                log.info("The key can't be null", new Exception());
+                log.error("The key can't be null", new Exception());
                 keyValue = "1313";
             }
             keyValue = key;
