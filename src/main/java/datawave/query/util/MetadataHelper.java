@@ -55,19 +55,8 @@ import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.time.format.DateTimeParseException;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -1098,7 +1087,7 @@ public class MetadataHelper {
             
             dateFreqMap.initialize(aggregatedValue);
             
-            for (Entry<String,Integer> dateFrequency : dateFreqMap.getDateToFrequencyValueMap().entrySet()) {
+            for (Entry<YearMonthDay,Frequency> dateFrequency : dateFreqMap.getDateToFrequencyValueMap().entrySet()) {
                 // If we were given a non-null datatype
                 // Ensure that we process records only on that type
                 if (null != datatype && !cq.isEmpty()) {
@@ -1117,12 +1106,12 @@ public class MetadataHelper {
                 String dateStr = "null";
                 Date date;
                 try {
-                    dateStr = dateFrequency.getKey();
+                    dateStr = dateFrequency.getKey().toString();
                     date = DateHelper.parse(dateStr);
                     // Add the provided count if we fall within begin and end,
                     // inclusive
                     if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                        count += dateFrequency.getValue();
+                        count += dateFrequency.getValue().getValue();
                     }
                 } catch (ValueFormatException e) {
                     log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
@@ -1239,10 +1228,10 @@ public class MetadataHelper {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         for (Entry<Key,Value> countEntry : scanner) {
             DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
-            HashMap<String,Integer> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
+            TreeMap<YearMonthDay,Frequency> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
             Long sum;
-            if (dateFrequencies.size() > 0 && dateFrequencies.get(date) != null) {
-                sum = Long.valueOf(dateFrequencies.get(date));
+            if (dateFrequencies.size() > 0 && dateFrequencies.get(new YearMonthDay(date)) != null) {
+                sum = Long.valueOf(dateFrequencies.get(new YearMonthDay(date)).getValue());
                 String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
                 datatypeToCounts.put(datatype, sum);
             }
