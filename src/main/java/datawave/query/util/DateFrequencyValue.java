@@ -5,8 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -14,27 +12,18 @@ import java.util.TreeMap;
  * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
  * a column qualifier that is prefixed with the string "compressed-" like "compressed-csv" for example. This is a class used to help compress the date and
  * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter. The byte array is in
- * regular expression format ((YEAR)(START_DAY)((4BYTE-FREQUENCY){1,366})))* . Explained verbally a four byte representation of Year followed by the julian
- * (ordinal day) of the first day there was a frequency value in that year. This is follow by up to 366 (Leap year) 4 byte holders for frequency values. The
- * month and day of the frequency value is coded by the position in the array from the base START_DAY. There aren't any delimiters between years and frequencies
- * which adds to the compression. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + 4 + (366 * 4) ) bytes long for a maximum length
- * for a 10 year capture of 14720 bytes.
+ * regular expression format ((YEAR)(4BYTE-FREQUENCY){366}))* . Explained verbally a four byte representation of Year followed by by up to 366 (Leap year) 4
+ * byte holders for frequency values. The month and day of the frequency value is coded by the position in the array. There aren't any delimiters between years
+ * and frequencies which adds to the compression. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + 4 + (366 * 4) ) bytes long for a
+ * maximum length for a 10 year capture of 14720 bytes.
  */
 
 public class DateFrequencyValue {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
     
-    // An intermediate data structure build up by iterating through uncompressDateFrequencies
-    // private HashMap<YearKey,byte[]> compressedDateFrequencies = new HashMap<>();
-    // The mapping of SimpleDateFormat strings to frequency counts. This is passed in by the
-    // FrequencyFamilyCounter object to this classes serialize function
-    private TreeMap<YearMonthDay,Frequency> uncompressedDateFrequencies = new TreeMap<>();
-    
     public static final int DAYS_IN_LEAP_YEAR = 366;
-    private static int MAX_YEARS = 10;
     private static int NUM_YEAR_BYTES = 4;
-    private static int NUM_ORDINAL_BYTES = 4;
     private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * 4;
     private static int NUM_BYTES_PER_FREQ_VALUE = 4;
     
