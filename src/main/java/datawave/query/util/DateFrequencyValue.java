@@ -8,15 +8,17 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * This class handles the serialization and deserialization of the Accumulo value in a record of the Datawave Metadata table that has a column family of "f" and
  * a column qualifier that is prefixed with the string "compressed-" like "compressed-csv" for example. This is a class used to help compress the date and
  * frequency values that are aggregated together to by the FrequencyTransformIterator and manipulated in the FrequencyFamilyCounter. The byte array is in
- * regular expression format (YEAR(4BYTE-FREQUENCY){366}))* . Explained verbally a four byte representation of Year followed by 366 (Leap year) 4 byte holders
- * for frequency. In this version all the arrays have a slot for the Feb 29 leap year frequency whether it is there or not. There aren't any delimiters between
- * years and frequencies which adds to the compression. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + (366 x * 4) ) bytes long for
- * a 10 year capture: 14620 bytes.
+ * regular expression format ((YEAR)(START_DAY)((4BYTE-FREQUENCY){1,366})))* . Explained verbally a four byte representation of Year followed by the julian
+ * (ordinal day) of the first day there was a frequency value in that year. This is follow by up to 366 (Leap year) 4 byte holders for frequency values. The
+ * month and day of the frequency value is coded by the position in the array from the base START_DAY. There aren't any delimiters between years and frequencies
+ * which adds to the compression. Each Accumulo row for this "aggregated" frequency "map" would be 10 x ( 4 + 4 + (366 * 4) ) bytes long for a maximum length
+ * for a 10 year capture of 14720 bytes.
  */
 
 public class DateFrequencyValue {
@@ -24,18 +26,17 @@ public class DateFrequencyValue {
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
     
     // An intermediate data structure build up by iterating through uncompressDateFrequencies
-    private HashMap<YearKey,byte[]> compressedDateFrequencies = new HashMap<>();
+    // private HashMap<YearKey,byte[]> compressedDateFrequencies = new HashMap<>();
     // The mapping of SimpleDateFormat strings to frequency counts. This is passed in by the
     // FrequencyFamilyCounter object to this classes serialize function
-    private HashMap<String,Integer> uncompressedDateFrequencies = null;
+    private TreeMap<YearMonthDay,Frequency> uncompressedDateFrequencies = new TreeMap<>();
     
     public static final int DAYS_IN_LEAP_YEAR = 366;
     private static int MAX_YEARS = 10;
     private static int NUM_YEAR_BYTES = 4;
+    private static int NUM_ORDINAL_BYTES = 4;
     private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * 4;
     private static int NUM_BYTES_PER_FREQ_VALUE = 4;
-    
-    private byte[] compressedDateFrequencyMapBytes = null;
     
     public DateFrequencyValue() {}
     
@@ -45,77 +46,61 @@ public class DateFrequencyValue {
      *            the keys should be dates in yyyyMMdd format
      * @return Value the value to store in accumulo
      */
-    public Value serialize(HashMap<String,Integer> dateToFrequencyValueMap) {
+    public Value serialize(TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap) {
         
         Value serializedMap;
-        uncompressedDateFrequencies = dateToFrequencyValueMap;
+        int year, presentYear = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        OutputStream theOutputstreamInUse;
+        byte[] dayFrequencies = null;
         
-        for (Map.Entry<String,Integer> entry : uncompressedDateFrequencies.entrySet()) {
-            if (entry.getKey() == null || entry.getKey().isEmpty())
-                continue;
-            
-            log.trace("Serializing the key/value " + entry.getKey() + " value: " + entry.getValue());
-            
-            KeyParser parser = new KeyParser(entry.getKey());
-            YearKey compressedMapKey = new YearKey(parser.getYear(), parser.getYearBytes());
-            byte[] dayFrequencies;
-            // Build the compressedDateFrequencies object
-            if (compressedDateFrequencies.containsKey(compressedMapKey)) {
-                dayFrequencies = compressedDateFrequencies.get(compressedMapKey);
-                // Get the 366 x 4 byte array vector to hold frequencies
-                // corresponding to the ordinal dates of the year.
-                putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
-                compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
-            } else {
-                log.trace("Allocating and array of byte frequencies for year " + compressedMapKey.getKey());
-                dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
-                putFrequencyBytesInByteArray(parser, entry, dayFrequencies);
-                compressedDateFrequencies.put(compressedMapKey, dayFrequencies);
+        for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
+            year = dateFrequencyEntry.getKey().year;
+            if (year != presentYear) {
+                
+                if (dayFrequencies != null) {
+                    try {
+                        baos.write(dayFrequencies);
+                    } catch (IOException ioException) {
+                        log.error("Did not write out the frequence properly ", ioException);
+                    }
+                }
+                
+                presentYear = year;
+                try {
+                    baos.write(Base256Compression.numToBytes(presentYear));
+                    dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
+                } catch (IOException ioException) {
+                    log.error("Could not convert the year or the first ordinal (julian) to bytes ", ioException);
+                }
             }
             
+            putFrequencyBytesInByteArray(dateFrequencyEntry, dayFrequencies);
+            
+            if (log.isTraceEnabled())
+                log.trace(dateFrequencyEntry.getKey().toString());
+            
+            // dateToFrequencyValueMap.entrySet().stream().sorted()
         }
         
-        theOutputstreamInUse = baos;
-        
-        // Iterate through the compressed object map and push out to the byte stream
-        for (Map.Entry<YearKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
-            log.trace("Compressing key: " + entry.getKey().key + " value" + entry.getValue() + "Byte array " + entry.getValue());
+        if (dayFrequencies != null) {
             try {
-                theOutputstreamInUse.write(entry.getKey().compressedContent);
-                theOutputstreamInUse.write(entry.getValue());
+                baos.write(dayFrequencies);
             } catch (IOException ioException) {
-                log.error("There was an error writing compressed map to output stream", new Exception());
+                log.error("Did not write out the frequence properly ", ioException);
             }
-        }
-        
-        try {
-            theOutputstreamInUse.close();
-        } catch (IOException ioException) {
-            log.info("Could not close Zip output stream - Error compressing DateFrequencyValue", ioException);
-            return new Value("Error closing Zip output stream while compressing DateFrequencyValue");
         }
         
         serializedMap = new Value(baos.toByteArray());
         
-        this.compressedDateFrequencyMapBytes = Arrays.copyOf(baos.toByteArray(), baos.size());
-        
-        log.trace("DateFrequencyValue.serialize compressed date value to byte size of " + baos.toByteArray().length);
-        
         return serializedMap;
     }
     
-    private void putFrequencyBytesInByteArray(KeyParser parser, Map.Entry<String,Integer> entry, byte[] dayFrequencies) {
+    private void putFrequencyBytesInByteArray(Map.Entry<YearMonthDay,Frequency> entry, byte[] dayFrequencies) {
         // This will always be 4 bytes now even if null it will get compressed later on.
-        byte[] frequency = Base256Compression.numToBytes(entry.getValue());
-        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(parser.keyValue.substring(4), parser.getYear());
-        int dateOrdinal = ordinalDayOfYear.getOrdinalDay();
+        byte[] frequency = Base256Compression.numToBytes(entry.getValue().value);
         
-        if (dateOrdinal > DAYS_IN_LEAP_YEAR) {
-            log.error("There is a bad MMDD value in the date " + ordinalDayOfYear.getMmDD(), new Exception());
-            return;
-        }
+        int dateOrdinal = entry.getKey().julian;
+        
         int index = 0;
         try {
             for (byte frequencyByte : frequency) {
@@ -127,35 +112,19 @@ public class DateFrequencyValue {
         }
     }
     
-    public HashMap<String,Integer> deserialize(Value oldValue) {
+    public TreeMap<YearMonthDay,Frequency> deserialize(Value oldValue) {
         
-        // 10 years of of frequency counts
-        byte[] readBuffer = new byte[MAX_YEARS * (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)];
-        ByteArrayInputStream theInputStreamUsed;
-        
-        HashMap<String,Integer> dateFrequencyMap = new HashMap<>();
+        TreeMap<YearMonthDay,Frequency> dateFrequencyMap = new TreeMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
             log.error("The datefrequency value was empty");
-            dateFrequencyMap.put("Error", 0);
+            dateFrequencyMap.put(new YearMonthDay("Error"), new Frequency(0));
             return dateFrequencyMap;
         }
         
-        theInputStreamUsed = new ByteArrayInputStream(oldValue.get());
-        
-        int read;
-        read = theInputStreamUsed.read(readBuffer, 0, readBuffer.length);
+        byte[] expandedData = oldValue.get();
         
         try {
-            theInputStreamUsed.close();
-        } catch (IOException ioException) {
-            log.error("Error creating input stream during deserialization ", ioException);
-            dateFrequencyMap.put("Error closing compressed input stream", 0);
-        }
-        // Should hold the original (reconstructed) data
-        byte[] expandedData = Arrays.copyOf(readBuffer, read);
-        
-        try {
-            for (int i = 0; i < read; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
+            for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.debug("Deserialize decoded the year " + decodedYear);
@@ -168,7 +137,7 @@ public class DateFrequencyValue {
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
                         OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear);
-                        dateFrequencyMap.put(decodedYear + ordinalDayOfYear.getMmDD(), decodedFrequencyOnDay);
+                        dateFrequencyMap.put(new YearMonthDay(decodedYear + ordinalDayOfYear.getMmDD()), new Frequency(decodedFrequencyOnDay));
                         log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
                     }
                     
@@ -181,37 +150,6 @@ public class DateFrequencyValue {
         }
         
         return dateFrequencyMap;
-    }
-    
-    private class KeyParser {
-        // Assuming YYYYMMDD SimpleDateFormat
-        private String keyValue;
-        
-        public KeyParser(String key) {
-            if (key == null) {
-                log.error("The key can't be null", new Exception());
-                keyValue = "1313";
-            }
-            keyValue = key;
-            
-        }
-        
-        public byte[] getYearBytes() {
-            int year = '\u0000';
-            try {
-                String yearStr = keyValue.substring(0, 4);
-                year = Integer.parseUnsignedInt(yearStr);
-                
-            } catch (NumberFormatException numberFormatException) {
-                log.error("the year could not be extract from ", keyValue, numberFormatException);
-            }
-            return Base256Compression.numToBytes(year);
-        }
-        
-        public String getYear() {
-            return keyValue.substring(0, 4);
-        }
-        
     }
     
     /**
@@ -227,52 +165,6 @@ public class DateFrequencyValue {
             return ((int) byteArray[0] & 0xff) << 24 | ((int) byteArray[1] & 0xff) << 16 | ((int) byteArray[2] & 0xff) << 8 | ((int) byteArray[3] & 0xff);
         }
         
-    }
-    
-    private class YearKey {
-        private String key;
-        private byte[] compressedContent;
-        
-        public YearKey(String key, byte[] compressedContent) {
-            this.key = key;
-            this.compressedContent = compressedContent;
-        }
-        
-        public String getKey() {
-            return key;
-        }
-        
-        public void setKey(String key) {
-            this.key = key;
-        }
-        
-        public byte[] getCompressedContent() {
-            return compressedContent;
-        }
-        
-        public void setCompressedContent(byte[] compressedContent) {
-            this.compressedContent = compressedContent;
-        }
-        
-        @Override
-        public int hashCode() {
-            return key.hashCode();
-        }
-        
-        @Override
-        public boolean equals(Object obj) {
-            return key.equals(((YearKey) obj).key);
-        }
-    }
-    
-    public void dumpCompressedDateFrequencies() {
-        for (Map.Entry<YearKey,byte[]> entry : compressedDateFrequencies.entrySet()) {
-            System.out.println(entry.getKey().key + ":" + entry.getKey().compressedContent + "Byte array " + entry.getValue());
-        }
-    }
-    
-    public byte[] getCompressedDateFrequencyMapBytes() {
-        return compressedDateFrequencyMapBytes;
     }
     
 }

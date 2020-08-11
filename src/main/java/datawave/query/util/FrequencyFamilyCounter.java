@@ -4,13 +4,13 @@ import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
+import datawave.query.util.Frequency;
+import datawave.query.util.YearMonthDay;
+import java.util.TreeMap;
 
 public class FrequencyFamilyCounter {
     
-    private long total = 0L;
-    private HashMap<String,Integer> dateToFrequencyValueMap = new HashMap<>();
+    private TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap = new TreeMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     private DateFrequencyValue serializer = new DateFrequencyValue();
     
@@ -30,7 +30,7 @@ public class FrequencyFamilyCounter {
         dateToFrequencyValueMap.clear();
     }
     
-    public HashMap<String,Integer> getDateToFrequencyValueMap() {
+    public TreeMap<YearMonthDay,Frequency> getDateToFrequencyValueMap() {
         return dateToFrequencyValueMap;
     }
     
@@ -42,7 +42,7 @@ public class FrequencyFamilyCounter {
      */
     public void deserializeCompressedValue(Value oldValue) {
         
-        HashMap<String,Integer> uncompressedValueMap = serializer.deserialize(oldValue);
+        TreeMap<YearMonthDay,Frequency> uncompressedValueMap = serializer.deserialize(oldValue);
         dateToFrequencyValueMap.clear();
         dateToFrequencyValueMap.putAll(uncompressedValueMap);
     }
@@ -77,21 +77,23 @@ public class FrequencyFamilyCounter {
         } else
             return;
         
-        log.trace("inserting key: " + cleanKey + " value: " + value);
+        if (log.isTraceEnabled())
+            log.trace("inserting key: " + cleanKey + " value: " + value);
         
         if (value.isEmpty())
             return;
         
         try {
             parsedLong = Integer.parseUnsignedInt(value);
-            total += parsedLong;
         } catch (NumberFormatException nfe) {
             try {
-                log.trace("Long.parseLong could not parse " + value + " to long for this key " + cleanKey);
-                log.trace("Trying to use Long.decode");
+                if (log.isTraceEnabled()) {
+                    log.trace("Long.parseLong could not parse " + value + " to long for this key " + cleanKey);
+                    log.trace("Trying to use Long.decode");
+                }
                 parsedLong = Integer.decode(value);
-                total += parsedLong;
-                log.trace("Long.decode processed " + value);
+                if (log.isTraceEnabled())
+                    log.trace("Long.decode processed " + value);
             } catch (NumberFormatException nfe2) {
                 log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
                 log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
@@ -102,13 +104,14 @@ public class FrequencyFamilyCounter {
         
         try {
             
-            if (!dateToFrequencyValueMap.containsKey(cleanKey))
-                dateToFrequencyValueMap.put(cleanKey, parsedLong);
+            if (!dateToFrequencyValueMap.containsKey(new YearMonthDay(cleanKey)))
+                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), new Frequency(parsedLong));
             else {
-                
-                int lastValue = dateToFrequencyValueMap.get(cleanKey);
-                dateToFrequencyValueMap.put(cleanKey, lastValue + parsedLong);
+                Frequency lastValue = dateToFrequencyValueMap.get(new YearMonthDay(cleanKey));
+                lastValue.addFrequency(parsedLong);
+                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), lastValue);
             }
+            
         } catch (Exception e) {
             log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
         }
