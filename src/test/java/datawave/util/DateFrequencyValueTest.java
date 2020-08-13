@@ -27,6 +27,8 @@ public class DateFrequencyValueTest {
     
     public static String[] YEARS = new String[] {"2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"};
     public static String[] MONTHS = new String[] {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
+    public static final int[] MONTH_LENGTH = new int[] {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    public static final int[] LEAP_MONTH_LENGTH = new int[] {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     
     @Before
     public void initialize() {
@@ -43,9 +45,9 @@ public class DateFrequencyValueTest {
             int[] monthLegths;
             
             if (isLeapYear)
-                monthLegths = OrdinalDayOfYear.LEAP_MONTH_LENGTH;
+                monthLegths = LEAP_MONTH_LENGTH;
             else
-                monthLegths = OrdinalDayOfYear.MONTH_LENGTH;
+                monthLegths = MONTH_LENGTH;
             
             for (String month : MONTHS) {
                 for (int day = 1; day <= monthLegths[monthIndex]; day++) {
