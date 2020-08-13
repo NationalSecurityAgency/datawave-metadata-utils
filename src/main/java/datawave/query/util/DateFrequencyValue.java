@@ -127,9 +127,10 @@ public class DateFrequencyValue {
                     byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
                     int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
                     if (decodedFrequencyOnDay != 0) {
-                        OrdinalDayOfYear ordinalDayOfYear = new OrdinalDayOfYear(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear);
-                        dateFrequencyMap.put(new YearMonthDay(decodedYear + ordinalDayOfYear.getMmDD()), new Frequency(decodedFrequencyOnDay));
-                        log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear + ordinalDayOfYear.getMmDD() + "-" + decodedFrequencyOnDay);
+                        dateFrequencyMap.put(new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear)),
+                                        new Frequency(decodedFrequencyOnDay));
+                        log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear
+                                        + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear) + "-" + decodedFrequencyOnDay);
                     }
                     
                 }
