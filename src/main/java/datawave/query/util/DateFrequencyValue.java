@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -40,13 +41,14 @@ public class DateFrequencyValue {
         Value serializedMap;
         int year, presentYear = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        byte[] dayFrequencies = null;
+        byte[] dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
+        Arrays.fill(dayFrequencies, (byte) 0);
         
         for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
             year = dateFrequencyEntry.getKey().year;
             if (year != presentYear) {
                 
-                if (dayFrequencies != null) {
+                if (presentYear != 0) {
                     try {
                         baos.write(dayFrequencies);
                     } catch (IOException ioException) {
@@ -55,9 +57,10 @@ public class DateFrequencyValue {
                 }
                 
                 presentYear = year;
+                
                 try {
                     baos.write(Base256Compression.numToBytes(presentYear));
-                    dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
+                    Arrays.fill(dayFrequencies, (byte) 0);
                 } catch (IOException ioException) {
                     log.error("Could not convert the year or the first ordinal (julian) to bytes ", ioException);
                 }
