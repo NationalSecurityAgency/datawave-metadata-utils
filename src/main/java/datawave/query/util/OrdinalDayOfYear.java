@@ -3,6 +3,8 @@ package datawave.query.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 
@@ -25,13 +27,14 @@ public class OrdinalDayOfYear {
      */
     public OrdinalDayOfYear(int ordinal, int theyear) {
         ordinalDay = ordinal;
+        year = theyear;
         gregorianCalendar = new GregorianCalendar(theyear, 1, 1);
         gregorianCalendar.set(GregorianCalendar.DAY_OF_YEAR, ordinal);
         Date date = gregorianCalendar.getGregorianChange();
         String strDate = date.toString();
         isLeapYear = gregorianCalendar.isLeapYear(theyear);
         mmDD = calculateMMDD(ordinalDay);
-        year = theyear;
+        
     }
     
     public String getMmDD() {
@@ -39,47 +42,12 @@ public class OrdinalDayOfYear {
     }
     
     private String calculateMMDD(int ordinal) {
-        if (ordinal > 366)
-            log.error("The ordinal is out of range" + ordinal);
-        
-        int remainingPossibleOrdinals = ordinal;
-        int daysInMonthIndex = 0;
-        
-        int[] monthLegths;
-        
-        if (isLeapYear)
-            monthLegths = LEAP_MONTH_LENGTH;
-        else
-            monthLegths = MONTH_LENGTH;
-        
-        while (daysInMonthIndex < 12) {
-            for (String checkMonth : MONTHSTRINGS) {
-                
-                if (remainingPossibleOrdinals - monthLegths[daysInMonthIndex] <= 0) {
-                    buildMMDD(remainingPossibleOrdinals, checkMonth);
-                    return mmDD;
-                }
-                
-                remainingPossibleOrdinals -= monthLegths[daysInMonthIndex];
-                daysInMonthIndex++;
-            }
-            
-        }
-        
-        if (remainingPossibleOrdinals < 0)
-            log.error("counld not transform ordinal " + ordinal + " to yyyyMMdd format");
-        mmDD = "1313";
-        return mmDD;
+        SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.YEAR, year);
+        c.set(Calendar.DAY_OF_YEAR, ordinal);
+        String result = formatter.format(c.getTime());
+        return result;
     }
-    
-    private void buildMMDD(int ordinal, String month) {
-        if (ordinal < 10)
-            mmDD = month + "0" + ordinal;
-        else
-            mmDD = month + ordinal;
-        
-        if (ordinal > 31)
-            log.error("Ordinal is over 31 - not correct :" + ordinal);
-    }
-    
+
 }
