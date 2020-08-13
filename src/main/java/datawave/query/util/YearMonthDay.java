@@ -21,12 +21,16 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         
     }
     
-    int getYear() {
+    public int getYear() {
         return year;
     }
     
-    int getJulian() {
+    public int getJulian() {
         return julian;
+    }
+    
+    public String getYyyymmdd() {
+        return yyyymmdd;
     }
     
     @Override

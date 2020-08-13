@@ -68,7 +68,6 @@ public class DateFrequencyValue {
             if (log.isTraceEnabled())
                 log.trace(dateFrequencyEntry.getKey().toString());
             
-            // dateToFrequencyValueMap.entrySet().stream().sorted()
         }
         
         if (dayFrequencies != null) {

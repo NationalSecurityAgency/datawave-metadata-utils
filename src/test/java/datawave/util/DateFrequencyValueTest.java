@@ -11,6 +11,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.GregorianCalendar;
 import java.util.Map;
 import java.util.Random;
@@ -103,6 +106,24 @@ public class DateFrequencyValueTest {
         
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
+    }
+    
+    @Test
+    public void GenerateAccumuloShellScript() {
+        
+        try {
+            PrintWriter printWriter = new PrintWriter(new FileWriter("/var/tmp/dw_716_accumulo_script.txt"));
+            
+            for (Map.Entry<YearMonthDay,Frequency> entry : dateFrequencyUncompressed.entrySet()) {
+                String command = "insert BAR_FIELD f csv\\x00" + entry.getKey().getYyyymmdd() + "  " + entry.getValue().getValue();
+                printWriter.println(command);
+                
+            }
+            printWriter.close();
+        } catch (IOException ioException) {
+            Assert.fail("There was an error creating test script");
+            log.info("Here is the problem:", ioException);
+        }
     }
     
 }
