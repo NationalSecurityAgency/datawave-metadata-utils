@@ -18,7 +18,7 @@ public class OrdinalDayOfYear {
         year = theyear;
         gregorianCalendar = new GregorianCalendar(theyear, 1, 1);
         gregorianCalendar.set(GregorianCalendar.DAY_OF_YEAR, ordinal);
-        mmDD = calculateMMDD(ordinalDay);
+        mmDD = calculateMMDD(ordinalDay, year);
         
     }
     
@@ -26,13 +26,15 @@ public class OrdinalDayOfYear {
         return mmDD;
     }
     
-    private String calculateMMDD(int ordinal) {
+    public static String calculateMMDD(int ordinal, int year) {
+        
         SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, year);
         c.set(Calendar.DAY_OF_YEAR, ordinal);
-        String result = formatter.format(c.getTime());
-        return result;
+        synchronized (formatter) {
+            return formatter.format(c.getTime());
+        }
     }
     
 }
