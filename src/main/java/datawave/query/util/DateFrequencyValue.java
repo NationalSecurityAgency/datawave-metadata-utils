@@ -42,7 +42,6 @@ public class DateFrequencyValue {
         int year, presentYear = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
-        Arrays.fill(dayFrequencies, (byte) 0);
         
         for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
             year = dateFrequencyEntry.getKey().year;
@@ -56,14 +55,15 @@ public class DateFrequencyValue {
                     }
                 }
                 
-                presentYear = year;
-                
                 try {
-                    baos.write(Base256Compression.numToBytes(presentYear));
-                    Arrays.fill(dayFrequencies, (byte) 0);
+                    baos.write(Base256Compression.numToBytes(year));
+                    if (presentYear != 0)
+                        Arrays.fill(dayFrequencies, (byte) 0);
                 } catch (IOException ioException) {
                     log.error("Could not convert the year or the first ordinal (julian) to bytes ", ioException);
                 }
+                
+                presentYear = year;
             }
             
             putFrequencyBytesInByteArray(dateFrequencyEntry, dayFrequencies);
@@ -87,7 +87,8 @@ public class DateFrequencyValue {
     }
     
     private void putFrequencyBytesInByteArray(Map.Entry<YearMonthDay,Frequency> entry, byte[] dayFrequencies) {
-        // This will always be 4 bytes now even if null it will get compressed later on.
+        // This will always be 4 bytes now - the frequency variable in the function call below get copied into.
+        // the dayFrequencies array.
         byte[] frequency = Base256Compression.numToBytes(entry.getValue().value);
         
         int dateOrdinal = entry.getKey().julian;
