@@ -41,24 +41,30 @@ public class DateFrequencyValue {
         Value serializedMap;
         int year, presentYear = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        byte[] dayFrequencies = new byte[NUM_FREQUENCY_BYTES];
+        int ordinal, nextOrdinal = 1;
+        OrdinalDayOfYear ordinalDayOfYear = null;
         
         for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
             year = dateFrequencyEntry.getKey().year;
+            ordinal = dateFrequencyEntry.getKey().julian;
+            
             if (year != presentYear) {
                 
-                if (presentYear != 0) {
-                    try {
-                        baos.write(dayFrequencies);
-                    } catch (IOException ioException) {
-                        log.error("Did not write out the frequence properly ", ioException);
-                    }
+                if (nextOrdinal > 1 && (nextOrdinal < DAYS_IN_LEAP_YEAR)) {
+                    if (nextOrdinal != DAYS_IN_LEAP_YEAR + 1)
+                        log.error("The next ordinal should be 367 and not " + nextOrdinal, new Exception());
+                    
+                    do {
+                        Base256Compression.writeToOutputStream(0, baos);
+                        nextOrdinal++;
+                    } while (nextOrdinal < (DAYS_IN_LEAP_YEAR + 1));
                 }
+                
+                ordinalDayOfYear = new OrdinalDayOfYear(ordinal, year);
+                nextOrdinal = 1;
                 
                 try {
                     baos.write(Base256Compression.numToBytes(year));
-                    if (presentYear != 0)
-                        Arrays.fill(dayFrequencies, (byte) 0);
                 } catch (IOException ioException) {
                     log.error("Could not convert the year or the first ordinal (julian) to bytes ", ioException);
                 }
@@ -66,54 +72,54 @@ public class DateFrequencyValue {
                 presentYear = year;
             }
             
-            putFrequencyBytesInByteArray(dateFrequencyEntry, dayFrequencies);
+            if (ordinal == nextOrdinal) {
+                nextOrdinal++;
+                Base256Compression.writeToOutputStream(dateFrequencyEntry.getValue().value, baos);
+            } else {
+                do {
+                    Base256Compression.writeToOutputStream(0, baos);
+                    nextOrdinal++;
+                } while (nextOrdinal < ordinal);
+                
+                Base256Compression.writeToOutputStream(dateFrequencyEntry.getValue().value, baos);
+                nextOrdinal++;
+                
+            }
+            
+            if (nextOrdinal == 366 && ordinalDayOfYear != null && !ordinalDayOfYear.isLeapYear())
+                Base256Compression.writeToOutputStream(0, baos);
             
             if (log.isTraceEnabled())
                 log.trace(dateFrequencyEntry.getKey().toString());
             
         }
         
-        if (dayFrequencies != null) {
-            try {
-                baos.write(dayFrequencies);
-            } catch (IOException ioException) {
-                log.error("Did not write out the frequence properly ", ioException);
-            }
-        }
+        do {
+            Base256Compression.writeToOutputStream(0, baos);
+            nextOrdinal++;
+        } while (nextOrdinal < (DAYS_IN_LEAP_YEAR + 1));
         
         serializedMap = new Value(baos.toByteArray());
         
         return serializedMap;
     }
     
-    private void putFrequencyBytesInByteArray(Map.Entry<YearMonthDay,Frequency> entry, byte[] dayFrequencies) {
-        // This will always be 4 bytes now - the frequency variable in the function call below get copied into.
-        // the dayFrequencies array.
-        byte[] frequency = Base256Compression.numToBytes(entry.getValue().value);
-        
-        int dateOrdinal = entry.getKey().julian;
-        
-        int index = 0;
-        try {
-            for (byte frequencyByte : frequency) {
-                dayFrequencies[(dateOrdinal - 1) * 4 + index] = frequencyByte;
-                index++;
-            }
-        } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {
-            log.error("The ordinal " + dateOrdinal + " causes an index out of bounds excepton", arrayIndexOutOfBoundsException);
-        }
-    }
-    
     public TreeMap<YearMonthDay,Frequency> deserialize(Value oldValue) {
         
         TreeMap<YearMonthDay,Frequency> dateFrequencyMap = new TreeMap<>();
         if (oldValue == null || oldValue.toString().isEmpty()) {
-            log.error("The datefrequency value was empty");
+            log.error("The datefrequency value was empty", new Exception());
             dateFrequencyMap.put(new YearMonthDay("Error"), new Frequency(0));
             return dateFrequencyMap;
         }
         
         byte[] expandedData = oldValue.get();
+        
+        if (expandedData.length < (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
+            log.error("The value array is too short ", new Exception());
+            dateFrequencyMap.put(new YearMonthDay("Error"), new Frequency(0));
+            return dateFrequencyMap;
+        }
         
         try {
             for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
@@ -152,6 +158,13 @@ public class DateFrequencyValue {
         
         public static byte[] numToBytes(long num) {
             return new byte[] {(byte) (num >>> 24), (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
+        }
+        
+        public static void writeToOutputStream(long num, ByteArrayOutputStream baos) {
+            baos.write((byte) (num >>> 24));
+            baos.write((byte) (num >>> 16));
+            baos.write((byte) (num >>> 8));
+            baos.write((byte) (num));
         }
         
         public static int bytesToInteger(byte[] byteArray) {
