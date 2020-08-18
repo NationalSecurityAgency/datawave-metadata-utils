@@ -8,6 +8,7 @@ public class OrdinalDayOfYear {
     private String mmDD;
     private int ordinalDay;
     private int year;
+    private boolean isLeapYear;
     private GregorianCalendar gregorianCalendar;
     
     /*
@@ -18,12 +19,17 @@ public class OrdinalDayOfYear {
         year = theyear;
         gregorianCalendar = new GregorianCalendar(theyear, 1, 1);
         gregorianCalendar.set(GregorianCalendar.DAY_OF_YEAR, ordinal);
+        isLeapYear = gregorianCalendar.isLeapYear(year);
         mmDD = calculateMMDD(ordinalDay, year);
         
     }
     
     public String getMmDD() {
         return mmDD;
+    }
+    
+    public boolean isLeapYear() {
+        return isLeapYear;
     }
     
     public static String calculateMMDD(int ordinal, int year) {

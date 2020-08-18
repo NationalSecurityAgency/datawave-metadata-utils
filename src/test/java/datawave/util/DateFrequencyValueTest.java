@@ -37,25 +37,26 @@ public class DateFrequencyValueTest {
         String dayString;
         int monthIndex = 0;
         int nYear;
-        boolean isLeapYear = false;
+        boolean isLeapYear;
         for (String year : YEARS) {
             GregorianCalendar gc = new GregorianCalendar(Integer.parseInt(year), 1, 1);
             nYear = Integer.parseInt(year);
             isLeapYear = gc.isLeapYear(nYear);
-            int[] monthLegths;
+            int[] monthLengths;
             
             if (isLeapYear)
-                monthLegths = LEAP_MONTH_LENGTH;
+                monthLengths = LEAP_MONTH_LENGTH;
             else
-                monthLegths = MONTH_LENGTH;
+                monthLengths = MONTH_LENGTH;
             
             for (String month : MONTHS) {
-                for (int day = 1; day <= monthLegths[monthIndex]; day++) {
+                for (int day = 1; day <= monthLengths[monthIndex]; day++) {
                     frequencyValue = random.nextInt(Integer.MAX_VALUE);
                     // frequencyValue = 255;
                     dayString = makeDayString(day);
-                    dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
-                                    new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
+                    if (!month.equals(MONTHS[11]))
+                        dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
+                                        new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
                 }
                 monthIndex++;
             }
@@ -87,8 +88,8 @@ public class DateFrequencyValueTest {
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3652);
-        Assert.assertTrue(restored.size() == 3652);
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3342);
+        Assert.assertTrue(restored.size() == 3342);
         
         // Verify accurate restoration
         Frequency restoredFreq, originalFreq;
