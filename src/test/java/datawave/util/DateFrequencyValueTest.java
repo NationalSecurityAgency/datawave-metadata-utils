@@ -30,8 +30,7 @@ public class DateFrequencyValueTest {
     public static final int[] MONTH_LENGTH = new int[] {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     public static final int[] LEAP_MONTH_LENGTH = new int[] {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     
-    @Before
-    public void initialize() {
+    private void initialize(String monthToEliminate) {
         Random random = new Random();
         int frequencyValue;
         String dayString;
@@ -54,9 +53,14 @@ public class DateFrequencyValueTest {
                     frequencyValue = random.nextInt(Integer.MAX_VALUE);
                     // frequencyValue = 255;
                     dayString = makeDayString(day);
-                    if (!month.equals(MONTHS[11]))
+                    if (monthToEliminate != null) {
+                        if (!month.equals(monthToEliminate))
+                            dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
+                                            new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
+                    } else {
                         dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
                                         new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
+                    }
                 }
                 monthIndex++;
             }
@@ -77,7 +81,8 @@ public class DateFrequencyValueTest {
     }
     
     @Test
-    public void DateFrequencyValueTest() {
+    public void DateFrequencyValueTestNoDecemberFrequencies() {
+        initialize(MONTHS[11]);
         Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
@@ -90,7 +95,13 @@ public class DateFrequencyValueTest {
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
         Assert.assertTrue(dateFrequencyUncompressed.size() == 3342);
         Assert.assertTrue(restored.size() == 3342);
+        verifySerializationAndDeserialization(restored);
         
+        log.info("All entries were inserted, tranformed, compressed and deserialized properly");
+        
+    }
+    
+    private void verifySerializationAndDeserialization(TreeMap<YearMonthDay,Frequency> restored) {
         // Verify accurate restoration
         Frequency restoredFreq, originalFreq;
         
@@ -106,6 +117,49 @@ public class DateFrequencyValueTest {
                 Assert.fail("The key: " + entry.getKey() + " with value: " + entry.getValue() + " was not restored");
             }
         }
+    }
+    
+    @Test
+    public void DateFrequencyValueTestNoJanuaryFrequencies() {
+        initialize(MONTHS[0]);
+        Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
+        byte[] compressedMapBytes = accumuloValue.get();
+        Assert.assertTrue(compressedMapBytes != null);
+        TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
+        
+        for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
+            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+        }
+        log.info("The restored size is " + restored.size());
+        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3342);
+        Assert.assertTrue(restored.size() == 3342);
+        
+        // Verify accurate restoration
+        verifySerializationAndDeserialization(restored);
+        
+        log.info("All entries were inserted, tranformed, compressed and deserialized properly");
+        
+    }
+    
+    @Test
+    public void DateFrequencyValueTestNoFebruaryFrequencies() {
+        initialize(MONTHS[1]);
+        Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
+        byte[] compressedMapBytes = accumuloValue.get();
+        Assert.assertTrue(compressedMapBytes != null);
+        TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
+        
+        for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
+            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+        }
+        log.info("The restored size is " + restored.size());
+        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
+        Assert.assertTrue(dateFrequencyUncompressed.size() == 3370);
+        Assert.assertTrue(restored.size() == 3370);
+        
+        // Verify accurate restoration
+        verifySerializationAndDeserialization(restored);
         
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
@@ -113,7 +167,7 @@ public class DateFrequencyValueTest {
     
     @Test
     public void GenerateAccumuloShellScript() {
-        
+        initialize(null);
         try {
             PrintWriter printWriter = new PrintWriter(new FileWriter("/var/tmp/dw_716_accumulo_script.txt"));
             

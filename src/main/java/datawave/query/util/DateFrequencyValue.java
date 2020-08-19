@@ -51,9 +51,8 @@ public class DateFrequencyValue {
             if (year != presentYear) {
                 
                 if (nextOrdinal > 1 && (nextOrdinal < DAYS_IN_LEAP_YEAR)) {
-                    if (nextOrdinal != DAYS_IN_LEAP_YEAR + 1)
-                        log.error("The next ordinal should be 367 and not " + nextOrdinal, new Exception());
-                    
+                    // Add zero frequencies for the remaining days of the year that were not in the map
+                    // for the last year processed
                     do {
                         Base256Compression.writeToOutputStream(0, baos);
                         nextOrdinal++;
@@ -144,7 +143,7 @@ public class DateFrequencyValue {
                 
             }
         } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
-            log.error("Error decoding the compressed array of date values.", indexOutOfBoundsException);
+            log.error("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length, indexOutOfBoundsException);
             
         }
         
