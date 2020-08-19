@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -125,6 +124,9 @@ public class DateFrequencyValue {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.debug("Deserialize decoded the year " + decodedYear);
+                //TODO Extra 4 bytes are being written out in serialize - need to figure this out and remove 2 lines below.
+                if (i == expandedData.length - NUM_BYTES_PER_FREQ_VALUE)
+                    break;
                 /*
                  * Decode the frequencies for each day of the year.
                  */
@@ -144,7 +146,6 @@ public class DateFrequencyValue {
             }
         } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
             log.error("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length, indexOutOfBoundsException);
-            
         }
         
         return dateFrequencyMap;
