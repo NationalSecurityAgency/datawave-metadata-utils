@@ -30,6 +30,28 @@ public class DateFrequencyValue {
     public DateFrequencyValue() {}
     
     /**
+     * @param dateToFrequencyValueMap
+     *            the keys should be dates in yyyyMMdd format
+     * @return size the size of the ByteArrayOutputStream
+     */
+    private int calculateOutputArraySize(TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap) {
+        int year, presentYear = 0, size = 0;
+        
+        for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
+            year = dateFrequencyEntry.getKey().year;
+            if (year != presentYear) {
+                size += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES);
+                presentYear = year;
+                if (log.isTraceEnabled())
+                    log.trace("Estimating size for year : " + presentYear);
+                log.info("Estimating size for year : " + presentYear);
+            }
+        }
+        
+        return size;
+    }
+    
+    /**
      *
      * @param dateToFrequencyValueMap
      *            the keys should be dates in yyyyMMdd format
@@ -39,7 +61,7 @@ public class DateFrequencyValue {
         
         Value serializedMap;
         int year, presentYear = 0;
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(calculateOutputArraySize(dateToFrequencyValueMap));
         int ordinal, nextOrdinal = 1;
         OrdinalDayOfYear ordinalDayOfYear = null;
         
@@ -124,7 +146,7 @@ public class DateFrequencyValue {
                 byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
                 int decodedYear = Base256Compression.bytesToInteger(encodedYear);
                 log.debug("Deserialize decoded the year " + decodedYear);
-                //TODO Extra 4 bytes are being written out in serialize - need to figure this out and remove 2 lines below.
+                // TODO Extra 4 bytes are being written out in serialize - need to figure this out and remove 2 lines below.
                 if (i == expandedData.length - NUM_BYTES_PER_FREQ_VALUE)
                     break;
                 /*
