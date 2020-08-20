@@ -6,7 +6,6 @@ import org.junit.Test;
 
 public class Base256CompressionTest {
     
-    
     @Test
     public void nullBytePrefixedByteArrayTest() {
         byte[] testArray = {'\u0000', '\u0000', '\u0001', '\u0001'};

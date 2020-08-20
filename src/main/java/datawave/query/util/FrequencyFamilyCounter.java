@@ -8,13 +8,17 @@ import datawave.query.util.Frequency;
 import datawave.query.util.YearMonthDay;
 import java.util.TreeMap;
 
+/**
+ * This class contains the TreeMap of date to frequency values that get changed during the tranformRange operation in the FrequencyTransformIterator. It mainly
+ * performs the task of a SummingCombiner of the date frequency values. The class uses the DateFrequencyValue class to serialize and deserialize values into and
+ * out of Accumulo.
+ */
+
 public class FrequencyFamilyCounter {
     
     private TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap = new TreeMap<>();
     private static final int SIMPLEDATE_LENGTH = 8;
     private DateFrequencyValue serializer = new DateFrequencyValue();
-    
-    // private static Pattern SimpleDatePattern = Pattern.compile("^(19|20)\\d\\d[- /.] (0[1-9]|1[012])[- /.] (0[1-9]|[12][0-9]|3[01])$");
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
     
@@ -41,11 +45,12 @@ public class FrequencyFamilyCounter {
      * @param oldValue
      */
     public void deserializeCompressedValue(Value oldValue) {
-        
-        TreeMap<YearMonthDay,Frequency> uncompressedValueMap = serializer.deserialize(oldValue);
-        dateToFrequencyValueMap.clear();
-        dateToFrequencyValueMap.putAll(uncompressedValueMap);
+        dateToFrequencyValueMap = serializer.deserialize(oldValue);
     }
+    
+    /**
+     * Performs what the SummingCombiner used to perform for date and frequency values. The function accumulutes ingest frequencies for individual dates
+     */
     
     public void aggregateRecord(String key, String value) {
         
