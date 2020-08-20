@@ -35,20 +35,9 @@ public class DateFrequencyValue {
      * @return size the size of the ByteArrayOutputStream
      */
     private int calculateOutputArraySize(TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap) {
-        int year, presentYear = 0, size = 0;
-        
-        for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
-            year = dateFrequencyEntry.getKey().year;
-            if (year != presentYear) {
-                size += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES);
-                presentYear = year;
-                if (log.isTraceEnabled())
-                    log.trace("Estimating size for year : " + presentYear);
-                log.info("Estimating size for year : " + presentYear);
-            }
-        }
-        
-        return size;
+        int firstYear = dateToFrequencyValueMap.firstKey().year;
+        int lastYear = dateToFrequencyValueMap.lastKey().year;
+        return (lastYear - firstYear + 1) * (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES);
     }
     
     /**
@@ -83,12 +72,7 @@ public class DateFrequencyValue {
                 ordinalDayOfYear = new OrdinalDayOfYear(ordinal, year);
                 nextOrdinal = 1;
                 
-                try {
-                    baos.write(Base256Compression.numToBytes(year));
-                } catch (IOException ioException) {
-                    log.error("Could not convert the year or the first ordinal (julian) to bytes ", ioException);
-                }
-                
+                Base256Compression.writeToOutputStream(year, baos);
                 presentYear = year;
             }
             
@@ -143,8 +127,7 @@ public class DateFrequencyValue {
         
         try {
             for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
-                byte[] encodedYear = new byte[] {expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]};
-                int decodedYear = Base256Compression.bytesToInteger(encodedYear);
+                int decodedYear = Base256Compression.bytesToInteger(expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]);
                 log.debug("Deserialize decoded the year " + decodedYear);
                 // TODO Extra 4 bytes are being written out in serialize - need to figure this out and remove 2 lines below.
                 if (i == expandedData.length - NUM_BYTES_PER_FREQ_VALUE)
@@ -154,8 +137,8 @@ public class DateFrequencyValue {
                  */
                 for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
                     int k = i + j;
-                    byte[] encodedfrequencyOnDay = new byte[] {expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]};
-                    int decodedFrequencyOnDay = Base256Compression.bytesToInteger(encodedfrequencyOnDay);
+                    int decodedFrequencyOnDay = Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2],
+                                    expandedData[k + 3]);
                     if (decodedFrequencyOnDay != 0) {
                         dateFrequencyMap.put(new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear)),
                                         new Frequency(decodedFrequencyOnDay));
@@ -178,10 +161,6 @@ public class DateFrequencyValue {
      */
     public static class Base256Compression {
         
-        public static byte[] numToBytes(long num) {
-            return new byte[] {(byte) (num >>> 24), (byte) (num >>> 16), (byte) (num >>> 8), (byte) num};
-        }
-        
         public static void writeToOutputStream(long num, ByteArrayOutputStream baos) {
             baos.write((byte) (num >>> 24));
             baos.write((byte) (num >>> 16));
@@ -189,8 +168,8 @@ public class DateFrequencyValue {
             baos.write((byte) (num));
         }
         
-        public static int bytesToInteger(byte[] byteArray) {
-            return ((int) byteArray[0] & 0xff) << 24 | ((int) byteArray[1] & 0xff) << 16 | ((int) byteArray[2] & 0xff) << 8 | ((int) byteArray[3] & 0xff);
+        public static int bytesToInteger(byte high, byte nextHigh, byte lowbyte, byte lowest) {
+            return ((int) high & 0xff) << 24 | ((int) nextHigh & 0xff) << 16 | ((int) lowbyte & 0xff) << 8 | ((int) lowest & 0xff);
         }
         
     }
