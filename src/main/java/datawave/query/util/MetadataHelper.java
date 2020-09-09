@@ -1126,6 +1126,44 @@ public class MetadataHelper {
         return count;
     }
     
+    public Date getEndDateCap(Date begin, Date end) throws TableNotFoundException {
+        
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
+        // colfam
+        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        
+        long count = 0;
+        
+        for (Entry<Key,Value> entry : bs) {
+            Text colq = entry.getKey().getColumnQualifier();
+            
+            int index = colq.find(NULL_BYTE);
+            if (index != -1) {
+                
+                // Parse the date to ensure that we want this record
+                String dateStr = "null";
+                Date date;
+                try {
+                    dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
+                    date = DateHelper.parse(dateStr);
+                    // Add the provided count if we fall within begin and end,
+                    // inclusive
+                    // inclusive
+                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
+                        count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                    }
+                } catch (CharacterCodingException e) {
+                    log.warn("Could not deserialize colqual: " + entry.getKey());
+                }
+            }
+        }
+        
+        bs.close();
+        
+        return end;
+        
+    }
+    
     public Set<String> getDatatypes(Set<String> ingestTypeFilter) throws TableNotFoundException {
         
         Set<String> datatypes = this.allFieldMetadataHelper.loadDatatypes();
