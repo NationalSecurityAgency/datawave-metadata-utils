@@ -109,10 +109,9 @@ public class DateFrequencyValue {
         
         return serializedMap;
     }
-
+    
     /**
-     * Deserializes the Accumulo Value object which contains a byte array into a TreeMap of
-     * dates to the associated ingest frequencies.
+     * Deserializes the Accumulo Value object which contains a byte array into a TreeMap of dates to the associated ingest frequencies.
      *
      * @param oldValue
      * @return
