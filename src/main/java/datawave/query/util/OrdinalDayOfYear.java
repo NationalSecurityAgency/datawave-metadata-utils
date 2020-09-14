@@ -34,7 +34,7 @@ public class OrdinalDayOfYear {
     
     public static String calculateMMDD(int ordinal, int year) {
         
-        SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
+            SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, year);
         c.set(Calendar.DAY_OF_YEAR, ordinal);

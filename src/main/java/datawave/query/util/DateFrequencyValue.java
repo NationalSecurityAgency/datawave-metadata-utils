@@ -42,6 +42,8 @@ public class DateFrequencyValue {
     
     /**
      *
+     * Serializes a treemap of dates with associated frequencies to an Accumulo value
+     *
      * @param dateToFrequencyValueMap
      *            the keys should be dates in yyyyMMdd format
      * @return Value the value to store in accumulo
@@ -107,7 +109,14 @@ public class DateFrequencyValue {
         
         return serializedMap;
     }
-    
+
+    /**
+     * Deserializes the Accumulo Value object which contains a byte array into a TreeMap of
+     * dates to the associated ingest frequencies.
+     *
+     * @param oldValue
+     * @return
+     */
     public TreeMap<YearMonthDay,Frequency> deserialize(Value oldValue) {
         
         TreeMap<YearMonthDay,Frequency> dateFrequencyMap = new TreeMap<>();

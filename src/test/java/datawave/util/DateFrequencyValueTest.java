@@ -47,7 +47,7 @@ public class DateFrequencyValueTest {
                 monthLengths = LEAP_MONTH_LENGTH;
             else
                 monthLengths = MONTH_LENGTH;
-            
+            long thelong = Long.MAX_VALUE;
             for (String month : MONTHS) {
                 for (int day = 1; day <= monthLengths[monthIndex]; day++) {
                     frequencyValue = random.nextInt(Integer.MAX_VALUE);
