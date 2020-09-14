@@ -10,6 +10,7 @@ public class OrdinalDayOfYear {
     private int year;
     private boolean isLeapYear;
     private GregorianCalendar gregorianCalendar;
+    private static SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
     
     /*
      * Used during deserializaton in DateFrequencyValue
@@ -24,17 +25,12 @@ public class OrdinalDayOfYear {
         
     }
     
-    public String getMmDD() {
-        return mmDD;
-    }
-    
     public boolean isLeapYear() {
         return isLeapYear;
     }
     
     public static String calculateMMDD(int ordinal, int year) {
         
-        SimpleDateFormat formatter = new SimpleDateFormat("MMdd");
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, year);
         c.set(Calendar.DAY_OF_YEAR, ordinal);
