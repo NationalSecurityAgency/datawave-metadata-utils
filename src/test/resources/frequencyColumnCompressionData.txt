@@ -1,5 +1,4 @@
-clonetable datawave.metadata testTable
-table testTable
+table datawave.metadata
 config -t testTable -s table.iterator.majc.vers.opt.maxVersions=10
 config -t testTable -s table.iterator.minc.vers.opt.maxVersions=10
 config -t testTable -s table.iterator.scan.vers.opt.maxVersions=10
