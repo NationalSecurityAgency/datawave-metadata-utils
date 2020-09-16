@@ -1255,18 +1255,19 @@ public class MetadataHelper {
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
+        boolean foundCompressedValue = false;
         
         Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         scanner.setRange(Range.exact(fieldName));
         
         IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-        //RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
         RegExFilter.setRegexs(cqRegex, null, null, MetadataHelper.COL_QUAL_PREFIX + ".*", null, false);
         scanner.addScanIterator(cqRegex);
         
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         for (Entry<Key,Value> countEntry : scanner) {
+            foundCompressedValue = true;
             DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
             TreeMap<YearMonthDay,Frequency> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
             Long sum;
@@ -1275,6 +1276,42 @@ public class MetadataHelper {
                 String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
                 datatypeToCounts.put(datatype, sum);
             }
+        }
+        
+        if (!foundCompressedValue)
+            datatypeToCounts.putAll(getCountsByFieldInDayWithTypesLegacy(identifier));
+        
+        return datatypeToCounts;
+    }
+    
+    protected HashMap<String,Long> getCountsByFieldInDayWithTypesLegacy(Entry<String,String> identifier) throws TableNotFoundException, IOException {
+        String fieldName = identifier.getKey();
+        String date = identifier.getValue();
+        
+        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+        scanner.setRange(Range.exact(fieldName));
+        
+        IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
+        RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
+        scanner.addScanIterator(cqRegex);
+        
+        final Text holder = new Text();
+        final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
+        for (Entry<Key,Value> countEntry : scanner) {
+            ByteArrayInputStream bais = new ByteArrayInputStream(countEntry.getValue().get());
+            DataInputStream inputStream = new DataInputStream(bais);
+            
+            Long sum = WritableUtils.readVLong(inputStream);
+            
+            countEntry.getKey().getColumnQualifier(holder);
+            int offset = holder.find(NULL_BYTE);
+            
+            Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + countEntry.getKey());
+            
+            String datatype = Text.decode(holder.getBytes(), 0, offset);
+            
+            datatypeToCounts.put(datatype, sum);
         }
         
         return datatypeToCounts;
