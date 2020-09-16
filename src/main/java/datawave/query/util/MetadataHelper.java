@@ -1146,7 +1146,7 @@ public class MetadataHelper {
                 String dateStr = "null";
                 Date date;
                 try {
-                    dateStr = dateFrequency.getKey().toString();
+                    dateStr = dateFrequency.getKey().yyyymmdd;
                     date = DateHelper.parse(dateStr);
                     // Add the provided count if we fall within begin and end,
                     // inclusive
@@ -1252,7 +1252,6 @@ public class MetadataHelper {
         }
     }
     
-    // TODO: Need to get this to work for frequency column compression
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
@@ -1262,6 +1261,7 @@ public class MetadataHelper {
         scanner.setRange(Range.exact(fieldName));
         
         IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
+        //RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
         RegExFilter.setRegexs(cqRegex, null, null, MetadataHelper.COL_QUAL_PREFIX + ".*", null, false);
         scanner.addScanIterator(cqRegex);
         
