@@ -89,7 +89,7 @@ public class DateFrequencyValueTest {
         TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
         
         for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
@@ -128,7 +128,7 @@ public class DateFrequencyValueTest {
         TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
         
         for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
@@ -151,7 +151,7 @@ public class DateFrequencyValueTest {
         TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
         
         for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         
         log.info("The restored size is " + restored.size());
