@@ -93,14 +93,14 @@ public class FrequencyFamilyCounter {
         } catch (NumberFormatException nfe) {
             try {
                 if (log.isTraceEnabled()) {
-                    log.trace("Long.parseLong could not parse " + value + " to long for this key " + cleanKey);
-                    log.trace("Trying to use Long.decode");
+                    log.trace("Integer.parseUnsignedInt could not parse " + value + " to long for this key " + cleanKey);
+                    log.trace("Trying to use Integer.decode");
                 }
                 parsedLong = Integer.decode(value);
                 if (log.isTraceEnabled())
-                    log.trace("Long.decode processed " + value);
+                    log.trace("Integer.decode processed " + value);
             } catch (NumberFormatException nfe2) {
-                log.error("Long.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
+                log.error("Integer.parseUnsignedInt and Integer.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
                 log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
                 return;
             }
