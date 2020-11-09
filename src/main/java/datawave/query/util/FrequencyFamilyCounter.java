@@ -66,7 +66,7 @@ public class FrequencyFamilyCounter {
      *            value is a an Integer in string format that might be hexadecimal, decimal or octal
      */
     public void insertIntoMap(String key, String value) {
-        int parsedLong;
+        int parsedInteger;
         String cleanKey;
         
         // Assuming that as SimpleDate is at the end of the key passed in. yyyyMMdd
@@ -89,18 +89,18 @@ public class FrequencyFamilyCounter {
             return;
         
         try {
-            parsedLong = Integer.parseUnsignedInt(value);
+            parsedInteger = Integer.parseUnsignedInt(value);
         } catch (NumberFormatException nfe) {
             try {
                 if (log.isTraceEnabled()) {
-                    log.trace("Integer.parseUnsignedInt could not parse " + value + " to long for this key " + cleanKey);
+                    log.trace("Integer.parseUnsignedInt could not parse " + value + " to integer for this key " + cleanKey);
                     log.trace("Trying to use Integer.decode");
                 }
-                parsedLong = Integer.decode(value);
+                parsedInteger = Integer.decode(value);
                 if (log.isTraceEnabled())
                     log.trace("Integer.decode processed " + value);
             } catch (NumberFormatException nfe2) {
-                log.error("Integer.parseUnsignedInt and Integer.decode could not parse " + value + " to long for this key " + cleanKey, nfe2);
+                log.error("Integer.parseUnsignedInt and Integer.decode could not parse " + value + " to int for this key " + cleanKey, nfe2);
                 log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
                 return;
             }
@@ -110,10 +110,10 @@ public class FrequencyFamilyCounter {
         try {
             
             if (!dateToFrequencyValueMap.containsKey(new YearMonthDay(cleanKey)))
-                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), new Frequency(parsedLong));
+                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), new Frequency(parsedInteger));
             else {
                 Frequency lastValue = dateToFrequencyValueMap.get(new YearMonthDay(cleanKey));
-                lastValue.addFrequency(parsedLong);
+                lastValue.addFrequency(parsedInteger);
                 dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), lastValue);
             }
             
