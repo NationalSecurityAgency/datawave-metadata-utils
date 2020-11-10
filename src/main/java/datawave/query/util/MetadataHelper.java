@@ -1074,55 +1074,20 @@ public class MetadataHelper {
         
         long count = 0;
         Value aggregatedValue = null;
+        boolean foundAggregatedValue = false;
         
         String cq = "";
         
         for (Entry<Key,Value> entry : bs) {
-            if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX))
+            if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX)) {
                 aggregatedValue = entry.getValue();
-            cq = entry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
+                foundAggregatedValue = true;
+                cq = entry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
+            }
         }
         
-        if (aggregatedValue == null) {
-            for (Entry<Key,Value> entry : bs) {
-                Text colq = entry.getKey().getColumnQualifier();
-                
-                int index = colq.find(NULL_BYTE);
-                if (index != -1) {
-                    // If we were given a non-null datatype
-                    // Ensure that we process records only on that type
-                    if (null != datatype) {
-                        try {
-                            String type = Text.decode(colq.getBytes(), 0, index);
-                            if (!type.equals(datatype)) {
-                                continue;
-                            }
-                        } catch (CharacterCodingException e) {
-                            log.warn("Could not deserialize colqual: " + entry.getKey());
-                            continue;
-                        }
-                    }
-                    
-                    // Parse the date to ensure that we want this record
-                    String dateStr = "null";
-                    Date date;
-                    try {
-                        dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
-                        date = DateHelper.parse(dateStr);
-                        // Add the provided count if we fall within begin and end,
-                        // inclusive
-                        if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                            count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
-                        }
-                    } catch (ValueFormatException e) {
-                        log.warn("Could not convert the Value to a long" + entry.getValue());
-                    } catch (CharacterCodingException e) {
-                        log.warn("Could not deserialize colqual: " + entry.getKey());
-                    } catch (DateTimeParseException e) {
-                        log.warn("Could not convert date string: " + dateStr);
-                    }
-                }
-            }
+        if (!foundAggregatedValue) {
+            return getCardinalityForFieldLegacy(fieldName, datatype, begin, end);
         } else {
             
             dateFreqMap.initialize(aggregatedValue);
@@ -1155,6 +1120,75 @@ public class MetadataHelper {
                     }
                 } catch (ValueFormatException e) {
                     log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
+                } catch (DateTimeParseException e) {
+                    log.warn("Could not convert date string: " + dateStr);
+                }
+            }
+        }
+        
+        bs.close();
+        
+        return count;
+    }
+    
+    /**
+     * Sum all of the frequency counts for a field in a datatype between a start and end date (inclusive)
+     *
+     * @param fieldName
+     * @param datatype
+     * @param begin
+     * @param end
+     * @return
+     * @throws TableNotFoundException
+     */
+    public long getCardinalityForFieldLegacy(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
+        log.trace("getCardinalityForField from table: " + metadataTableName);
+        Text row = new Text(fieldName.toUpperCase());
+        
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
+        // colfam
+        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        
+        Key startKey = new Key(row);
+        bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
+        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+        
+        long count = 0;
+        
+        for (Entry<Key,Value> entry : bs) {
+            Text colq = entry.getKey().getColumnQualifier();
+            
+            int index = colq.find(NULL_BYTE);
+            if (index != -1) {
+                // If we were given a non-null datatype
+                // Ensure that we process records only on that type
+                if (null != datatype) {
+                    try {
+                        String type = Text.decode(colq.getBytes(), 0, index);
+                        if (!type.equals(datatype)) {
+                            continue;
+                        }
+                    } catch (CharacterCodingException e) {
+                        log.warn("Could not deserialize colqual: " + entry.getKey());
+                        continue;
+                    }
+                }
+                
+                // Parse the date to ensure that we want this record
+                String dateStr = "null";
+                Date date;
+                try {
+                    dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
+                    date = DateHelper.parse(dateStr);
+                    // Add the provided count if we fall within begin and end,
+                    // inclusive
+                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
+                        count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                    }
+                } catch (ValueFormatException e) {
+                    log.warn("Could not convert the Value to a long" + entry.getValue());
+                } catch (CharacterCodingException e) {
+                    log.warn("Could not deserialize colqual: " + entry.getKey());
                 } catch (DateTimeParseException e) {
                     log.warn("Could not convert date string: " + dateStr);
                 }
