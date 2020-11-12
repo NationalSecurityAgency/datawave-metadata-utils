@@ -1,5 +1,6 @@
 package datawave.query.util;
 
+import com.google.common.base.Preconditions;
 import org.apache.accumulo.core.data.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +25,8 @@ public class DateFrequencyValue {
     
     public static final int DAYS_IN_LEAP_YEAR = 366;
     private static int NUM_YEAR_BYTES = 4;
-    private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * 4;
     private static int NUM_BYTES_PER_FREQ_VALUE = 4;
+    private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE;
     
     public DateFrequencyValue() {}
     
@@ -54,7 +55,6 @@ public class DateFrequencyValue {
         int year, presentYear = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream(calculateOutputArraySize(dateToFrequencyValueMap));
         int ordinal, nextOrdinal = 1;
-        OrdinalDayOfYear ordinalDayOfYear = null;
         
         for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
             year = dateFrequencyEntry.getKey().year;
@@ -62,25 +62,23 @@ public class DateFrequencyValue {
             
             if (year != presentYear) {
                 
-                if (nextOrdinal > 1 && (nextOrdinal < DAYS_IN_LEAP_YEAR)) {
+                if (nextOrdinal > 1 && (nextOrdinal <= DAYS_IN_LEAP_YEAR)) {
                     // Add zero frequencies for the remaining days of the year that were not in the map
                     // for the last year processed
                     do {
                         Base256Compression.writeToOutputStream(0, baos);
                         nextOrdinal++;
-                    } while (nextOrdinal < (DAYS_IN_LEAP_YEAR + 1));
+                    } while (nextOrdinal <= DAYS_IN_LEAP_YEAR);
                 }
                 
-                ordinalDayOfYear = new OrdinalDayOfYear(ordinal, year);
-                nextOrdinal = 1;
-                
                 Base256Compression.writeToOutputStream(year, baos);
+                nextOrdinal = 1;
                 presentYear = year;
             }
             
             if (ordinal == nextOrdinal) {
-                nextOrdinal++;
                 Base256Compression.writeToOutputStream(dateFrequencyEntry.getValue().value, baos);
+                nextOrdinal++;
             } else {
                 do {
                     Base256Compression.writeToOutputStream(0, baos);
@@ -92,9 +90,6 @@ public class DateFrequencyValue {
                 
             }
             
-            if (nextOrdinal == 366 && ordinalDayOfYear != null && !ordinalDayOfYear.isLeapYear())
-                Base256Compression.writeToOutputStream(0, baos);
-            
             if (log.isTraceEnabled())
                 log.trace(dateFrequencyEntry.getKey().toString());
             
@@ -103,7 +98,7 @@ public class DateFrequencyValue {
         do {
             Base256Compression.writeToOutputStream(0, baos);
             nextOrdinal++;
-        } while (nextOrdinal < (DAYS_IN_LEAP_YEAR + 1));
+        } while (nextOrdinal <= DAYS_IN_LEAP_YEAR);
         
         serializedMap = new Value(baos.toByteArray());
         
@@ -117,19 +112,45 @@ public class DateFrequencyValue {
      * @return
      */
     public TreeMap<YearMonthDay,Frequency> deserialize(Value oldValue) {
-        
-        TreeMap<YearMonthDay,Frequency> dateFrequencyMap = new TreeMap<>();
-        if (oldValue == null || oldValue.toString().isEmpty()) {
-            log.error("The datefrequency value was empty", new Exception());
-            dateFrequencyMap.put(new YearMonthDay("Error"), new Frequency(0));
-            return dateFrequencyMap;
-        }
+        return deserialize(new TreeMap(), oldValue, null, false, null, false);
+    }
+    
+    /**
+     * Deserializes the Accumulo Value object which contains a byte array into a TreeMap of dates to the associated ingest frequencies.
+     *
+     * @param oldValue
+     * @param startDate
+     *            yyyyMMdd start date to deserialize, null means no bound
+     * @param startInclusive
+     * @param endDate
+     *            yyyyMMdd end date to deserialize, null means no bound
+     * @param endInclusive
+     * @return
+     */
+    public TreeMap<YearMonthDay,Frequency> deserialize(Value oldValue, String startDate, boolean startInclusive, String endDate, boolean endInclusive) {
+        return deserialize(new TreeMap(), oldValue, startDate, startInclusive, endDate, endInclusive);
+    }
+    
+    /**
+     * Deserializes and aggregates the Accumulo Value object which contains a byte array into a TreeMap of dates to the associated ingest frequencies.
+     *
+     * @param dateFrequencyMap
+     * @param oldValue
+     * @param startDate
+     *            yyyyMMdd start date to deserialize, null means no bound
+     * @param startInclusive
+     * @param endDate
+     *            yyyyMMdd end date to deserialize, null means no bound
+     * @param endInclusive
+     * @return
+     */
+    public TreeMap<YearMonthDay,Frequency> deserialize(TreeMap<YearMonthDay,Frequency> dateFrequencyMap, Value oldValue, String startDate,
+                    boolean startInclusive, String endDate, boolean endInclusive) {
+        Preconditions.checkNotNull(oldValue);
         
         byte[] expandedData = oldValue.get();
         
-        if (expandedData.length < (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
-            log.error("The value array is too short ", new Exception());
-            dateFrequencyMap.put(new YearMonthDay("Error"), new Frequency(0));
+        if (expandedData.length == 0) {
             return dateFrequencyMap;
         }
         
@@ -137,31 +158,77 @@ public class DateFrequencyValue {
             for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 int decodedYear = Base256Compression.bytesToInteger(expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]);
                 log.debug("Deserialize decoded the year " + decodedYear);
-                // TODO Extra 4 bytes are being written out in serialize - need to figure this out and remove 2 lines below.
-                if (i == expandedData.length - NUM_BYTES_PER_FREQ_VALUE)
-                    break;
-                /*
-                 * Decode the frequencies for each day of the year.
-                 */
+                
+                // Decode the frequencies for each day of the year.
                 for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
                     int k = i + j;
-                    int decodedFrequencyOnDay = Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2],
-                                    expandedData[k + 3]);
-                    if (decodedFrequencyOnDay != 0) {
-                        dateFrequencyMap.put(new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear)),
-                                        new Frequency(decodedFrequencyOnDay));
-                        log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear
-                                        + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear) + "-" + decodedFrequencyOnDay);
+                    YearMonthDay date = new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear));
+                    if (date.withinBounds(startDate, startInclusive, endDate, endInclusive)) {
+                        int decodedFrequencyOnDay = Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2],
+                                        expandedData[k + 3]);
+                        if (decodedFrequencyOnDay != 0) {
+                            if (dateFrequencyMap.containsKey(date)) {
+                                dateFrequencyMap.get(date).addFrequency(decodedFrequencyOnDay);
+                            } else {
+                                dateFrequencyMap.put(date, new Frequency(decodedFrequencyOnDay));
+                            }
+                            log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear
+                                            + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear) + "-" + decodedFrequencyOnDay);
+                        }
                     }
-                    
                 }
-                
             }
         } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
             log.error("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length, indexOutOfBoundsException);
+            throw new IllegalStateException("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length,
+                            indexOutOfBoundsException);
         }
         
         return dateFrequencyMap;
+    }
+    
+    /**
+     * Sums the frequencies of the Accumulo Value object which contains a byte array into a TreeMap of dates to the associated ingest frequencies.
+     *
+     * @param oldValue
+     * @param startDate
+     *            yyyyMMdd start date to deserialize, null means no bound
+     * @param startInclusive
+     * @param endDate
+     *            yyyyMMdd end date to deserialize, null means no bound
+     * @param endInclusive
+     * @return
+     */
+    public long count(Value oldValue, String startDate, boolean startInclusive, String endDate, boolean endInclusive) {
+        Preconditions.checkNotNull(oldValue);
+        
+        byte[] expandedData = oldValue.get();
+        
+        if (expandedData.length == 0) {
+            return 0;
+        }
+        
+        try {
+            long count = 0;
+            for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
+                int decodedYear = Base256Compression.bytesToInteger(expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]);
+                log.debug("Deserialize decoded the year " + decodedYear);
+                
+                // Decode the frequencies for each day of the year.
+                for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
+                    int k = i + j;
+                    YearMonthDay date = new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear));
+                    if (date.withinBounds(startDate, startInclusive, endDate, endInclusive)) {
+                        count += Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]);
+                    }
+                }
+            }
+            return count;
+        } catch (IndexOutOfBoundsException indexOutOfBoundsException) {
+            log.error("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length, indexOutOfBoundsException);
+            throw new IllegalStateException("Error decoding the compressed array of date values. Expanded array length: " + expandedData.length,
+                            indexOutOfBoundsException);
+        }
     }
     
     /**

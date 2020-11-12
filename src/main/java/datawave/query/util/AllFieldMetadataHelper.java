@@ -196,10 +196,6 @@ public class AllFieldMetadataHelper {
                     colq = colq.substring(0, idx);
                 }
                 
-                if (idx == -1 && colq.startsWith(MetadataHelper.COL_QUAL_PREFIX)) {
-                    colq = colq.replace(MetadataHelper.COL_QUAL_PREFIX, "");
-                }
-                
                 // If types are specified and this type is not in the list,
                 // skip it.
                 if (datatype == null || datatype.isEmpty() || datatype.contains(colq)) {
