@@ -22,13 +22,7 @@ public class FrequencyFamilyCounter {
     
     private static final Logger log = LoggerFactory.getLogger(FrequencyFamilyCounter.class);
     
-    public FrequencyFamilyCounter() {
-        
-    }
-    
-    public void initialize(Value value) {
-        deserializeCompressedValue(value);
-    }
+    public FrequencyFamilyCounter() {}
     
     public void clear() {
         dateToFrequencyValueMap.clear();
@@ -39,20 +33,63 @@ public class FrequencyFamilyCounter {
     }
     
     /**
-     * Takes the value of a compressed f column record and creates the qualifierToFrequencyValueMap so that other records that are not yet aggregated can be
-     * added to the compressed record. After those records are aggregated they are discarded.
+     * Takes the value of a compressed f column record and resets the dateToFrequencyValueMap with its contents.
      *
      * @param oldValue
      */
     public void deserializeCompressedValue(Value oldValue) {
-        dateToFrequencyValueMap = serializer.deserialize(oldValue);
+        deserializeCompressedValue(oldValue, null);
+    }
+    
+    /**
+     * Takes the value of a compressed f column record and resets the dateToFrequencyValueMap with its contents.
+     *
+     * @param oldValue
+     * @param ageOffDate
+     *            yyyyMMdd ageoff date, null implies no ageoff
+     */
+    public void deserializeCompressedValue(Value oldValue, String ageOffDate) {
+        dateToFrequencyValueMap = serializer.deserialize(oldValue, ageOffDate, false, null, false);
+    }
+    
+    /**
+     * Takes the value of a compressed f column record and resets the dateToFrequencyValueMap with its contents.
+     *
+     * @param oldValue
+     * @param beginDate
+     *            yyyyMMdd ageoff date, null implies no begin date
+     * @param endDate
+     *            yyyyMMdd ageoff date, null implies no end date
+     */
+    public void deserializeCompressedValue(Value oldValue, String beginDate, String endDate) {
+        dateToFrequencyValueMap = serializer.deserialize(oldValue, beginDate, true, endDate, true);
+    }
+    
+    /**
+     * Takes the value of a compressed f column record and aggregates it into dateToFrequencyValueMap current.
+     *
+     * @param oldValue
+     */
+    public void aggregateCompressedValue(Value oldValue) {
+        aggregateCompressedValue(oldValue, null);
+    }
+    
+    /**
+     * Takes the value of a compressed f column record and aggregates it into dateToFrequencyValueMap current.
+     *
+     * @param oldValue
+     * @param ageOffDate
+     *            yyyyMMdd ageoff date, null implies no ageoff
+     */
+    public void aggregateCompressedValue(Value oldValue, String ageOffDate) {
+        dateToFrequencyValueMap = serializer.deserialize(dateToFrequencyValueMap, oldValue, ageOffDate, false, null, false);
     }
     
     /**
      * Performs what the SummingCombiner used to perform for date and frequency values. The function accumulutes ingest frequencies for individual dates
      */
     
-    public void aggregateRecord(String key, String value) {
+    public void aggregateRecord(String key, int value) {
         
         insertIntoMap(key, value);
     }
@@ -65,8 +102,7 @@ public class FrequencyFamilyCounter {
      * @param value
      *            value is a an Integer in string format that might be hexadecimal, decimal or octal
      */
-    public void insertIntoMap(String key, String value) {
-        int parsedInteger;
+    public void insertIntoMap(String key, int value) {
         String cleanKey;
         
         // Assuming that as SimpleDate is at the end of the key passed in. yyyyMMdd
@@ -85,35 +121,13 @@ public class FrequencyFamilyCounter {
         if (log.isTraceEnabled())
             log.trace("inserting key: " + cleanKey + " value: " + value);
         
-        if (value.isEmpty())
-            return;
-        
-        try {
-            parsedInteger = Integer.parseUnsignedInt(value);
-        } catch (NumberFormatException nfe) {
-            try {
-                if (log.isTraceEnabled()) {
-                    log.trace("Integer.parseUnsignedInt could not parse " + value + " to integer for this key " + cleanKey);
-                    log.trace("Trying to use Integer.decode");
-                }
-                parsedInteger = Integer.decode(value);
-                if (log.isTraceEnabled())
-                    log.trace("Integer.decode processed " + value);
-            } catch (NumberFormatException nfe2) {
-                log.error("Integer.parseUnsignedInt and Integer.decode could not parse " + value + " to int for this key " + cleanKey, nfe2);
-                log.error("Key " + key + " and value: " + value + " could not be inserted into new record");
-                return;
-            }
-            
-        }
-        
         try {
             
             if (!dateToFrequencyValueMap.containsKey(new YearMonthDay(cleanKey)))
-                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), new Frequency(parsedInteger));
+                dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), new Frequency(value));
             else {
                 Frequency lastValue = dateToFrequencyValueMap.get(new YearMonthDay(cleanKey));
-                lastValue.addFrequency(parsedInteger);
+                lastValue.addFrequency(value);
                 dateToFrequencyValueMap.put(new YearMonthDay(cleanKey), lastValue);
             }
             

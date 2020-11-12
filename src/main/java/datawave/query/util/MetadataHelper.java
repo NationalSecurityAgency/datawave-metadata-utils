@@ -17,11 +17,11 @@ import datawave.iterators.EdgeMetadataCombiner;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
+import datawave.query.model.QueryModel;
 import datawave.security.util.AuthorizationsMinimizer;
+import datawave.security.util.ScannerHelper;
 import datawave.util.StringUtils;
 import datawave.util.UniversalSet;
-import datawave.query.model.QueryModel;
-import datawave.security.util.ScannerHelper;
 import datawave.util.time.DateHelper;
 import datawave.util.time.TraceStopwatch;
 import org.apache.accumulo.core.client.AccumuloException;
@@ -35,13 +35,9 @@ import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.PartialKey;
 import org.apache.accumulo.core.data.Range;
 import org.apache.accumulo.core.data.Value;
-import org.apache.accumulo.core.iterators.ValueFormatException;
-import org.apache.accumulo.core.iterators.user.RegExFilter;
-import org.apache.accumulo.core.iterators.user.SummingCombiner;
+import org.apache.accumulo.core.iterators.user.ColumnSliceFilter;
 import org.apache.accumulo.core.security.Authorizations;
-import org.apache.commons.lang.time.DateUtils;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.WritableUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -49,14 +45,21 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -85,11 +88,44 @@ public class MetadataHelper {
     
     protected static final Text PV = new Text("pv");
     
-    public static final String COL_QUAL_PREFIX = "compressed-";
+    public static final char AGGREGATED_FREQ_COL_QUAL = 'a';
     
     protected static final Function<MetadataEntry,String> toFieldName = new MetadataEntryToFieldName(), toDatatype = new MetadataEntryToDatatype();
     
-    protected String getDatatype(Key k) {
+    /**
+     * Determine if this key is an F column and contains aggregated counts.
+     */
+    public static boolean isAggregatedFreqKey(Key key) {
+        if (key.getColumnFamily().equals(ColumnFamilyConstants.COLF_F)) {
+            return isAggregatedFreqCQ(key.getColumnQualifier());
+        }
+        return false;
+    }
+    
+    /**
+     * Determine if this CQ of an F column contains aggregated counts.
+     */
+    public static boolean isAggregatedFreqCQ(Text cq) {
+        byte[] bytes = cq.getBytes();
+        int len = cq.getLength();
+        return ((len >= 2) && (bytes[len - 1] == (byte) AGGREGATED_FREQ_COL_QUAL) && (bytes[len - 2] == '\0'));
+    }
+    
+    /**
+     * Pull the datatype out of an aggregated F column CQ (more efficient than getDatatype(Key))
+     */
+    public static String getDataTypeFromAggregatedFreqCQ(Text cq) {
+        try {
+            return Text.decode(cq.getBytes(), 0, cq.getLength() - 2);
+        } catch (CharacterCodingException cce) {
+            throw new IllegalStateException("Unable to decode datatype from F column CQ " + cq.toString(), cce);
+        }
+    }
+    
+    /**
+     * Pull the datatype out of a metadata key
+     */
+    public static String getDatatype(Key k) {
         String datatype = k.getColumnQualifier().toString();
         int index = datatype.indexOf('\0');
         if (index >= 0) {
@@ -1046,7 +1082,7 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public long getCardinalityForField(String fieldName, Date begin, Date end) throws TableNotFoundException {
-        return getCardinalityForField(fieldName, null, begin, end);
+        return getCardinalityForField(fieldName, (String) null, begin, end);
     }
     
     /**
@@ -1060,142 +1096,89 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public long getCardinalityForField(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(begin);
+        Preconditions.checkNotNull(end);
+        Preconditions.checkArgument(begin.before(end));
+        
         log.trace("getCardinalityForField from table: " + metadataTableName);
+        long count = 0;
+        
         Text row = new Text(fieldName.toUpperCase());
-        FrequencyFamilyCounter dateFreqMap = new FrequencyFamilyCounter();
+        DateFrequencyValue serializer = new DateFrequencyValue();
+        
+        String beginYMD = DateHelper.format(begin);
+        String endYMD = DateHelper.format(end);
         
         // Get all the rows in DatawaveMetadata for the field, only in the 'f'
         // colfamily
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
-        
-        Key startKey = new Key(row);
-        bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-        
-        long count = 0;
-        Value aggregatedValue = null;
-        boolean foundAggregatedValue = false;
-        
-        String cq = "";
-        
-        for (Entry<Key,Value> entry : bs) {
-            if (entry.getKey().getColumnQualifier().toString().startsWith(COL_QUAL_PREFIX)) {
-                aggregatedValue = entry.getValue();
-                foundAggregatedValue = true;
-                cq = entry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
+        try (Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths)) {
+            
+            Key startKey = new Key(row);
+            bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            if (datatype != null) {
+                IteratorSetting setting = new IteratorSetting(30, ColumnSliceFilter.class);
+                setting.addOption(ColumnSliceFilter.START_BOUND, datatype + '\0');
+                setting.addOption(ColumnSliceFilter.END_BOUND, datatype + '\0' + new String(Character.toChars(Character.MAX_CODE_POINT)));
+                bs.addScanIterator(setting);
+            }
+            
+            for (Entry<Key,Value> entry : bs) {
+                count += serializer.count(entry.getValue(), beginYMD, true, endYMD, true);
             }
         }
-        
-        if (!foundAggregatedValue) {
-            return getCardinalityForFieldLegacy(fieldName, datatype, begin, end);
-        } else {
-            
-            dateFreqMap.initialize(aggregatedValue);
-            
-            for (Entry<YearMonthDay,Frequency> dateFrequency : dateFreqMap.getDateToFrequencyValueMap().entrySet()) {
-                // If we were given a non-null datatype
-                // Ensure that we process records only on that type
-                if (null != datatype && !cq.isEmpty()) {
-                    try {
-                        String type = cq;
-                        if (!type.equals(datatype)) {
-                            continue;
-                        }
-                    } catch (Exception e) {
-                        log.warn("Could not deserialize colqual: " + dateFrequency.getKey());
-                        continue;
-                    }
-                }
-                
-                // Parse the date to ensure that we want this record
-                String dateStr = "null";
-                Date date;
-                try {
-                    dateStr = dateFrequency.getKey().yyyymmdd;
-                    date = DateHelper.parse(dateStr);
-                    // Add the provided count if we fall within begin and end,
-                    // inclusive
-                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                        count += dateFrequency.getValue().getValue();
-                    }
-                } catch (ValueFormatException e) {
-                    log.warn("Could not convert the Value to a long" + dateFrequency.getValue());
-                } catch (DateTimeParseException e) {
-                    log.warn("Could not convert date string: " + dateStr);
-                }
-            }
-        }
-        
-        bs.close();
         
         return count;
     }
     
     /**
-     * Sum all of the frequency counts for a field in a datatype between a start and end date (inclusive)
+     * Sum all of the frequency counts for a field in a set of datatypes between a start and end date (inclusive)
      *
      * @param fieldName
-     * @param datatype
+     * @param datatypes
      * @param begin
      * @param end
      * @return
      * @throws TableNotFoundException
      */
-    public long getCardinalityForFieldLegacy(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
+    public long getCardinalityForField(String fieldName, Set<String> datatypes, Date begin, Date end) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(begin);
+        Preconditions.checkNotNull(end);
+        Preconditions.checkArgument(begin.before(end) || begin.equals(end));
+        Preconditions.checkNotNull(datatypes);
+        
         log.trace("getCardinalityForField from table: " + metadataTableName);
-        Text row = new Text(fieldName.toUpperCase());
-        
-        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
-        // colfam
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
-        
-        Key startKey = new Key(row);
-        bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         
         long count = 0;
         
-        for (Entry<Key,Value> entry : bs) {
-            Text colq = entry.getKey().getColumnQualifier();
+        Text row = new Text(fieldName.toUpperCase());
+        DateFrequencyValue serializer = new DateFrequencyValue();
+        
+        String beginYMD = DateHelper.format(begin);
+        String endYMD = DateHelper.format(end);
+        
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
+        // colfamily
+        try (Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths)) {
             
-            int index = colq.find(NULL_BYTE);
-            if (index != -1) {
-                // If we were given a non-null datatype
-                // Ensure that we process records only on that type
-                if (null != datatype) {
-                    try {
-                        String type = Text.decode(colq.getBytes(), 0, index);
-                        if (!type.equals(datatype)) {
-                            continue;
-                        }
-                    } catch (CharacterCodingException e) {
-                        log.warn("Could not deserialize colqual: " + entry.getKey());
-                        continue;
-                    }
-                }
-                
-                // Parse the date to ensure that we want this record
-                String dateStr = "null";
-                Date date;
-                try {
-                    dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
-                    date = DateHelper.parse(dateStr);
-                    // Add the provided count if we fall within begin and end,
-                    // inclusive
-                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                        count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
-                    }
-                } catch (ValueFormatException e) {
-                    log.warn("Could not convert the Value to a long" + entry.getValue());
-                } catch (CharacterCodingException e) {
-                    log.warn("Could not deserialize colqual: " + entry.getKey());
-                } catch (DateTimeParseException e) {
-                    log.warn("Could not convert date string: " + dateStr);
+            Key startKey = new Key(row);
+            bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            TreeSet<String> sortedSet = new TreeSet(datatypes);
+            IteratorSetting setting = new IteratorSetting(30, ColumnSliceFilter.class);
+            setting.addOption(ColumnSliceFilter.START_BOUND, sortedSet.first() + '\0');
+            setting.addOption(ColumnSliceFilter.END_BOUND, sortedSet.last() + '\0' + new String(Character.toChars(Character.MAX_CODE_POINT)));
+            bs.addScanIterator(setting);
+            
+            for (Entry<Key,Value> entry : bs) {
+                String datatype = getDataTypeFromAggregatedFreqCQ(entry.getKey().getColumnQualifier());
+                if (datatypes.contains(datatype)) {
+                    count += serializer.count(entry.getValue(), beginYMD, true, endYMD, true);
                 }
             }
         }
-        
-        bs.close();
         
         return count;
     }
@@ -1210,43 +1193,6 @@ public class MetadataHelper {
         return Collections.unmodifiableSet(datatypes);
     }
     
-    public Long getCountsByFieldForDays(String fieldName, Date begin, Date end) {
-        return getCountsByFieldForDays(fieldName, begin, end, UniversalSet.instance());
-    }
-    
-    public Long getCountsByFieldForDays(String fieldName, Date begin, Date end, Set<String> ingestTypeFilter) {
-        Preconditions.checkNotNull(fieldName);
-        Preconditions.checkNotNull(begin);
-        Preconditions.checkNotNull(end);
-        Preconditions.checkArgument(begin.before(end));
-        Preconditions.checkNotNull(ingestTypeFilter);
-        
-        Date truncatedBegin = DateUtils.truncate(begin, Calendar.DATE);
-        Date truncatedEnd = DateUtils.truncate(end, Calendar.DATE);
-        
-        if (truncatedEnd.getTime() != end.getTime()) {
-            // If we don't have the same time for both, we actually truncated
-            // the end,
-            // and, as such, we want to bump out the date range to include the
-            // end
-            truncatedEnd = new Date(truncatedEnd.getTime() + 86400000);
-        }
-        
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-        cal.setTime(truncatedBegin);
-        
-        long sum = 0l;
-        while (cal.getTime().before(truncatedEnd)) {
-            Date curDate = cal.getTime();
-            String desiredDate = DateHelper.format(curDate);
-            
-            sum += getCountsByFieldInDayWithTypes(fieldName, desiredDate, ingestTypeFilter);
-            cal.add(Calendar.DATE, 1);
-        }
-        
-        return sum;
-    }
-    
     /**
      * Return the sum across all datatypes of the {@link ColumnFamilyConstants#COLF_F} on the given day.
      *
@@ -1259,7 +1205,19 @@ public class MetadataHelper {
     }
     
     /**
-     * Return the sum across all datatypes of the {@link ColumnFamilyConstants#COLF_F} on the given day in the provided types
+     * Return the sum across all datatypes of the {@link ColumnFamilyConstants#COLF_F} in a given date range.
+     *
+     * @param fieldName
+     * @param begin
+     * @param end
+     * @return
+     */
+    public Long getCountsByFieldForDays(String fieldName, Date begin, Date end) {
+        return getCountsByFieldForDays(fieldName, begin, end, UniversalSet.instance());
+    }
+    
+    /**
+     * Return the sum across all datatypes of the {@link ColumnFamilyConstants#COLF_F} on the given day.
      *
      * @param fieldName
      * @param date
@@ -1267,85 +1225,51 @@ public class MetadataHelper {
      * @return
      */
     public Long getCountsByFieldInDayWithTypes(String fieldName, String date, final Set<String> datatypes) {
-        Preconditions.checkNotNull(fieldName);
-        Preconditions.checkNotNull(date);
-        Preconditions.checkNotNull(datatypes);
-        
+        Date dateDate = DateHelper.parse(date);
+        return getCountsByFieldForDays(fieldName, dateDate, dateDate, datatypes);
+    }
+    
+    /**
+     * Return the sum across all datatypes of the {@link ColumnFamilyConstants#COLF_F} on the given day.
+     *
+     * @param fieldName
+     * @param begin
+     * @param end
+     * @param ingestTypeFilter
+     * @return
+     */
+    public Long getCountsByFieldForDays(String fieldName, Date begin, Date end, Set<String> ingestTypeFilter) {
         try {
-            Map<String,Long> countsByType = getCountsByFieldInDayWithTypes(Maps.immutableEntry(fieldName, date));
-            Iterable<Entry<String,Long>> filteredByType = Iterables.filter(countsByType.entrySet(), input -> datatypes.contains(input.getKey()));
-            
-            long sum = 0;
-            for (Entry<String,Long> entry : filteredByType) {
-                sum += entry.getValue();
-            }
-            
-            return sum;
-        } catch (TableNotFoundException | IOException e) {
-            throw new RuntimeException(e);
+            return getCardinalityForField(fieldName, ingestTypeFilter, begin, end);
+        } catch (TableNotFoundException te) {
+            throw new RuntimeException(te);
         }
     }
     
+    /**
+     * Return a map of sums by datatype of the {@link ColumnFamilyConstants#COLF_F} for the given field and date
+     *
+     * @param identifier
+     * @return
+     */
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
         String fieldName = identifier.getKey();
-        String date = identifier.getValue();
-        boolean foundCompressedValue = false;
-        
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
-        scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-        scanner.setRange(Range.exact(fieldName));
-        
-        IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-        RegExFilter.setRegexs(cqRegex, null, null, MetadataHelper.COL_QUAL_PREFIX + ".*", null, false);
-        scanner.addScanIterator(cqRegex);
+        YearMonthDay date = new YearMonthDay(identifier.getValue());
         
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
-        for (Entry<Key,Value> countEntry : scanner) {
-            foundCompressedValue = true;
-            DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
-            TreeMap<YearMonthDay,Frequency> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
-            Long sum;
-            if (dateFrequencies.size() > 0 && dateFrequencies.get(new YearMonthDay(date)) != null) {
-                sum = Long.valueOf(dateFrequencies.get(new YearMonthDay(date)).getValue());
-                String datatype = countEntry.getKey().getColumnQualifier().toString().replaceAll(MetadataHelper.COL_QUAL_PREFIX, "");
-                datatypeToCounts.put(datatype, sum);
+        DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
+        
+        try (Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths)) {
+            scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            scanner.setRange(Range.exact(fieldName));
+            
+            for (Entry<Key,Value> countEntry : scanner) {
+                TreeMap<YearMonthDay,Frequency> dateFrequencies = dateFrequencyValue.deserialize(countEntry.getValue());
+                Frequency freq = dateFrequencies.get(date);
+                if (freq != null && freq.getValue() > 0) {
+                    datatypeToCounts.put(getDataTypeFromAggregatedFreqCQ(countEntry.getKey().getColumnQualifier()), new Long(freq.getValue()));
+                }
             }
-        }
-        
-        if (!foundCompressedValue)
-            datatypeToCounts.putAll(getCountsByFieldInDayWithTypesLegacy(identifier));
-        
-        return datatypeToCounts;
-    }
-    
-    protected HashMap<String,Long> getCountsByFieldInDayWithTypesLegacy(Entry<String,String> identifier) throws TableNotFoundException, IOException {
-        String fieldName = identifier.getKey();
-        String date = identifier.getValue();
-        
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
-        scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-        scanner.setRange(Range.exact(fieldName));
-        
-        IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-        RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
-        scanner.addScanIterator(cqRegex);
-        
-        final Text holder = new Text();
-        final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
-        for (Entry<Key,Value> countEntry : scanner) {
-            ByteArrayInputStream bais = new ByteArrayInputStream(countEntry.getValue().get());
-            DataInputStream inputStream = new DataInputStream(bais);
-            
-            Long sum = WritableUtils.readVLong(inputStream);
-            
-            countEntry.getKey().getColumnQualifier(holder);
-            int offset = holder.find(NULL_BYTE);
-            
-            Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + countEntry.getKey());
-            
-            String datatype = Text.decode(holder.getBytes(), 0, offset);
-            
-            datatypeToCounts.put(datatype, sum);
         }
         
         return datatypeToCounts;

@@ -1,5 +1,9 @@
 package datawave.query.util;
 
+import org.apache.commons.lang.builder.CompareToBuilder;
+import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.commons.lang.builder.HashCodeBuilder;
+
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
@@ -33,6 +37,11 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         return yyyymmdd;
     }
     
+    public boolean withinBounds(String start, boolean startInclusive, String end, boolean endInclusive) {
+        return ((start == null || (startInclusive ? yyyymmdd.compareTo(start) >= 0 : yyyymmdd.compareTo(start) > 0))
+                        && (end == null || (endInclusive ? yyyymmdd.compareTo(end) <= 0 : yyyymmdd.compareTo(end) < 0)));
+    }
+    
     @Override
     public String toString() {
         return "String date: " + yyyymmdd + " ordinal day: " + julian;
@@ -40,16 +49,21 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     
     @Override
     public int compareTo(YearMonthDay yearMonthDay) {
-        if (year > yearMonthDay.year)
-            return 1;
-        if (year < yearMonthDay.year)
-            return -1;
-        if (julian > yearMonthDay.julian)
-            return 1;
-        if (julian < yearMonthDay.julian)
-            return -1;
-        
-        return 0;
+        return new CompareToBuilder().append(year, yearMonthDay.year).append(julian, yearMonthDay.julian).toComparison();
+    }
+    
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder().append(year).append(julian).toHashCode();
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof YearMonthDay) {
+            YearMonthDay yearMonthDay = (YearMonthDay) o;
+            return new EqualsBuilder().append(year, yearMonthDay.year).append(julian, yearMonthDay.julian).isEquals();
+        }
+        return false;
     }
     
 }

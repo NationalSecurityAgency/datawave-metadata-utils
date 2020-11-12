@@ -166,8 +166,7 @@ public class EdgeMetadataCQStripperCombinerTest {
                 continue;
             }
             
-            System.out.println(row + " " + columnFamily + ":" + columnQualifier + " " + "[" + visibility + "] " + timeStamp + " "
-                            + meta.toString().replace('\n', ' '));
+            log.trace(row + " " + columnFamily + ":" + columnQualifier + " " + "[" + visibility + "] " + timeStamp + " " + meta.toString().replace('\n', ' '));
         }
         
     }
