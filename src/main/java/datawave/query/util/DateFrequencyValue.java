@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.time.Year;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -23,7 +24,7 @@ public class DateFrequencyValue {
     
     private static final Logger log = LoggerFactory.getLogger(DateFrequencyValue.class);
     
-    public static final int DAYS_IN_LEAP_YEAR = 366;
+    private static int DAYS_IN_LEAP_YEAR = YearMonthDay.DAYS_IN_LEAP_YEAR;
     private static int NUM_YEAR_BYTES = 4;
     private static int NUM_BYTES_PER_FREQ_VALUE = 4;
     private static int NUM_FREQUENCY_BYTES = DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE;
@@ -36,8 +37,8 @@ public class DateFrequencyValue {
      * @return size the size of the ByteArrayOutputStream
      */
     private int calculateOutputArraySize(TreeMap<YearMonthDay,Frequency> dateToFrequencyValueMap) {
-        int firstYear = dateToFrequencyValueMap.firstKey().year;
-        int lastYear = dateToFrequencyValueMap.lastKey().year;
+        int firstYear = dateToFrequencyValueMap.firstKey().getYear();
+        int lastYear = dateToFrequencyValueMap.lastKey().getYear();
         return (lastYear - firstYear + 1) * (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES);
     }
     
@@ -57,8 +58,8 @@ public class DateFrequencyValue {
         int ordinal, nextOrdinal = 1;
         
         for (Map.Entry<YearMonthDay,Frequency> dateFrequencyEntry : dateToFrequencyValueMap.entrySet()) {
-            year = dateFrequencyEntry.getKey().year;
-            ordinal = dateFrequencyEntry.getKey().julian;
+            year = dateFrequencyEntry.getKey().getYear();
+            ordinal = dateFrequencyEntry.getKey().getJulian();
             
             if (year != presentYear) {
                 
@@ -154,16 +155,24 @@ public class DateFrequencyValue {
             return dateFrequencyMap;
         }
         
+        YearMonthDay.Bounds bounds = new YearMonthDay.Bounds(startDate, startInclusive, endDate, endInclusive);
+        
         try {
             for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 int decodedYear = Base256Compression.bytesToInteger(expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]);
-                log.debug("Deserialize decoded the year " + decodedYear);
+                String decodedYearStr = String.valueOf(decodedYear);
+                log.debug("Deserialize decoded the year " + decodedYearStr);
                 
-                // Decode the frequencies for each day of the year.
-                for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
-                    int k = i + j;
-                    YearMonthDay date = new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear));
-                    if (date.withinBounds(startDate, startInclusive, endDate, endInclusive)) {
+                if (bounds.intersectsYear(decodedYearStr)) {
+                    // determine the range within this year
+                    int startOrdinalInYear = bounds.getStartOrdinal(decodedYearStr);
+                    int endOrdinalInYear = bounds.getEndOrdinal(decodedYearStr);
+                    
+                    // Decode the frequencies for each day of the year within the range.
+                    for (int j = NUM_YEAR_BYTES + ((startOrdinalInYear - 1) * NUM_BYTES_PER_FREQ_VALUE); j < endOrdinalInYear * NUM_BYTES_PER_FREQ_VALUE
+                                    + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
+                        int k = i + j;
+                        YearMonthDay date = new YearMonthDay(decodedYear, ((j - NUM_YEAR_BYTES) / NUM_BYTES_PER_FREQ_VALUE) + 1);
                         int decodedFrequencyOnDay = Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2],
                                         expandedData[k + 3]);
                         if (decodedFrequencyOnDay != 0) {
@@ -172,8 +181,7 @@ public class DateFrequencyValue {
                             } else {
                                 dateFrequencyMap.put(date, new Frequency(decodedFrequencyOnDay));
                             }
-                            log.debug("put key value pair in SimpleDateFrequency map: " + decodedYear
-                                            + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear) + "-" + decodedFrequencyOnDay);
+                            log.debug("put key value pair in SimpleDateFrequency map: " + date + ", " + dateFrequencyMap.get(date));
                         }
                     }
                 }
@@ -208,17 +216,25 @@ public class DateFrequencyValue {
             return 0;
         }
         
+        YearMonthDay.Bounds bounds = new YearMonthDay.Bounds(startDate, startInclusive, endDate, endInclusive);
+        
         try {
             long count = 0;
             for (int i = 0; i < expandedData.length; i += (NUM_YEAR_BYTES + NUM_FREQUENCY_BYTES)) {
                 int decodedYear = Base256Compression.bytesToInteger(expandedData[i], expandedData[i + 1], expandedData[i + 2], expandedData[i + 3]);
-                log.debug("Deserialize decoded the year " + decodedYear);
+                String decodedYearStr = String.valueOf(decodedYear);
+                log.debug("Deserialize decoded the year " + decodedYearStr);
                 
-                // Decode the frequencies for each day of the year.
-                for (int j = NUM_YEAR_BYTES; j < DAYS_IN_LEAP_YEAR * NUM_BYTES_PER_FREQ_VALUE + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
-                    int k = i + j;
-                    YearMonthDay date = new YearMonthDay(decodedYear + OrdinalDayOfYear.calculateMMDD(j / NUM_BYTES_PER_FREQ_VALUE, decodedYear));
-                    if (date.withinBounds(startDate, startInclusive, endDate, endInclusive)) {
+                if (bounds.intersectsYear(decodedYearStr)) {
+                    // determine the range within this year
+                    int startOrdinalInYear = bounds.getStartOrdinal(decodedYearStr);
+                    int endOrdinalInYear = bounds.getEndOrdinal(decodedYearStr);
+                    
+                    // Decode the frequencies for each day of the year within the range.
+                    for (int j = NUM_YEAR_BYTES + ((startOrdinalInYear - 1) * NUM_BYTES_PER_FREQ_VALUE); j < endOrdinalInYear * NUM_BYTES_PER_FREQ_VALUE
+                                    + NUM_YEAR_BYTES; j += NUM_BYTES_PER_FREQ_VALUE) {
+                        int k = i + j;
+                        YearMonthDay date = new YearMonthDay(decodedYear, ((j - NUM_YEAR_BYTES) / NUM_BYTES_PER_FREQ_VALUE) + 1);
                         count += Base256Compression.bytesToInteger(expandedData[k], expandedData[k + 1], expandedData[k + 2], expandedData[k + 3]);
                     }
                 }
