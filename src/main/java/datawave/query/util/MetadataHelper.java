@@ -1099,7 +1099,7 @@ public class MetadataHelper {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(begin);
         Preconditions.checkNotNull(end);
-        Preconditions.checkArgument(begin.before(end));
+        Preconditions.checkArgument(begin.before(end) || begin.equals(end));
         
         log.trace("getCardinalityForField from table: " + metadataTableName);
         long count = 0;
@@ -1167,10 +1167,12 @@ public class MetadataHelper {
             bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
             bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             TreeSet<String> sortedSet = new TreeSet(datatypes);
-            IteratorSetting setting = new IteratorSetting(30, ColumnSliceFilter.class);
-            setting.addOption(ColumnSliceFilter.START_BOUND, sortedSet.first() + '\0');
-            setting.addOption(ColumnSliceFilter.END_BOUND, sortedSet.last() + '\0' + new String(Character.toChars(Character.MAX_CODE_POINT)));
-            bs.addScanIterator(setting);
+            if (!sortedSet.isEmpty()) {
+                IteratorSetting setting = new IteratorSetting(30, ColumnSliceFilter.class);
+                setting.addOption(ColumnSliceFilter.START_BOUND, sortedSet.first() + '\0');
+                setting.addOption(ColumnSliceFilter.END_BOUND, sortedSet.last() + '\0' + new String(Character.toChars(Character.MAX_CODE_POINT)));
+                bs.addScanIterator(setting);
+            }
             
             for (Entry<Key,Value> entry : bs) {
                 String datatype = getDataTypeFromAggregatedFreqCQ(entry.getKey().getColumnQualifier());
