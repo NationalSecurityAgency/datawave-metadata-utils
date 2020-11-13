@@ -2,11 +2,9 @@ package datawave.util;
 
 import datawave.query.util.DateFrequencyValue;
 import datawave.query.util.Frequency;
-import datawave.query.util.OrdinalDayOfYear;
 import datawave.query.util.YearMonthDay;
 import org.apache.accumulo.core.data.Value;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
