@@ -11,7 +11,8 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     
     public YearMonthDay(String value) {
         yyyymmdd = value;
-        cal.setTime(DateHelper.parse(value));
+        cal.clear();
+        cal.set(Integer.parseInt(value.substring(0, 4)), Integer.parseInt(value.substring(4, 6)) - 1, Integer.parseInt(value.substring(6)));
     }
     
     public YearMonthDay(int year, int julian) {
