@@ -41,19 +41,19 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     
     @Override
     public int compareTo(YearMonthDay yearMonthDay) {
-        return cal.compareTo(yearMonthDay.cal);
+        return yyyymmdd.compareTo(yearMonthDay.yyyymmdd);
     }
     
     @Override
     public int hashCode() {
-        return cal.hashCode();
+        return yyyymmdd.hashCode();
     }
     
     @Override
     public boolean equals(Object o) {
         if (o instanceof YearMonthDay) {
             YearMonthDay yearMonthDay = (YearMonthDay) o;
-            return cal.equals(yearMonthDay.cal);
+            return yyyymmdd.equals(yearMonthDay.yyyymmdd);
         }
         return false;
     }
