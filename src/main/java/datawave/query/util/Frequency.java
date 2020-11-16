@@ -20,10 +20,17 @@ public class Frequency {
         return "Frequency{" + "value=" + value + '}';
     }
     
-    public boolean equals(Frequency obj) {
-        if (obj.value == value)
-            return true;
-        else
-            return false;
+    @Override
+    public int hashCode() {
+        return value;
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Frequency) {
+            if (((Frequency) obj).value == value)
+                return true;
+        }
+        return false;
     }
 }

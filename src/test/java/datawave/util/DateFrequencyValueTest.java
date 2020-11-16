@@ -125,8 +125,11 @@ public class DateFrequencyValueTest {
         Assert.assertTrue(compressedMapBytes != null);
         TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
         
+        for (Map.Entry<YearMonthDay,Frequency> entry : dateFrequencyUncompressed.entrySet()) {
+            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
+        }
         for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
+            log.info("key is: " + entry.getKey() + " value is: " + entry.getValue());
         }
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
