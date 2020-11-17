@@ -1358,6 +1358,20 @@ public class MetadataHelper {
         return Multimaps.unmodifiableMultimap(fields);
     }
     
+    public FrequencyFamilyCounter getIndexDates(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
+        
+        Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
+        
+        try {
+            return this.allFieldMetadataHelper.getIndexDates(ColumnFamilyConstants.COLF_I, entry);
+        } catch (InstantiationException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        
+    }
+    
     private static String getKey(Instance instance, String metadataTableName) {
         StringBuilder builder = new StringBuilder();
         builder.append(instance != null ? instance.getInstanceID() : null).append('\0');

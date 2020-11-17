@@ -210,6 +210,68 @@ public class AllFieldMetadataHelper {
     }
     
     /**
+     * Method that fetches fetches a DataFrequencyValue for an indexed rowid.
+     *
+     * @param colf
+     * @param key
+     * @return
+     * @throws TableNotFoundException
+     * @throws InstantiationException
+     * @throws ExecutionException
+     */
+    @Cacheable(value = "getIndexDates", key = "{#root.target.auths,#root.target.metadataTableName,#colf,#key}", cacheManager = "cacheManager", sync = true)
+    // using cache with higher maximumSize
+    public FrequencyFamilyCounter getIndexDates(Text colf, Entry<String,Entry<String,Set<String>>> key)
+                    throws TableNotFoundException, InstantiationException, ExecutionException {
+        log.debug("cache fault for getIndexDates(" + this.auths + "," + this.metadataTableName + "," + colf + "," + key + ")");
+        Preconditions.checkNotNull(key);
+        
+        final String tableName = key.getKey();
+        final String fieldName = key.getValue().getKey();
+        final Set<String> datatype = key.getValue().getValue();
+        
+        Preconditions.checkNotNull(fieldName);
+        
+        // FieldNames are "normalized" to be all upper case
+        String upCaseFieldName = fieldName.toUpperCase();
+        
+        // Scanner to the provided metadata table
+        Scanner scanner = ScannerHelper.createScanner(connector, tableName, auths);
+        
+        Range range = new Range(upCaseFieldName);
+        scanner.setRange(range);
+        scanner.fetchColumnFamily(colf);
+        FrequencyFamilyCounter counter = new FrequencyFamilyCounter();
+        
+        for (Entry<Key,Value> entry : scanner) {
+            // Get the column qualifier from the key. It contains the ingesttype
+            // and datatype class
+            if (null != entry.getKey().getColumnQualifier()) {
+                String colq = entry.getKey().getColumnQualifier().toString();
+                
+                // there should not be a null byte and Normalizer class in the 'i' entry for version3+
+                int idx = colq.indexOf(NULL_BYTE);
+                if (idx != -1) {
+                    colq = colq.substring(0, idx);
+                }
+                // If types are specified and this type is not in the list,
+                // skip it.
+                if (datatype == null || datatype.isEmpty() || datatype.contains(colq)) {
+                    try {
+                        counter.deserializeCompressedValue(entry.getValue());
+                    } catch (Exception e) {
+                        log.error("Could not deserialize the indexed row's DataFrequencyValue");
+                    }
+                    break;
+                }
+            } else {
+                log.warn("ColumnQualifier null in ColumnFamilyConstants for key: " + entry.getKey());
+            }
+        }
+        return counter;
+    }
+    
+    /**
      * Returns a Set of all Types in use by any type in Accumulo
      * 
      * @return
