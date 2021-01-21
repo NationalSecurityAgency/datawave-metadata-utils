@@ -1,0 +1,179 @@
+package datawave.query.util;
+
+import org.apache.accumulo.core.data.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.TreeSet;
+
+public class IndexedDatesValue {
+    
+    private static final Logger log = LoggerFactory.getLogger(IndexedDatesValue.class);
+    
+    private YearMonthDay startDay;
+    private TreeSet<YearMonthDay> indexedDatesSet = new TreeSet<>();
+    private BitSet indexedDatesBitSet;
+    public static final int YYMMDDSIZE = 8;
+    
+    public IndexedDatesValue(YearMonthDay startDate) {
+        startDay = startDate;
+        indexedDatesBitSet = new BitSet(1);
+        indexedDatesBitSet.set(0);
+        indexedDatesSet.add(startDate);
+    }
+    
+    /*
+     * build byte array with the start day at the beginning and the bytes of the bit set remaining
+     */
+    
+    /**
+     * Serialize a Bitset representing indexed dates and initial date the field was indexed.
+     *
+     * @return
+     */
+    public Value serialize() {
+
+        indexedDatesBitSet = new BitSet(indexedDatesSet.size());
+        int dayIndex = 0;
+        YearMonthDay nextDay = startDay;
+        for (YearMonthDay ymd : indexedDatesSet) {
+            if (ymd.compareTo(nextDay) == 0)
+                indexedDatesBitSet.set(dayIndex);
+            dayIndex++;
+            nextDay = YearMonthDay.nextDay(ymd.getYyyymmdd());
+
+        }
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(YYMMDDSIZE + indexedDatesBitSet.size());
+        try {
+            baos.write(startDay.getYyyymmdd().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            log.error("Could not write the initial day field was indexed");
+        }
+        if (indexedDatesBitSet != null && !indexedDatesBitSet.isEmpty()) {
+            try {
+                baos.write(indexedDatesBitSet.toByteArray());
+            } catch (IOException e) {
+                log.error("Could not write index set to the output stream.");
+            }
+        }
+        
+        return new Value(baos.toByteArray());
+    }
+    
+    public static IndexedDatesValue deserialize(Value accumuloValue) {
+        String yyyyMMdd = new String(Arrays.copyOfRange(accumuloValue.get(), 0, YYMMDDSIZE), StandardCharsets.UTF_8);
+        IndexedDatesValue indexedDates = new IndexedDatesValue(new YearMonthDay(yyyyMMdd));
+        if (accumuloValue.get().length > 8) {
+            BitSet theIndexedDates = BitSet.valueOf(Arrays.copyOfRange(accumuloValue.get(), YYMMDDSIZE, accumuloValue.get().length));
+            indexedDates.setIndexedDatesBitSet(theIndexedDates);
+        }
+
+        return indexedDates;
+    }
+    
+    /**
+     * Returns the TreeSet of dates a field was indexed
+     * 
+     * @return
+     */
+    public TreeSet<YearMonthDay> getIndexedDatesSet() {
+        return indexedDatesSet;
+    }
+    
+    /**
+     * Sets the bit for index which represents the number of days from the initial indexed date for a field.
+     * 
+     * @param baseIndexOffset
+     */
+    public void addDateIndex(int baseIndexOffset) {
+        if (indexedDatesBitSet != null)
+            indexedDatesBitSet.set(baseIndexOffset);
+        else
+            log.info("Need to initialize the indexDateSet");
+    }
+    
+    /**
+     * Puts a date a field was indexed into the TreeSet to be used during serialization to create the bit set called indexedDateSet.
+     * 
+     * @param indexedDate
+     */
+    
+    public void addIndexedDate(YearMonthDay indexedDate) {
+        indexedDatesSet.add(indexedDate);
+    }
+    
+    /**
+     * Sets the indexedDateSet if created externally in another class.
+     * 
+     * @param externalDateSet
+     */
+    public void setIndexedDatesBitSet(BitSet externalDateSet) {
+        if (externalDateSet != null)
+            this.indexedDatesBitSet = externalDateSet;
+    }
+    
+    @Override
+    public String toString() {
+        return "Start date: " + startDay + " Bitset: " + this.indexedDatesBitSet.toString();
+    }
+    
+    public static void main(String args[]) {
+        BitSet bits1 = new BitSet(24);
+        BitSet bits2 = new BitSet(24);
+        BitSet bits3 = new BitSet(24);
+        
+        IndexedDatesValue datesValue = new IndexedDatesValue(new YearMonthDay("20090101"));
+        datesValue.setIndexedDatesBitSet(bits3);
+        // set some bits
+        for (int i = 0; i < 24; i++) {
+            if ((i % 4) == 0)
+                bits1.set(i);
+            bits2.set(i);
+            bits3.set(i);
+        }
+        
+        System.out.println("Initial pattern in bits1: ");
+        System.out.println(bits1);
+        System.out.println("\nInitial pattern in bits2: ");
+        System.out.println(bits2);
+        
+        // AND bits
+        bits2.and(bits1);
+        System.out.println("\nbits2 AND bits1: ");
+        System.out.println(bits2);
+        
+        // OR bits
+        bits2.or(bits1);
+        System.out.println("\nbits2 OR bits1: ");
+        System.out.println(bits2);
+        
+        // XOR bits
+        bits2.xor(bits1);
+        System.out.println("\nbits2 XOR bits1: ");
+        System.out.println(bits2);
+        
+        Value value = datesValue.serialize();
+        
+        IndexedDatesValue datesValue2 = IndexedDatesValue.deserialize(value);
+        System.out.println(datesValue2);
+        System.out.println("Bitset should be the same as:");
+        System.out.println(bits3);
+
+        int i = 0;
+        YearMonthDay nextDay = new YearMonthDay("20081215");
+        System.out.println(nextDay);
+
+        while (i < 400){
+            nextDay = YearMonthDay.nextDay(nextDay.getYyyymmdd());
+            System.out.println(nextDay);
+            i++;
+        }
+    }
+    
+}
