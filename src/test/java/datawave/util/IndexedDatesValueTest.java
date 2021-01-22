@@ -1,11 +1,10 @@
 package datawave.util;
 
-import datawave.query.util.DateFrequencyValue;
 import datawave.query.util.IndexedDatesValue;
-import datawave.query.util.Frequency;
 import datawave.query.util.YearMonthDay;
 import org.apache.accumulo.core.data.Value;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,14 +12,11 @@ import org.slf4j.LoggerFactory;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.GregorianCalendar;
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
+import java.util.*;
 
 public class IndexedDatesValueTest {
-    DateFrequencyValue dateFrequencyValue = new DateFrequencyValue();
-    TreeMap<YearMonthDay,Frequency> dateFrequencyUncompressed = new TreeMap<>();
+    IndexedDatesValue indexedDatesValue = new IndexedDatesValue();
+    TreeSet<YearMonthDay> indexedDatesUncompressed = new TreeSet<>();
     
     private static final Logger log = LoggerFactory.getLogger(IndexedDatesValueTest.class);
     
@@ -30,8 +26,6 @@ public class IndexedDatesValueTest {
     public static final int[] LEAP_MONTH_LENGTH = new int[] {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     
     private void initialize(String monthToEliminate) {
-        Random random = new Random();
-        int frequencyValue;
         String dayString;
         int monthIndex = 0;
         int nYear;
@@ -46,19 +40,15 @@ public class IndexedDatesValueTest {
                 monthLengths = LEAP_MONTH_LENGTH;
             else
                 monthLengths = MONTH_LENGTH;
-            long thelong = Long.MAX_VALUE;
+
             for (String month : MONTHS) {
                 for (int day = 1; day <= monthLengths[monthIndex]; day++) {
-                    frequencyValue = random.nextInt(Integer.MAX_VALUE);
-                    // frequencyValue = 255;
                     dayString = makeDayString(day);
                     if (monthToEliminate != null) {
                         if (!month.equals(monthToEliminate))
-                            dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
-                                            new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
+                            indexedDatesUncompressed.add(new YearMonthDay(year + month + dayString));
                     } else {
-                        dateFrequencyUncompressed.put(new YearMonthDay(year + month + dayString),
-                                        new Frequency(frequencyValue < 0 ? -frequencyValue : frequencyValue));
+                        indexedDatesUncompressed.add(new YearMonthDay(year + month + dayString));
                     }
                 }
                 monthIndex++;
@@ -82,56 +72,57 @@ public class IndexedDatesValueTest {
     @Test
     public void DateFrequencyValueTestNoDecemberFrequencies() {
         initialize(MONTHS[11]);
-        Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
+        Value accumuloValue = initAndSerializeIndexDatesValue();
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
-        TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
-        
-        for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
-        }
+        TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
+
+        testRestoredEntries(restored);
         log.info("The restored size is " + restored.size());
-        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3342);
+        log.info("The size of the unprocessed frequency map is " + indexedDatesUncompressed.size());
+        Assert.assertTrue(indexedDatesUncompressed.size() == 3342);
         Assert.assertTrue(restored.size() == 3342);
         verifySerializationAndDeserialization(restored);
         
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-    
-    private void verifySerializationAndDeserialization(TreeMap<YearMonthDay,Frequency> restored) {
-        // Verify accurate restoration
-        Frequency restoredFreq, originalFreq;
-        
-        for (Map.Entry<YearMonthDay,Frequency> entry : dateFrequencyUncompressed.entrySet()) {
-            if (restored.containsKey(entry.getKey())) {
-                restoredFreq = restored.get(entry.getKey());
-                originalFreq = entry.getValue();
-                if (!(restoredFreq.equals(originalFreq))) {
-                    Assert.fail("The key: " + entry.getKey() + " was not restored with the original value ");
-                }
-                
-            } else {
-                Assert.fail("The key: " + entry.getKey() + " with value: " + entry.getValue() + " was not restored");
+
+    private void testRestoredEntries(TreeSet<YearMonthDay> restored) {
+        for (YearMonthDay entry : restored) {
+            if (!indexedDatesUncompressed.contains(entry)){
+                log.info("Restored entry is not in the original set " + entry);
             }
         }
+    }
+
+    private void verifySerializationAndDeserialization(TreeSet<YearMonthDay> restored) {
+        // Verify accurate restoration
+        boolean passTest = true;
+        
+        for (YearMonthDay entry : indexedDatesUncompressed) {
+            if (!restored.contains(entry)) {
+                passTest = false;
+                log.info("The date: " + entry + " was not restored");
+            }
+        }
+
+        Assert.assertTrue(passTest);
     }
     
     @Test
     public void DateFrequencyValueTestNoJanuaryFrequencies() {
         initialize(MONTHS[0]);
-        Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
+        Value accumuloValue = initAndSerializeIndexDatesValue();
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
-        TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
-        
-        for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
-        }
+        TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
+
+        testRestoredEntries(restored);
+
         log.info("The restored size is " + restored.size());
-        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3342);
+        log.info("The size of the unprocessed frequency map is " + indexedDatesUncompressed.size());
+        Assert.assertTrue(indexedDatesUncompressed.size() == 3342);
         Assert.assertTrue(restored.size() == 3342);
         
         // Verify accurate restoration
@@ -140,22 +131,27 @@ public class IndexedDatesValueTest {
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-    
+
+    private Value initAndSerializeIndexDatesValue() {
+        indexedDatesValue.clear();
+        indexedDatesValue.setStartDay(indexedDatesUncompressed.first());
+        indexedDatesValue.setIndexedDatesSet(indexedDatesUncompressed);
+        return indexedDatesValue.serialize();
+    }
+
     @Test
     public void DateFrequencyValueTestNoFebruaryFrequencies() {
         initialize(MONTHS[1]);
-        Value accumuloValue = dateFrequencyValue.serialize(dateFrequencyUncompressed);
+        Value accumuloValue = initAndSerializeIndexDatesValue();
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
-        TreeMap<YearMonthDay,Frequency> restored = dateFrequencyValue.deserialize(accumuloValue);
-        
-        for (Map.Entry<YearMonthDay,Frequency> entry : restored.entrySet()) {
-            log.debug("key is: " + entry.getKey() + " value is: " + entry.getValue());
-        }
+        TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
+
+        testRestoredEntries(restored);
         
         log.info("The restored size is " + restored.size());
-        log.info("The size of the unprocessed frequency map is " + dateFrequencyUncompressed.size());
-        Assert.assertTrue(dateFrequencyUncompressed.size() == 3370);
+        log.info("The size of the unprocessed frequency map is " + indexedDatesUncompressed.size());
+        Assert.assertTrue(indexedDatesUncompressed.size() == 3370);
         Assert.assertTrue(restored.size() == 3370);
         
         // Verify accurate restoration
@@ -164,15 +160,16 @@ public class IndexedDatesValueTest {
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-    
+
+    @Ignore
     @Test
     public void GenerateAccumuloShellScript() {
         initialize(null);
         try {
             PrintWriter printWriter = new PrintWriter(new FileWriter("/var/tmp/dw_716_accumulo_script.txt"));
             
-            for (Map.Entry<YearMonthDay,Frequency> entry : dateFrequencyUncompressed.entrySet()) {
-                String command = "insert BAR_FIELD f csv\\x00" + entry.getKey().getYyyymmdd() + "  " + entry.getValue().getValue();
+            for (YearMonthDay entry : indexedDatesUncompressed) {
+                String command = "insert BAR_FIELD i csv\\x00" + entry;
                 printWriter.println(command);
                 
             }
