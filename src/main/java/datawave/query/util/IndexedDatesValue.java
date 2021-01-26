@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Iterator;
 import java.util.TreeSet;
 
 public class IndexedDatesValue {
@@ -47,16 +48,48 @@ public class IndexedDatesValue {
      */
     public Value serialize() {
 
-        indexedDatesBitSet = new BitSet(indexedDatesSet.size());
+        //TODO the next line is wrong.  The size of the BitSet needs.
+        //to be the length of days in the span of days in indexedDatesSet
+        //
+        YearMonthDay firstDay = indexedDatesSet.first();
+        if (!firstDay.equals(startDay))
+            log.error("First day in treeset should be the start day");
+        YearMonthDay lastDay = indexedDatesSet.last();
+        //Estimate the span of dates with firstDay and lastDay
+        int bitSetSize;
+        if (lastDay.getYear() == firstDay.getYear())
+            bitSetSize = lastDay.getJulian() - firstDay.getJulian() + 1;
+        else  //Estimate the span of dates with firstDay and lastDay
+            bitSetSize = (lastDay.getYear() - firstDay.getYear() + 1) * 366;
+        indexedDatesBitSet = new BitSet(bitSetSize);
         int dayIndex = 0;
         YearMonthDay nextDay = startDay;
+        
+
         for (YearMonthDay ymd : indexedDatesSet) {
-            if (ymd.compareTo(nextDay) == 0)
+            System.out.println("Processing date  " + ymd);
+
+            if (ymd.compareTo(nextDay) == 0) {
+                System.out.println("Setting index bit for  " + ymd);
                 indexedDatesBitSet.set(dayIndex);
-            dayIndex++;
-            nextDay = YearMonthDay.nextDay(ymd.getYyyymmdd());
+                dayIndex++;
+                nextDay = YearMonthDay.nextDay(nextDay.getYyyymmdd());
+            }
+            else{
+                do {
+                    dayIndex++;
+                    nextDay = YearMonthDay.nextDay(nextDay.getYyyymmdd());
+                    if (ymd.compareTo(nextDay) == 0) {
+                        System.out.println("Setting index bit for  " + ymd);
+                        indexedDatesBitSet.set(dayIndex);
+                    }
+
+
+                }while (nextDay.compareTo(ymd) < 0);
+            }
 
         }
+
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(YYMMDDSIZE + indexedDatesBitSet.size());
         try {
@@ -91,8 +124,6 @@ public class IndexedDatesValue {
                 if (theIndexedDates.get(i))
                 {
                      indexedDatesSet.add(nextday);
-                }else {
-                    log.info("The days this field in indexed is not continuous");
                 }
             }
             indexedDates.setIndexedDatesSet(indexedDatesSet);
@@ -201,7 +232,8 @@ public class IndexedDatesValue {
         int i = 0;
         while (i < 10){
             nextDay = YearMonthDay.nextDay(nextDay.getYyyymmdd());
-            datesValue.addIndexedDate(nextDay);
+            if ((i % 2) == 0)
+                 datesValue.addIndexedDate(nextDay);
             //System.out.println(nextDay);
             i++;
         }
