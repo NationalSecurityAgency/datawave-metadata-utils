@@ -40,7 +40,7 @@ public class IndexedDatesValueTest {
                 monthLengths = LEAP_MONTH_LENGTH;
             else
                 monthLengths = MONTH_LENGTH;
-
+            
             for (String month : MONTHS) {
                 for (int day = 1; day <= monthLengths[monthIndex]; day++) {
                     dayString = makeDayString(day);
@@ -76,7 +76,7 @@ public class IndexedDatesValueTest {
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
         TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
-
+        
         testRestoredEntries(restored);
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + indexedDatesUncompressed.size());
@@ -87,15 +87,15 @@ public class IndexedDatesValueTest {
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-
+    
     private void testRestoredEntries(TreeSet<YearMonthDay> restored) {
         for (YearMonthDay entry : restored) {
-            if (!indexedDatesUncompressed.contains(entry)){
+            if (!indexedDatesUncompressed.contains(entry)) {
                 log.info("Restored entry is not in the original set " + entry);
             }
         }
     }
-
+    
     private void verifySerializationAndDeserialization(TreeSet<YearMonthDay> restored) {
         // Verify accurate restoration
         boolean passTest = true;
@@ -106,7 +106,7 @@ public class IndexedDatesValueTest {
                 log.info("The date: " + entry + " was not restored");
             }
         }
-
+        
         Assert.assertTrue(passTest);
     }
     
@@ -117,9 +117,9 @@ public class IndexedDatesValueTest {
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
         TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
-
+        
         testRestoredEntries(restored);
-
+        
         log.info("The restored size is " + restored.size());
         log.info("The size of the unprocessed frequency map is " + indexedDatesUncompressed.size());
         Assert.assertTrue(indexedDatesUncompressed.size() == 3342);
@@ -131,14 +131,14 @@ public class IndexedDatesValueTest {
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-
+    
     private Value initAndSerializeIndexDatesValue() {
         indexedDatesValue.clear();
         indexedDatesValue.setStartDay(indexedDatesUncompressed.first());
         indexedDatesValue.setIndexedDatesSet(indexedDatesUncompressed);
         return indexedDatesValue.serialize();
     }
-
+    
     @Test
     public void DateFrequencyValueTestNoFebruaryFrequencies() {
         initialize(MONTHS[1]);
@@ -146,7 +146,7 @@ public class IndexedDatesValueTest {
         byte[] compressedMapBytes = accumuloValue.get();
         Assert.assertTrue(compressedMapBytes != null);
         TreeSet<YearMonthDay> restored = IndexedDatesValue.deserialize(accumuloValue).getIndexedDatesSet();
-
+        
         testRestoredEntries(restored);
         
         log.info("The restored size is " + restored.size());
@@ -160,7 +160,7 @@ public class IndexedDatesValueTest {
         log.info("All entries were inserted, tranformed, compressed and deserialized properly");
         
     }
-
+    
     @Ignore
     @Test
     public void GenerateAccumuloShellScript() {
