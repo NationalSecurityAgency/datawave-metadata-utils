@@ -21,13 +21,16 @@ public class IndexedDatesValue {
     private BitSet indexedDatesBitSet;
     public static final int YYMMDDSIZE = 8;
     
-    public IndexedDatesValue() {}
-    
     public IndexedDatesValue(YearMonthDay startDate) {
         startDay = startDate;
         indexedDatesBitSet = new BitSet(1);
         indexedDatesBitSet.set(0);
-        indexedDatesSet.add(startDate);
+        if (startDate != null)
+            indexedDatesSet.add(startDate);
+    }
+    
+    public IndexedDatesValue() {
+        startDay = null;
     }
     
     public YearMonthDay getStartDay() {
@@ -36,6 +39,7 @@ public class IndexedDatesValue {
     
     public void setStartDay(YearMonthDay startDay) {
         this.startDay = startDay;
+        indexedDatesSet.add(startDay);
     }
     
     /**
@@ -46,17 +50,24 @@ public class IndexedDatesValue {
      * @return
      */
     public Value serialize() {
-        
-        // TODO the next line is wrong. The size of the BitSet needs.
-        // to be the length of days in the span of days in indexedDatesSet
-        //
+        if (startDay == null) {
+            log.warn("Start date was not initialized before serialization");
+            startDay = indexedDatesSet.first();
+        }
         YearMonthDay firstDay = indexedDatesSet.first();
-        if (!firstDay.equals(startDay))
-            log.error("First day in treeset should be the start day");
+        if (!firstDay.equals(startDay)) {
+            log.warn("First day in treeset should be the start day");
+            log.warn("Start day will now be initialized to firstDate in the sorted treeset");
+            startDay = firstDay;
+        }
+        
         YearMonthDay lastDay = indexedDatesSet.last();
+        // TODO Do a better job estimating the size using the ordinals
         // Estimate the span of dates with firstDay and lastDay
         int bitSetSize;
-        if (lastDay.getYear() == firstDay.getYear())
+        if (firstDay.equals(lastDay))
+            bitSetSize = 1;
+        else if (lastDay.getYear() == firstDay.getYear())
             bitSetSize = lastDay.getJulian() - firstDay.getJulian() + 1;
         else // Estimate the span of dates with firstDay and lastDay
             bitSetSize = (lastDay.getYear() - firstDay.getYear() + 1) * 366;
@@ -101,7 +112,13 @@ public class IndexedDatesValue {
     
     public static IndexedDatesValue deserialize(Value accumuloValue) {
         String yyyyMMdd = new String(Arrays.copyOfRange(accumuloValue.get(), 0, YYMMDDSIZE), StandardCharsets.UTF_8);
-        YearMonthDay startDay = new YearMonthDay(yyyyMMdd);
+        YearMonthDay startDay;
+        try {
+            startDay = new YearMonthDay(yyyyMMdd);
+        } catch (Exception e) {
+            log.warn("Accumulo value was not originally an IndexedDatesValue - Start date was not deserialized");
+            return new IndexedDatesValue();
+        }
         IndexedDatesValue indexedDates = new IndexedDatesValue(startDay);
         TreeSet<YearMonthDay> indexedDatesSet = new TreeSet<>();
         indexedDatesSet.add(startDay);

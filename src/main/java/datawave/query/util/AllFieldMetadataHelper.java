@@ -221,7 +221,7 @@ public class AllFieldMetadataHelper {
      */
     @Cacheable(value = "getIndexDates", key = "{#root.target.auths,#root.target.metadataTableName,#colf,#key}", cacheManager = "cacheManager", sync = true)
     // using cache with higher maximumSize
-    public FrequencyFamilyCounter getIndexDates(Text colf, Entry<String,Entry<String,Set<String>>> key)
+    public IndexedDatesValue getIndexDates(Text colf, Entry<String,Entry<String,Set<String>>> key)
                     throws TableNotFoundException, InstantiationException, ExecutionException {
         log.debug("cache fault for getIndexDates(" + this.auths + "," + this.metadataTableName + "," + colf + "," + key + ")");
         Preconditions.checkNotNull(key);
@@ -241,7 +241,7 @@ public class AllFieldMetadataHelper {
         Range range = new Range(upCaseFieldName);
         scanner.setRange(range);
         scanner.fetchColumnFamily(colf);
-        FrequencyFamilyCounter counter = new FrequencyFamilyCounter();
+        IndexedDatesValue counter = new IndexedDatesValue();
         
         for (Entry<Key,Value> entry : scanner) {
             // Get the column qualifier from the key. It contains the ingesttype
@@ -258,7 +258,7 @@ public class AllFieldMetadataHelper {
                 // skip it.
                 if (datatype == null || datatype.isEmpty() || datatype.contains(colq)) {
                     try {
-                        counter.deserializeCompressedValue(entry.getValue());
+                        counter = IndexedDatesValue.deserialize(entry.getValue());
                     } catch (Exception e) {
                         log.error("Could not deserialize the indexed row's DataFrequencyValue");
                     }

@@ -1358,7 +1358,7 @@ public class MetadataHelper {
         return Multimaps.unmodifiableMultimap(fields);
     }
     
-    public FrequencyFamilyCounter getIndexDates(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
+    public IndexedDatesValue getIndexDates(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(ingestTypeFilter);
         

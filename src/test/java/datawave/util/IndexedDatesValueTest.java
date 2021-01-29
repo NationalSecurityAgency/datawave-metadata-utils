@@ -15,7 +15,8 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class IndexedDatesValueTest {
-    IndexedDatesValue indexedDatesValue = new IndexedDatesValue();
+    // The date used in the constructor will be overwritten
+    IndexedDatesValue indexedDatesValue = new IndexedDatesValue(null);
     TreeSet<YearMonthDay> indexedDatesUncompressed = new TreeSet<>();
     
     private static final Logger log = LoggerFactory.getLogger(IndexedDatesValueTest.class);
