@@ -126,7 +126,6 @@ public class IndexedDatesValue {
         if (accumuloValue.get().length > 8) {
             BitSet theIndexedDates = BitSet.valueOf(Arrays.copyOfRange(accumuloValue.get(), YYMMDDSIZE, accumuloValue.get().length));
             indexedDates.setIndexedDatesBitSet(theIndexedDates);
-            log.info("The number of dates is " + theIndexedDates.size());
             for (int i = 1; i < theIndexedDates.size(); i++) {
                 nextday = YearMonthDay.nextDay(nextday.getYyyymmdd());
                 if (theIndexedDates.get(i)) {
@@ -134,6 +133,7 @@ public class IndexedDatesValue {
                 }
             }
             indexedDates.setIndexedDatesSet(indexedDatesSet);
+            log.info("The number of dates is " + indexedDatesSet.size());
         }
         
         return indexedDates;

@@ -162,22 +162,4 @@ public class IndexedDatesValueTest {
         
     }
     
-    @Ignore
-    @Test
-    public void GenerateAccumuloShellScript() {
-        initialize(null);
-        try {
-            PrintWriter printWriter = new PrintWriter(new FileWriter("/var/tmp/dw_716_accumulo_script.txt"));
-            
-            for (YearMonthDay entry : indexedDatesUncompressed) {
-                String command = "insert BAR_FIELD i csv\\x00" + entry;
-                printWriter.println(command);
-                
-            }
-            printWriter.close();
-        } catch (IOException ioException) {
-            Assert.fail("There was an error creating test script");
-            log.info("Here is the problem:", ioException);
-        }
-    }
 }
