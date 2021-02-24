@@ -19,7 +19,7 @@
     <scm>
         <connection>scm:git:https://github.com/NationalSecurityAgency/datawave-metadata-utils.git</connection>
         <developerConnection>scm:git:git@github.com:NationalSecurityAgency/datawave-metadata-utils.git</developerConnection>
-        <tag>1.7</tag>
+        <tag>HEAD</tag>
         <url>https://github.com/NationalSecurityAgency/datawave-metadata-utils</url>
     </scm>
     <properties>
