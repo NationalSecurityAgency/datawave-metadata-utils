@@ -27,7 +27,7 @@
         <version.accumulo-utils>2.0.0</version.accumulo-utils>
         <version.caffeine>2.8.0</version.caffeine>
         <version.kryo>2.20</version.kryo>
-        <version.type-utils>1.5</version.type-utils>
+        <version.type-utils>1.7</version.type-utils>
     </properties>
     <dependencyManagement>
         <dependencies>

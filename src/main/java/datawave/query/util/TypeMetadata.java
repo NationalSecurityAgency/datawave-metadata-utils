@@ -45,6 +45,7 @@ public class TypeMetadata implements Serializable {
             this.typeMetadata.put(entry.getKey(), HashMultimap.create(entry.getValue()));
         }
         this.ingestTypes.addAll(in.ingestTypes);
+        this.fieldNames.addAll(in.fieldNames);
     }
     
     public void addForAllIngestTypes(Map<String,Set<String>> map) {
