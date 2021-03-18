@@ -12,7 +12,7 @@ import java.util.BitSet;
 import java.util.Iterator;
 import java.util.TreeSet;
 
-public class IndexedDatesValue {
+public class IndexedDatesValue implements Comparable<IndexedDatesValue> {
     
     private static final Logger log = LoggerFactory.getLogger(IndexedDatesValue.class);
     
@@ -140,7 +140,15 @@ public class IndexedDatesValue {
     }
     
     /**
-     * Returns the TreeSet of dates a field was indexed
+     *  Gets the bit for index which represents the number of days from the initial indexed date for a field.
+     *
+     */
+    public BitSet getIndexedDatesBitSet() {
+        return indexedDatesBitSet;
+    }
+
+    /**
+     *  Returns the TreeSet of dates a field was indexed
      * 
      * @return
      */
@@ -193,4 +201,9 @@ public class IndexedDatesValue {
         return "Start date: " + startDay + " Bitset: " + this.indexedDatesBitSet.toString();
     }
     
+    @Override
+    public int compareTo(IndexedDatesValue other) {
+        return this.startDay.compareTo(other.getStartDay());
+    }
+
 }

@@ -2,6 +2,8 @@ package datawave.query.util;
 
 import datawave.util.time.DateHelper;
 
+import java.time.Month;
+
 import java.util.Calendar;
 
 public class YearMonthDay implements Comparable<YearMonthDay> {
@@ -9,6 +11,9 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     private String yyyymmdd;
     private Calendar cal = Calendar.getInstance();
     
+    private Month month;
+    private int day;
+
     public YearMonthDay(String value) {
         yyyymmdd = value;
         cal.clear();
@@ -26,6 +31,14 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         return cal.get(Calendar.YEAR);
     }
     
+    public Month getMonth() {
+        return Month.of(cal.get(Calendar.MONTH) + 1);
+    }
+
+    public int getDay() {
+        return cal.get(Calendar.DAY_OF_MONTH);
+    }
+
     public int getJulian() {
         return cal.get(Calendar.DAY_OF_YEAR);
     }
