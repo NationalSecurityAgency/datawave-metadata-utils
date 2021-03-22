@@ -13,7 +13,7 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     
     private Month month;
     private int day;
-
+    
     public YearMonthDay(String value) {
         yyyymmdd = value;
         cal.clear();
@@ -34,11 +34,11 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     public Month getMonth() {
         return Month.of(cal.get(Calendar.MONTH) + 1);
     }
-
+    
     public int getDay() {
         return cal.get(Calendar.DAY_OF_MONTH);
     }
-
+    
     public int getJulian() {
         return cal.get(Calendar.DAY_OF_YEAR);
     }

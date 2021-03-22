@@ -20,6 +20,7 @@ public class IndexedDatesValue implements Comparable<IndexedDatesValue> {
     private TreeSet<YearMonthDay> indexedDatesSet = new TreeSet<>();
     private BitSet indexedDatesBitSet;
     public static final int YYMMDDSIZE = 8;
+    public static final int COMPARE_FAILED = Integer.MAX_VALUE;
     
     public IndexedDatesValue(YearMonthDay startDate) {
         startDay = startDate;
@@ -54,6 +55,10 @@ public class IndexedDatesValue implements Comparable<IndexedDatesValue> {
             log.warn("Start date was not initialized before serialization");
             startDay = indexedDatesSet.first();
         }
+        
+        if (indexedDatesSet.isEmpty())
+            return null;
+        
         YearMonthDay firstDay = indexedDatesSet.first();
         if (!firstDay.equals(startDay)) {
             log.warn("First day in treeset should be the start day");
@@ -140,15 +145,15 @@ public class IndexedDatesValue implements Comparable<IndexedDatesValue> {
     }
     
     /**
-     *  Gets the bit for index which represents the number of days from the initial indexed date for a field.
+     * Gets the bit for index which represents the number of days from the initial indexed date for a field.
      *
      */
     public BitSet getIndexedDatesBitSet() {
         return indexedDatesBitSet;
     }
-
+    
     /**
-     *  Returns the TreeSet of dates a field was indexed
+     * Returns the TreeSet of dates a field was indexed
      * 
      * @return
      */
@@ -203,7 +208,12 @@ public class IndexedDatesValue implements Comparable<IndexedDatesValue> {
     
     @Override
     public int compareTo(IndexedDatesValue other) {
+        if (other.startDay == null || startDay == null) {
+            log.error("The start day should never be null");
+            return COMPARE_FAILED;
+        }
+        
         return this.startDay.compareTo(other.getStartDay());
     }
-
+    
 }

@@ -241,7 +241,7 @@ public class AllFieldMetadataHelper {
         Range range = new Range(upCaseFieldName);
         scanner.setRange(range);
         scanner.fetchColumnFamily(colf);
-        IndexedDatesValue counter = new IndexedDatesValue();
+        IndexedDatesValue counter = null;
         
         for (Entry<Key,Value> entry : scanner) {
             // Get the column qualifier from the key. It contains the ingesttype
