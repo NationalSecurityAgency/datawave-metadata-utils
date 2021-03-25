@@ -2,8 +2,10 @@ package datawave.query.util;
 
 import datawave.util.time.DateHelper;
 
+import java.time.LocalDate;
 import java.time.Month;
 
+import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
 
 public class YearMonthDay implements Comparable<YearMonthDay> {
@@ -140,6 +142,14 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         cal.clear();
         cal.set(year, nmonth - 1, nday);
         return cal.get(Calendar.DAY_OF_YEAR);
+    }
+    
+    public static long getNumOfDaysBetween(YearMonthDay firstStartDay, YearMonthDay lastStartDay) {
+        long numOfDaysBetween;
+        LocalDate dateBefore = LocalDate.of(firstStartDay.getYear(), firstStartDay.getMonth(), firstStartDay.getDay());
+        LocalDate dateAfter = LocalDate.of(lastStartDay.getYear(), lastStartDay.getMonth(), lastStartDay.getDay());
+        numOfDaysBetween = ChronoUnit.DAYS.between(dateBefore, dateAfter);
+        return numOfDaysBetween;
     }
     
 }
