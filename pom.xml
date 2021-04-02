@@ -4,7 +4,7 @@
     <parent>
         <groupId>gov.nsa.datawave.microservice</groupId>
         <artifactId>datawave-microservice-parent</artifactId>
-        <version>1.7</version>
+        <version>1.8</version>
         <relativePath />
     </parent>
     <artifactId>metadata-utils</artifactId>
@@ -24,7 +24,7 @@
     </scm>
     <properties>
         <spotbugs.excludes.file>${project.basedir}/src/main/spotbugs/excludes.xml</spotbugs.excludes.file>
-        <version.accumulo-utils>1.3</version.accumulo-utils>
+        <version.accumulo-utils>1.4-SNAPSHOT</version.accumulo-utils>
         <version.caffeine>2.6.2</version.caffeine>
         <version.kryo>2.20</version.kryo>
         <version.type-utils>1.7</version.type-utils>
