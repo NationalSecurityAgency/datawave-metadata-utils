@@ -125,6 +125,13 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         return ymd;
     }
     
+    public static YearMonthDay addDays(String value, int numDays) {
+        YearMonthDay ymd = new YearMonthDay(value);
+        ymd.cal.add(Calendar.DATE, numDays);
+        ymd.yyyymmdd = DateHelper.format(ymd.cal.getTime());
+        return ymd;
+    }
+    
     public static String calculateMMDD(int ordinal, int year) {
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, year);
