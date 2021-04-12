@@ -2,12 +2,19 @@ package datawave.query.util;
 
 import datawave.util.time.DateHelper;
 
+import java.time.LocalDate;
+import java.time.Month;
+
+import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
 
 public class YearMonthDay implements Comparable<YearMonthDay> {
     public static final int DAYS_IN_LEAP_YEAR = 366;
     private String yyyymmdd;
     private Calendar cal = Calendar.getInstance();
+    
+    private Month month;
+    private int day;
     
     public YearMonthDay(String value) {
         yyyymmdd = value;
@@ -24,6 +31,14 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
     
     public int getYear() {
         return cal.get(Calendar.YEAR);
+    }
+    
+    public Month getMonth() {
+        return Month.of(cal.get(Calendar.MONTH) + 1);
+    }
+    
+    public int getDay() {
+        return cal.get(Calendar.DAY_OF_MONTH);
     }
     
     public int getJulian() {
@@ -110,6 +125,13 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         return ymd;
     }
     
+    public static YearMonthDay addDays(String value, int numDays) {
+        YearMonthDay ymd = new YearMonthDay(value);
+        ymd.cal.add(Calendar.DATE, numDays);
+        ymd.yyyymmdd = DateHelper.format(ymd.cal.getTime());
+        return ymd;
+    }
+    
     public static String calculateMMDD(int ordinal, int year) {
         Calendar c = Calendar.getInstance();
         c.set(Calendar.YEAR, year);
@@ -127,6 +149,14 @@ public class YearMonthDay implements Comparable<YearMonthDay> {
         cal.clear();
         cal.set(year, nmonth - 1, nday);
         return cal.get(Calendar.DAY_OF_YEAR);
+    }
+    
+    public static long getNumOfDaysBetween(YearMonthDay firstStartDay, YearMonthDay lastStartDay) {
+        long numOfDaysBetween;
+        LocalDate dateBefore = LocalDate.of(firstStartDay.getYear(), firstStartDay.getMonth(), firstStartDay.getDay());
+        LocalDate dateAfter = LocalDate.of(lastStartDay.getYear(), lastStartDay.getMonth(), lastStartDay.getDay());
+        numOfDaysBetween = ChronoUnit.DAYS.between(dateBefore, dateAfter);
+        return numOfDaysBetween;
     }
     
 }
