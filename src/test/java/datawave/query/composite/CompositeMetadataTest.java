@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.IntStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class CompositeMetadataTest {
     
@@ -86,13 +87,24 @@ public class CompositeMetadataTest {
     @Test
     public void serializeManyThreads() {
         final ExecutorService executor = Executors.newFixedThreadPool(5);
-        for (int i = 0; i < 100; i++) {
-            executor.submit(() -> {
-                byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
-                Assert.assertNotNull(compMetadataBytes);
-            });
+        try {
+            for (int i = 0; i < 100; i++) {
+                executor.submit(() -> {
+                    byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
+                    Assert.assertNotNull(compMetadataBytes);
+                });
+            }
+        } finally {
+            // added protection
+            executor.shutdown();
+            try {
+                // should not need this, but will perform for safety sake
+                executor.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                // ignore and shutdownNow
+            }
+            executor.shutdownNow();
         }
-        executor.shutdown();
     }
     
 }
