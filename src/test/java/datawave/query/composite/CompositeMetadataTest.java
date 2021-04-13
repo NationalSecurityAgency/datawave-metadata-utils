@@ -9,6 +9,10 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.IntStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class CompositeMetadataTest {
     
@@ -77,6 +81,18 @@ public class CompositeMetadataTest {
             Assert.assertEquals(compositeMetadata.compositeTransitionDatesByType.get(ingestType),
                             destCompMetadata.compositeTransitionDatesByType.get(ingestType));
         }
+    }
+    
+    @Test
+    public void serializeManyThreads() {
+        final ExecutorService executor = Executors.newFixedThreadPool(5);
+        for (int i = 0; i < 100; i++) {
+            executor.submit(() -> {
+                byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
+                Assert.assertNotNull(compMetadataBytes);
+            });
+        }
+        executor.shutdown();
     }
     
 }
