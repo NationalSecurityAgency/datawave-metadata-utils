@@ -28,11 +28,7 @@ import java.util.Set;
  */
 public class CompositeMetadata implements Message<CompositeMetadata> {
     
-    private static final LinkedBuffer linkedBuffer;
-    
-    static {
-        linkedBuffer = LinkedBuffer.allocate(4096);
-    }
+    private static final ThreadLocal<LinkedBuffer> linkedBuffer = ThreadLocal.withInitial(() -> LinkedBuffer.allocate(4096));
     
     protected Map<String,Multimap<String,String>> compositeFieldMapByType;
     protected Map<String,Map<String,Date>> compositeTransitionDatesByType;
@@ -159,9 +155,12 @@ public class CompositeMetadata implements Message<CompositeMetadata> {
     
     public static byte[] toBytes(CompositeMetadata compositeMetadata) {
         if (compositeMetadata != null && !compositeMetadata.isEmpty()) {
-            byte[] bytes = ProtobufIOUtil.toByteArray(compositeMetadata, COMPOSITE_METADATA_SCHEMA, linkedBuffer);
-            linkedBuffer.clear();
-            return bytes;
+            try {
+                byte[] bytes = ProtobufIOUtil.toByteArray(compositeMetadata, COMPOSITE_METADATA_SCHEMA, linkedBuffer.get());
+                return bytes;
+            } finally {
+                linkedBuffer.get().clear();
+            }
         } else
             return new byte[] {};
     }
