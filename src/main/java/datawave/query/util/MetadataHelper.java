@@ -1378,7 +1378,7 @@ public class MetadataHelper {
      *            the wrapped connector
      * @return a batch writer
      */
-    protected BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, WrappedConnector wrappedConnector) {
+    private BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, WrappedConnector wrappedConnector) {
         try {
             if (writer == null) {
                 writer = wrappedConnector.getMock().createBatchWriter(metadataTableName, 10L * (1024L * 1024L), 100L, 1);
