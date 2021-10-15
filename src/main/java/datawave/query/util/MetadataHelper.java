@@ -1219,55 +1219,64 @@ public class MetadataHelper {
     }
     
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(Entry<String,String> identifier) throws TableNotFoundException, IOException {
-        List<Connector> connectors = getConnectorsList();
-        
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
         
+        // try to get the counts by field using the original (cached) connector
+        HashMap<String,Long> datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, connector, null);
+        
+        // if we don't get a hit, try the real connector
+        if (datatypeToCounts.isEmpty() && connector instanceof WrappedConnector) {
+            WrappedConnector wrappedConnector = ((WrappedConnector) connector);
+            datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, wrappedConnector.getReal(), wrappedConnector);
+        }
+        
+        return datatypeToCounts;
+    }
+    
+    protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, Connector connector, WrappedConnector wrappedConnector)
+                    throws TableNotFoundException, IOException {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         
-        for (Connector connector : connectors) {
-            BatchWriter writer = null;
+        BatchWriter writer = null;
+        
+        try {
+            // we have to use the real connector since the f column is not cached
+            Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+            scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            scanner.setRange(Range.exact(fieldName));
             
-            try {
-                // we have to use the real connector since the f column is not cached
-                Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
-                scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-                scanner.setRange(Range.exact(fieldName));
-                
-                IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-                RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
-                scanner.addScanIterator(cqRegex);
-                
-                final Text holder = new Text();
-                for (Entry<Key,Value> countEntry : scanner) {
-                    // if there's more than one connector (mock, and real) and this is the second (real)
-                    // connector, then write these entries to the cache table via the mock connector
-                    if (connectors.size() > 1 && connector == connectors.get(1)) {
-                        writer = updateCache(countEntry, writer, connectors.get(0));
-                    }
-                    
-                    ByteArrayInputStream bais = new ByteArrayInputStream(countEntry.getValue().get());
-                    DataInputStream inputStream = new DataInputStream(bais);
-                    
-                    Long sum = WritableUtils.readVLong(inputStream);
-                    
-                    countEntry.getKey().getColumnQualifier(holder);
-                    int offset = holder.find(NULL_BYTE);
-                    
-                    Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + countEntry.getKey());
-                    
-                    String datatype = Text.decode(holder.getBytes(), 0, offset);
-                    
-                    datatypeToCounts.put(datatype, sum);
+            IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
+            RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
+            scanner.addScanIterator(cqRegex);
+            
+            final Text holder = new Text();
+            for (Entry<Key,Value> entry : scanner) {
+                // if this is the real connector, and the mock connector is not null, update the cache
+                if (connector == wrappedConnector.getReal() && wrappedConnector.getMock() != null) {
+                    writer = updateCache(entry, writer, wrappedConnector);
                 }
-            } finally {
-                if (writer != null) {
-                    try {
-                        writer.close();
-                    } catch (MutationsRejectedException e) {
-                        log.warn("Error closing batch writer for cached table: " + metadataTableName, e);
-                    }
+                
+                ByteArrayInputStream bais = new ByteArrayInputStream(entry.getValue().get());
+                DataInputStream inputStream = new DataInputStream(bais);
+                
+                Long sum = WritableUtils.readVLong(inputStream);
+                
+                entry.getKey().getColumnQualifier(holder);
+                int offset = holder.find(NULL_BYTE);
+                
+                Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + entry.getKey());
+                
+                String datatype = Text.decode(holder.getBytes(), 0, offset);
+                
+                datatypeToCounts.put(datatype, sum);
+            }
+        } finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (MutationsRejectedException e) {
+                    log.warn("Error closing batch writer for cached table: " + metadataTableName, e);
                 }
             }
         }
@@ -1280,66 +1289,71 @@ public class MetadataHelper {
     }
     
     public Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType) {
-        List<Connector> connectors = getConnectorsList();
+        // try to get the date using the original (cached) connector
+        Date date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, connector, null);
         
+        // if we don't get a hit, try the real connector
+        if (date == null && connector instanceof WrappedConnector) {
+            WrappedConnector wrappedConnector = ((WrappedConnector) connector);
+            date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, wrappedConnector.getReal(), wrappedConnector);
+        }
+        
+        return date;
+    }
+    
+    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType, Connector connector, WrappedConnector wrappedConnector) {
         String dateString = null;
+        BatchWriter writer = null;
         
-        for (Connector connector : connectors) {
-            BatchWriter writer = null;
+        try {
+            Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+            scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            scanner.setRange(Range.exact(fieldName));
+            
+            // if a type was specified, add a regex filter for it
+            if (dataType != null) {
+                IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
+                RegExFilter.setRegexs(cqRegex, null, null, dataType + "\u0000.*", null, false);
+                scanner.addScanIterator(cqRegex);
+            }
             
             try {
-                Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
-                scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-                scanner.setRange(Range.exact(fieldName));
-                
-                // if a type was specified, add a regex filter for it
-                if (dataType != null) {
-                    IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-                    RegExFilter.setRegexs(cqRegex, null, null, dataType + "\u0000.*", null, false);
-                    scanner.addScanIterator(cqRegex);
-                }
-                
-                try {
-                    final Text holder = new Text();
-                    for (Entry<Key,Value> entry : scanner) {
-                        // if there's more than one connector (mock, and real) and this is the second (real)
-                        // connector, then write these entries to the cache table via the mock connector
-                        if (connectors.size() > 1 && connector == connectors.get(1)) {
-                            writer = updateCache(entry, writer, connectors.get(0));
-                        }
-                        
-                        entry.getKey().getColumnQualifier(holder);
-                        int startPos = holder.find(NULL_BYTE) + 1;
-                        
-                        if (0 == startPos) {
-                            log.trace("Could not find nullbyte separator in column qualifier for: " + entry.getKey());
-                        } else if ((holder.getLength() - startPos) <= 0) {
-                            log.trace("Could not find date to parse in column qualifier for: " + entry.getKey());
-                        } else {
-                            try {
-                                dateString = Text.decode(holder.getBytes(), startPos, holder.getLength());
-                                break;
-                            } catch (CharacterCodingException e) {
-                                log.trace("Unable to decode date string for: " + entry.getKey().getColumnQualifier());
-                            }
+                final Text holder = new Text();
+                for (Entry<Key,Value> entry : scanner) {
+                    // if this is the real connector, and wrapped connector is not null, it means
+                    // that we didn't get a hit in the cache. So, we will update the cache with the
+                    // entries from the real table
+                    if (wrappedConnector != null && connector == wrappedConnector.getReal()) {
+                        writer = updateCache(entry, writer, wrappedConnector);
+                    }
+                    
+                    entry.getKey().getColumnQualifier(holder);
+                    int startPos = holder.find(NULL_BYTE) + 1;
+                    
+                    if (0 == startPos) {
+                        log.trace("Could not find nullbyte separator in column qualifier for: " + entry.getKey());
+                    } else if ((holder.getLength() - startPos) <= 0) {
+                        log.trace("Could not find date to parse in column qualifier for: " + entry.getKey());
+                    } else {
+                        try {
+                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength());
+                            break;
+                        } catch (CharacterCodingException e) {
+                            log.trace("Unable to decode date string for: " + entry.getKey().getColumnQualifier());
                         }
                     }
-                } finally {
-                    scanner.close();
                 }
-                
-                if (dateString != null) {
-                    break;
-                }
-            } catch (TableNotFoundException e) {
-                log.warn("Error creating scanner against table: " + metadataTableName, e);
             } finally {
-                if (writer != null) {
-                    try {
-                        writer.close();
-                    } catch (MutationsRejectedException e) {
-                        log.warn("Error closing batch writer for cached table: " + metadataTableName, e);
-                    }
+                scanner.close();
+            }
+        } catch (TableNotFoundException e) {
+            log.warn("Error creating scanner against table: " + metadataTableName, e);
+        } finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (MutationsRejectedException e) {
+                    log.warn("Error closing batch writer for cached table: " + metadataTableName, e);
                 }
             }
         }
@@ -1353,23 +1367,6 @@ public class MetadataHelper {
     }
     
     /**
-     * Returns a list of connectors to run against. If our main connector is a WrappedConnector then it will contain a real connector which connects to the
-     * original table, and a mock connector which connects to the in-memory cached table. This will contain at most 2 connectors, and the first connector will
-     * always be the mock connector.
-     *
-     * @return a list of connectors
-     */
-    protected List<Connector> getConnectorsList() {
-        List<Connector> connectors = new ArrayList<>();
-        if (connector instanceof WrappedConnector) {
-            WrappedConnector wrappedConnector = (WrappedConnector) connector;
-            connectors.add(wrappedConnector.getMock());
-        }
-        connectors.add(connector);
-        return connectors;
-    }
-    
-    /**
      * Updates the table cache via the mock connector with the given entry and writer. If writer is null, a writer will be created and returned for subsequent
      * use.
      *
@@ -1377,14 +1374,14 @@ public class MetadataHelper {
      *            the entry to add
      * @param writer
      *            the batch writer
-     * @param mockConnector
-     *            the mock connector
+     * @param wrappedConnector
+     *            the wrapped connector
      * @return a batch writer
      */
-    protected BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, Connector mockConnector) {
+    protected BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, WrappedConnector wrappedConnector) {
         try {
             if (writer == null) {
-                writer = mockConnector.createBatchWriter(metadataTableName, 10L * (1024L * 1024L), 100L, 1);
+                writer = wrappedConnector.getMock().createBatchWriter(metadataTableName, 10L * (1024L * 1024L), 100L, 1);
             }
             
             Key valueKey = entry.getKey();
