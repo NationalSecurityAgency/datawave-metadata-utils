@@ -1252,8 +1252,10 @@ public class MetadataHelper {
             
             final Text holder = new Text();
             for (Entry<Key,Value> entry : scanner) {
-                // if this is the real connector, and the mock connector is not null, update the cache
-                if (connector == wrappedConnector.getReal() && wrappedConnector.getMock() != null) {
+                // if this is the real connector, and wrapped connector is not null, it means
+                // that we didn't get a hit in the cache. So, we will update the cache with the
+                // entries from the real table
+                if (wrappedConnector != null && connector == wrappedConnector.getReal()) {
                     writer = updateCache(entry, writer, wrappedConnector);
                 }
                 
