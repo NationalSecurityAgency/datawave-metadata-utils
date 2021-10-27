@@ -9,6 +9,11 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.IntStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class CompositeMetadataTest {
     
@@ -76,6 +81,29 @@ public class CompositeMetadataTest {
             Assert.assertEquals(compositeMetadata.compositeFieldMapByType.get(ingestType), destCompMetadata.compositeFieldMapByType.get(ingestType));
             Assert.assertEquals(compositeMetadata.compositeTransitionDatesByType.get(ingestType),
                             destCompMetadata.compositeTransitionDatesByType.get(ingestType));
+        }
+    }
+    
+    @Test
+    public void serializeManyThreads() {
+        final ExecutorService executor = Executors.newFixedThreadPool(5);
+        try {
+            for (int i = 0; i < 100; i++) {
+                executor.submit(() -> {
+                    byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
+                    Assert.assertNotNull(compMetadataBytes);
+                });
+            }
+        } finally {
+            // added protection
+            executor.shutdown();
+            try {
+                // should not need this, but will perform for safety sake
+                executor.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                // ignore and shutdownNow
+            }
+            executor.shutdownNow();
         }
     }
     
