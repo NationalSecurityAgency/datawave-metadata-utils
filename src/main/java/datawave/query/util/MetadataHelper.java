@@ -1338,7 +1338,7 @@ public class MetadataHelper {
                         log.trace("Could not find date to parse in column qualifier for: " + entry.getKey());
                     } else {
                         try {
-                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength());
+                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
                             break;
                         } catch (CharacterCodingException e) {
                             log.trace("Unable to decode date string for: " + entry.getKey().getColumnQualifier());
