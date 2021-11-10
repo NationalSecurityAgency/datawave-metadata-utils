@@ -1,6 +1,7 @@
 package datawave.query.composite;
 
 import com.google.common.collect.Multimap;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -8,9 +9,13 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CompositeMetadataTest {
@@ -78,6 +83,29 @@ public class CompositeMetadataTest {
         for (String ingestType : compositeMetadata.compositeFieldMapByType.keySet()) {
             assertEquals(compositeMetadata.compositeFieldMapByType.get(ingestType), destCompMetadata.compositeFieldMapByType.get(ingestType));
             assertEquals(compositeMetadata.compositeTransitionDatesByType.get(ingestType), destCompMetadata.compositeTransitionDatesByType.get(ingestType));
+        }
+    }
+    
+    @Test
+    public void serializeManyThreads() {
+        final ExecutorService executor = Executors.newFixedThreadPool(5);
+        try {
+            for (int i = 0; i < 100; i++) {
+                executor.submit(() -> {
+                    byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
+                    assertNotNull(compMetadataBytes);
+                });
+            }
+        } finally {
+            // added protection
+            executor.shutdown();
+            try {
+                // should not need this, but will perform for safety sake
+                executor.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                // ignore and shutdownNow
+            }
+            executor.shutdownNow();
         }
     }
     
