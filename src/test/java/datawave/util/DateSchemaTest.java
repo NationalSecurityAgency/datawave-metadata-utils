@@ -2,8 +2,8 @@ package datawave.util;
 
 import io.protostuff.LinkedBuffer;
 import io.protostuff.ProtobufIOUtil;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Date;
 
@@ -13,17 +13,17 @@ public class DateSchemaTest {
     
     @Test
     public void testDateSchemaConfig() {
-        Assert.assertNull(dateSchema.getFieldName(0));
-        Assert.assertEquals("dateMillis", dateSchema.getFieldName(1));
+        Assertions.assertNull(dateSchema.getFieldName(0));
+        Assertions.assertEquals("dateMillis", dateSchema.getFieldName(1));
         
-        Assert.assertEquals(0, dateSchema.getFieldNumber("bogusField"));
-        Assert.assertEquals(1, dateSchema.getFieldNumber("dateMillis"));
+        Assertions.assertEquals(0, dateSchema.getFieldNumber("bogusField"));
+        Assertions.assertEquals(1, dateSchema.getFieldNumber("dateMillis"));
         
-        Assert.assertTrue(dateSchema.isInitialized(null));
+        Assertions.assertTrue(dateSchema.isInitialized(null));
         
-        Assert.assertEquals("Date", dateSchema.messageName());
-        Assert.assertEquals("java.util.Date", dateSchema.messageFullName());
-        Assert.assertEquals(Date.class, dateSchema.typeClass());
+        Assertions.assertEquals("Date", dateSchema.messageName());
+        Assertions.assertEquals("java.util.Date", dateSchema.messageFullName());
+        Assertions.assertEquals(Date.class, dateSchema.typeClass());
     }
     
     @Test
@@ -32,20 +32,20 @@ public class DateSchemaTest {
         
         byte[] multimapBytes = ProtobufIOUtil.toByteArray(sourceDate, dateSchema, LinkedBuffer.allocate());
         
-        Assert.assertNotNull(multimapBytes);
-        Assert.assertTrue(multimapBytes.length > 0);
+        Assertions.assertNotNull(multimapBytes);
+        Assertions.assertTrue(multimapBytes.length > 0);
         
         Date destDate = dateSchema.newMessage();
         ProtobufIOUtil.mergeFrom(multimapBytes, destDate, dateSchema);
         
-        Assert.assertEquals(sourceDate, destDate);
+        Assertions.assertEquals(sourceDate, destDate);
     }
     
-    @Test(expected = RuntimeException.class)
+    @Test
     public void testProtobufReadError() {
         byte[] someBytes = new byte[] {30, 0};
         
         Date destDate = dateSchema.newMessage();
-        ProtobufIOUtil.mergeFrom(someBytes, destDate, dateSchema);
+        Assertions.assertThrows(RuntimeException.class, () -> ProtobufIOUtil.mergeFrom(someBytes, destDate, dateSchema));
     }
 }

@@ -1,8 +1,8 @@
 package datawave.util;
 
 import com.google.common.collect.Sets;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -15,41 +15,41 @@ public class UniversalSetTest {
     @Test
     public void testExpectedBehavior() {
         
-        Assert.assertTrue(universalSet.isEmpty());
+        Assertions.assertTrue(universalSet.isEmpty());
         
-        Assert.assertTrue(universalSet.contains(new Object()));
+        Assertions.assertTrue(universalSet.contains(new Object()));
         
-        Assert.assertTrue(universalSet.containsAll(Sets.newHashSet("foo", "bar", "baz")));
+        Assertions.assertTrue(universalSet.containsAll(Sets.newHashSet("foo", "bar", "baz")));
         
         int originalSize = universalSet.size();
         
-        Assert.assertFalse(universalSet.remove(this));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.remove(this));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
-        Assert.assertFalse(universalSet.removeAll(Sets.newHashSet(this)));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.removeAll(Sets.newHashSet(this)));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
-        Assert.assertFalse(universalSet.add("trouble-maker"));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.add("trouble-maker"));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
-        Assert.assertFalse(universalSet.addAll(Sets.newHashSet("foo", "bar", "baz")));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.addAll(Sets.newHashSet("foo", "bar", "baz")));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
-        Assert.assertFalse(universalSet.retainAll(Sets.newHashSet("foo", "bar", "baz")));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.retainAll(Sets.newHashSet("foo", "bar", "baz")));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
-        Assert.assertFalse(universalSet.removeIf(x -> true));
-        Assert.assertEquals(universalSet.size(), originalSize);
+        Assertions.assertFalse(universalSet.removeIf(x -> true));
+        Assertions.assertEquals(universalSet.size(), originalSize);
         
         Iterator<String> iterator = universalSet.iterator();
-        Assert.assertFalse(iterator.hasNext());
+        Assertions.assertFalse(iterator.hasNext());
         
-        Assert.assertArrayEquals(universalSet.toArray(), new String[0]);
+        Assertions.assertArrayEquals(universalSet.toArray(), new String[0]);
         
-        Assert.assertArrayEquals(universalSet.toArray(new String[0]), new String[0]);
+        Assertions.assertArrayEquals(universalSet.toArray(new String[0]), new String[0]);
         
-        Assert.assertEquals(universalSet.size(), 0);
+        Assertions.assertEquals(universalSet.size(), 0);
         
-        Assert.assertTrue(universalSet instanceof Set);
+        Assertions.assertTrue(universalSet instanceof Set);
     }
 }

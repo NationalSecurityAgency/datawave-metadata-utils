@@ -1,9 +1,9 @@
 package datawave.query.composite;
 
 import com.google.common.collect.Multimap;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Date;
@@ -24,7 +24,7 @@ public class CompositeMetadataTest {
             new String[] {"GONNA_TAKE", "POLLUTION", "DOWN", "TO", "ZERO"},
             new String[] {"CAPTAIN_POLLUTION", "RADIATION", "DEFORESTATION", "SMOG", "TOXICS", "HATE"}};
     
-    @Before
+    @BeforeEach
     public void setup() {
         compositeMetadata = new CompositeMetadata();
         
@@ -54,22 +54,22 @@ public class CompositeMetadataTest {
         
         // filter on specified composite fields
         CompositeMetadata fieldFilteredCompMetadata = compositeMetadata.filter(componentFields);
-        Assert.assertTrue(fieldFilteredCompMetadata.compositeFieldMapByType.keySet().containsAll(Arrays.asList(this.ingestTypes)));
+        Assertions.assertTrue(fieldFilteredCompMetadata.compositeFieldMapByType.keySet().containsAll(Arrays.asList(this.ingestTypes)));
         for (Multimap<String,String> compFieldMap : fieldFilteredCompMetadata.compositeFieldMapByType.values()) {
-            Assert.assertTrue(compFieldMap.keySet().containsAll(compositeFields));
-            Assert.assertFalse(compFieldMap.keySet().contains("CAPTAIN_POLLUTION"));
+            Assertions.assertTrue(compFieldMap.keySet().containsAll(compositeFields));
+            Assertions.assertFalse(compFieldMap.keySet().contains("CAPTAIN_POLLUTION"));
         }
-        Assert.assertTrue(fieldFilteredCompMetadata.compositeTransitionDatesByType.isEmpty());
+        Assertions.assertTrue(fieldFilteredCompMetadata.compositeTransitionDatesByType.isEmpty());
         
         // filter on ingest types and composite fields
         CompositeMetadata filteredCompMetadata = compositeMetadata.filter(ingestTypes, componentFields);
-        Assert.assertTrue(filteredCompMetadata.compositeFieldMapByType.keySet().containsAll(ingestTypes));
-        Assert.assertFalse(filteredCompMetadata.compositeFieldMapByType.keySet().containsAll(Arrays.asList(this.ingestTypes)));
+        Assertions.assertTrue(filteredCompMetadata.compositeFieldMapByType.keySet().containsAll(ingestTypes));
+        Assertions.assertFalse(filteredCompMetadata.compositeFieldMapByType.keySet().containsAll(Arrays.asList(this.ingestTypes)));
         for (Multimap<String,String> compFieldMap : filteredCompMetadata.compositeFieldMapByType.values()) {
-            Assert.assertTrue(compFieldMap.keySet().containsAll(compositeFields));
-            Assert.assertFalse(compFieldMap.keySet().contains("CAPTAIN_POLLUTION"));
+            Assertions.assertTrue(compFieldMap.keySet().containsAll(compositeFields));
+            Assertions.assertFalse(compFieldMap.keySet().contains("CAPTAIN_POLLUTION"));
         }
-        Assert.assertTrue(filteredCompMetadata.compositeTransitionDatesByType.isEmpty());
+        Assertions.assertTrue(filteredCompMetadata.compositeTransitionDatesByType.isEmpty());
     }
     
     @Test
@@ -78,8 +78,8 @@ public class CompositeMetadataTest {
         CompositeMetadata destCompMetadata = CompositeMetadata.fromBytes(compMetadataBytes);
         
         for (String ingestType : compositeMetadata.compositeFieldMapByType.keySet()) {
-            Assert.assertEquals(compositeMetadata.compositeFieldMapByType.get(ingestType), destCompMetadata.compositeFieldMapByType.get(ingestType));
-            Assert.assertEquals(compositeMetadata.compositeTransitionDatesByType.get(ingestType),
+            Assertions.assertEquals(compositeMetadata.compositeFieldMapByType.get(ingestType), destCompMetadata.compositeFieldMapByType.get(ingestType));
+            Assertions.assertEquals(compositeMetadata.compositeTransitionDatesByType.get(ingestType),
                             destCompMetadata.compositeTransitionDatesByType.get(ingestType));
         }
     }
@@ -91,7 +91,7 @@ public class CompositeMetadataTest {
             for (int i = 0; i < 100; i++) {
                 executor.submit(() -> {
                     byte[] compMetadataBytes = CompositeMetadata.toBytes(compositeMetadata);
-                    Assert.assertNotNull(compMetadataBytes);
+                    Assertions.assertNotNull(compMetadataBytes);
                 });
             }
         } finally {

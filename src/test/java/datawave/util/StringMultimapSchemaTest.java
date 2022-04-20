@@ -4,8 +4,8 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import io.protostuff.LinkedBuffer;
 import io.protostuff.ProtobufIOUtil;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
@@ -15,17 +15,17 @@ public class StringMultimapSchemaTest {
     
     @Test
     public void testMultimapSchemaConfig() {
-        Assert.assertNull(stringMultimapSchema.getFieldName(0));
-        Assert.assertEquals("e", stringMultimapSchema.getFieldName(1));
+        Assertions.assertNull(stringMultimapSchema.getFieldName(0));
+        Assertions.assertEquals("e", stringMultimapSchema.getFieldName(1));
         
-        Assert.assertEquals(0, stringMultimapSchema.getFieldNumber("bogusField"));
-        Assert.assertEquals(1, stringMultimapSchema.getFieldNumber("e"));
+        Assertions.assertEquals(0, stringMultimapSchema.getFieldNumber("bogusField"));
+        Assertions.assertEquals(1, stringMultimapSchema.getFieldNumber("e"));
         
-        Assert.assertTrue(stringMultimapSchema.isInitialized(null));
+        Assertions.assertTrue(stringMultimapSchema.isInitialized(null));
         
-        Assert.assertEquals("Multimap", stringMultimapSchema.messageName());
-        Assert.assertEquals("com.google.common.collect.Multimap", stringMultimapSchema.messageFullName());
-        Assert.assertEquals(Multimap.class, stringMultimapSchema.typeClass());
+        Assertions.assertEquals("Multimap", stringMultimapSchema.messageName());
+        Assertions.assertEquals("com.google.common.collect.Multimap", stringMultimapSchema.messageFullName());
+        Assertions.assertEquals(Multimap.class, stringMultimapSchema.typeClass());
     }
     
     @Test
@@ -36,20 +36,20 @@ public class StringMultimapSchemaTest {
         
         byte[] multimapBytes = ProtobufIOUtil.toByteArray(sourceMultimap, stringMultimapSchema, LinkedBuffer.allocate());
         
-        Assert.assertNotNull(multimapBytes);
-        Assert.assertTrue(multimapBytes.length > 0);
+        Assertions.assertNotNull(multimapBytes);
+        Assertions.assertTrue(multimapBytes.length > 0);
         
         Multimap<String,String> destMultimap = stringMultimapSchema.newMessage();
         ProtobufIOUtil.mergeFrom(multimapBytes, destMultimap, stringMultimapSchema);
         
-        Assert.assertEquals(sourceMultimap, destMultimap);
+        Assertions.assertEquals(sourceMultimap, destMultimap);
     }
     
-    @Test(expected = RuntimeException.class)
+    @Test
     public void testProtobufReadError() {
         byte[] someBytes = new byte[] {30, 0};
         
         Multimap<String,String> destMultimap = stringMultimapSchema.newMessage();
-        ProtobufIOUtil.mergeFrom(someBytes, destMultimap, stringMultimapSchema);
+        Assertions.assertThrows(RuntimeException.class, () -> ProtobufIOUtil.mergeFrom(someBytes, destMultimap, stringMultimapSchema));
     }
 }

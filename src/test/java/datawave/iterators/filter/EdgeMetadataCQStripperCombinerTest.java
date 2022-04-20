@@ -19,10 +19,10 @@ import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.log4j.Logger;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -40,7 +40,7 @@ public class EdgeMetadataCQStripperCombinerTest {
     private static int numAttributeEntries = 6;
     private static int numCondensedEntries = 8; // for testing sanity make this an even number
     
-    @Before
+    @BeforeEach
     public void init() throws Exception {
         
         InMemoryInstance i = new InMemoryInstance(EdgeMetadataCQStripperCombinerTest.class.toString());
@@ -58,7 +58,7 @@ public class EdgeMetadataCQStripperCombinerTest {
         printEdgeTable(null);
     }
     
-    @After
+    @AfterEach
     public void tearDown() {
         connector = null;
     }
@@ -124,14 +124,14 @@ public class EdgeMetadataCQStripperCombinerTest {
         for (Map.Entry<Key,Value> entry : scan) {
             
             if (counter % 2 == 0) {
-                Assert.assertEquals("Wrong timestamp", (startTime + day * 8L), entry.getKey().getTimestamp());
+                Assertions.assertEquals((startTime + day * 8L), entry.getKey().getTimestamp(), "Wrong timestamp");
             } else {
-                Assert.assertEquals("Wrong timestamp", (startTime + day * 10L), entry.getKey().getTimestamp());
+                Assertions.assertEquals((startTime + day * 10L), entry.getKey().getTimestamp(), "Wrong timestamp");
             }
             
             MetadataValue meta = MetadataValue.parseFrom(entry.getValue().get());
             
-            Assert.assertEquals("Unexpected amount of metadata.", (numAttributeEntries / 2), meta.getMetadataCount());
+            Assertions.assertEquals((numAttributeEntries / 2), meta.getMetadataCount(), "Unexpected amount of metadata.");
             counter++;
         }
         
