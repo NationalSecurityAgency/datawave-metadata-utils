@@ -129,6 +129,9 @@ public class MetadataHelper {
     protected final AllFieldMetadataHelper allFieldMetadataHelper;
     protected final Collection<Authorizations> allMetadataAuths;
     
+    // a set of fields that are dynamically created at evaluation time, and are not registered in the metadata table
+    protected Set<String> evaluationOnlyFields = Collections.emptySet();
+    
     public MetadataHelper(AllFieldMetadataHelper allFieldMetadataHelper, Collection<Authorizations> allMetadataAuths, AccumuloClient client,
                     String metadataTableName, Set<Authorizations> auths, Set<Authorizations> fullUserAuths) {
         Preconditions.checkNotNull(allFieldMetadataHelper, "An AllFieldMetadataHelper is required by MetadataHelper");
@@ -325,9 +328,21 @@ public class MetadataHelper {
                 fields.addAll(allFields.get(datatype));
             }
         }
+        
+        // Add any additional fields that are created at evaluation time and are hence not in the metadata table.
+        fields.addAll(evaluationOnlyFields);
+        
         if (log.isTraceEnabled())
             log.trace("getAllFields(" + ingestTypeFilter + ") returning " + fields);
         return Collections.unmodifiableSet(fields);
+    }
+    
+    public Set<String> getEvaluationOnlyFields() {
+        return Collections.unmodifiableSet(evaluationOnlyFields);
+    }
+    
+    public void setEvaluationOnlyFields(Set<String> evaluationOnlyFields) {
+        this.evaluationOnlyFields = (evaluationOnlyFields == null ? Collections.emptySet() : new HashSet<>(evaluationOnlyFields));
     }
     
     /**
