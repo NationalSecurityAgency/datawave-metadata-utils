@@ -49,7 +49,7 @@ public class MetadataHelperFactory {
      *            the name of the metadata table in Accumulo
      * @param fullUserAuths
      *            the authorizations for the proxied entity chain that is calling this method
-     * 
+     *            
      * @return a new MetadataHelper
      */
     @SuppressWarnings("unchecked")
