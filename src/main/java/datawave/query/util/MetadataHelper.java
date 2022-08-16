@@ -59,7 +59,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
@@ -793,6 +792,20 @@ public class MetadataHelper {
     
     public Map<String,Date> getCompositeTransitionDateMap(Set<String> ingestTypeFilter) throws TableNotFoundException {
         return this.allFieldMetadataHelper.getCompositeTransitionDateMap(ingestTypeFilter);
+    }
+    
+    /**
+     * A map of whindex field to creation date.
+     *
+     * @return An unmodifiable Map
+     * @throws TableNotFoundException
+     */
+    public Map<String,Date> getWhindexCreationDateMap() throws TableNotFoundException {
+        return this.allFieldMetadataHelper.getWhindexCreationDateMap();
+    }
+    
+    public Map<String,Date> getWhindexCreationDateMap(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        return this.allFieldMetadataHelper.getWhindexCreationDateMap(ingestTypeFilter);
     }
     
     /**
