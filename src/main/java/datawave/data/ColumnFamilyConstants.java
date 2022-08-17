@@ -85,4 +85,9 @@ public interface ColumnFamilyConstants {
      * a colf of 'vi' denotes an event that is part of a virtual field this is not used yet....
      */
     Text COLF_VI = new Text("vi");
+    
+    /**
+     * a colf of 'wcd' denotes a whindex field's creation date
+     */
+    Text COLF_WCD = new Text("wcd");
 }

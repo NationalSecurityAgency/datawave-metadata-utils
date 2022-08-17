@@ -383,6 +383,67 @@ public class AllFieldMetadataHelper {
     }
     
     /**
+     * A map of whindex field to creation date.
+     *
+     * @return An unmodifiable Map
+     * @throws TableNotFoundException
+     */
+    @Cacheable(value = "getWhindexCreationDateMap", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
+    public Map<String,Date> getWhindexCreationDateMap() throws TableNotFoundException {
+        log.debug("cache fault for getWhindexCreationDateMap(" + this.auths + "," + this.metadataTableName + ")");
+        return this.getWhindexCreationDateMap(null);
+    }
+    
+    @Cacheable(value = "getWhindexCreationDateMap", key = "{#root.target.auths,#root.target.metadataTableName,#ingestTypeFilter}",
+                    cacheManager = "metadataHelperCacheManager")
+    public Map<String,Date> getWhindexCreationDateMap(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        log.debug("cache fault for getWhindexCreationDateMap(" + this.auths + "," + this.metadataTableName + "," + ingestTypeFilter + ")");
+        
+        Map<String,Date> tdMap = new HashMap<>();
+        
+        // Note: Intentionally using the same transition date format as the composite fields.
+        SimpleDateFormat dateFormat = new SimpleDateFormat(CompositeMetadataHelper.transitionDateFormat);
+        
+        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Range range = new Range();
+        
+        bs.setRange(range);
+        
+        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_WCD);
+        
+        for (Entry<Key,Value> entry : bs) {
+            String fieldName = entry.getKey().getRow().toString();
+            if (null != entry.getKey().getColumnQualifier()) {
+                String colq = entry.getKey().getColumnQualifier().toString();
+                int idx = colq.indexOf(NULL_BYTE);
+                
+                if (idx != -1) {
+                    String type = colq.substring(0, idx);
+                    
+                    // If types are specified and this type is not in the list,
+                    // skip it.
+                    if (null != ingestTypeFilter && !ingestTypeFilter.isEmpty() && !ingestTypeFilter.contains(type)) {
+                        continue;
+                    }
+                    
+                    try {
+                        Date transitionDate = dateFormat.parse(colq.substring(idx + 1));
+                        tdMap.put(fieldName, transitionDate);
+                    } catch (ParseException e) {
+                        log.trace("Unable to parse whindex field creation date", e);
+                    }
+                } else {
+                    log.warn("EventMetadata entry did not contain a null byte in the column qualifier: " + entry.getKey());
+                }
+            } else {
+                log.warn("ColumnQualifier null in EventMetadata for key: " + entry.getKey());
+            }
+        }
+        
+        return Collections.unmodifiableMap(tdMap);
+    }
+    
+    /**
      * A map of composite name to field separator.
      *
      * @return An unmodifiable Map
