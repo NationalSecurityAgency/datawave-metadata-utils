@@ -570,6 +570,19 @@ public class MetadataHelper {
         
     }
     
+    public boolean isTokenized(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
+        
+        Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
+        
+        try {
+            return this.allFieldMetadataHelper.isIndexed(ColumnFamilyConstants.COLF_TF, entry);
+        } catch (InstantiationException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
     /**
      * Returns a Set of all TextNormalizers in use by any type in Accumulo
      * 
