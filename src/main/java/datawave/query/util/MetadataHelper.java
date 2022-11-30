@@ -17,6 +17,9 @@ import datawave.iterators.EdgeMetadataCombiner;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
+import datawave.query.model.Direction;
+import datawave.query.model.FieldMapping;
+import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
@@ -432,7 +435,6 @@ public class MetadataHelper {
         TraceStopwatch stopWatch = new TraceStopwatch("MetadataHelper -- Building Query Model from instance");
         stopWatch.start();
         
-        Set<String> unevalFields = null;
         if (log.isTraceEnabled())
             log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
                             + " looking at model " + modelName + " unevaluatedFields " + unevaluatedFields);
@@ -440,43 +442,26 @@ public class MetadataHelper {
         Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
         scan.setRange(new Range());
         scan.fetchColumnFamily(new Text(modelName));
-        Set<String> indexOnlyFields = new HashSet<>(); // will hold index only
-                                                       // fields
         // We need the entire Model so we can do both directions.
         final Set<String> allFields = this.getAllFields(ingestTypeFilter);
         
         for (Map.Entry<Key,Value> entry : scan) {
-            String original = entry.getKey().getRow().toString();
-            Text cq = entry.getKey().getColumnQualifier();
-            String[] parts = StringUtils.split(cq.toString(), "\0");
-            if (parts.length > 1 && null != parts[0] && !parts[0].isEmpty()) {
-                String replacement = parts[0];
-                
-                for (String part : parts) {
-                    if ("forward".equalsIgnoreCase(part)) {
-                        // Do not add a forward mapping entry
-                        // when the replacement does not exist in the database
-                        if (allFields.contains(replacement)) {
-                            queryModel.addTermToModel(original, replacement);
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("Ignoring forward mapping of " + replacement + " for " + original + " because the metadata table has no reference to it");
-                        }
-                    } else if ("reverse".equalsIgnoreCase(part)) {
-                        queryModel.addTermToReverseModel(original, replacement);
-                    } else if ("index_only".equalsIgnoreCase(part)) {
-                        indexOnlyFields.add(replacement);
-                    }
+            FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey());
+            if (mapping.isLenient()) {
+                queryModel.addLenientForwardMappings(mapping.getModelFieldName());
+            } else if (mapping.getDirection() == Direction.FORWARD) {
+                // Do not add a forward mapping entry
+                // when the replacement does not exist in the database
+                if (allFields.contains(mapping.getFieldName())) {
+                    queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
+                } else if (log.isTraceEnabled()) {
+                    log.trace("Ignoring forward mapping of " + mapping.getFieldName() + " for " + mapping.getModelFieldName()
+                                    + " because the metadata table has no reference to it");
                 }
+            } else {
+                queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
             }
         }
-        
-        if (unevaluatedFields != null)
-            unevalFields = new HashSet<>(unevaluatedFields);
-        else
-            unevalFields = new HashSet<>();
-        
-        unevalFields.addAll(indexOnlyFields);
-        queryModel.setUnevaluatedFields(unevalFields);
         
         if (queryModel.getReverseQueryMapping().isEmpty()) {
             if (log.isTraceEnabled()) {
