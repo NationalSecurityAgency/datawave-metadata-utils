@@ -152,7 +152,7 @@ public class AllFieldMetadataHelper {
     }
     
     /**
-     * Method that fetches whether or not a column is indexed.
+     * Method that determines whether or not a column exists in the metadata table for the given key.
      * 
      * @param colf
      * @param key

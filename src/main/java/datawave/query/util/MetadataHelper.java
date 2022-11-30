@@ -528,6 +528,14 @@ public class MetadataHelper {
         return modelNames;
     }
     
+    /**
+     * Determines whether a field has been reverse indexed by looking for the ri column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
     public boolean isReverseIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(ingestTypeFilter);
@@ -541,6 +549,14 @@ public class MetadataHelper {
         }
     }
     
+    /**
+     * Determines whether a field has been indexed by looking for the i column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
     public boolean isIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(ingestTypeFilter);
@@ -553,6 +569,27 @@ public class MetadataHelper {
             throw new RuntimeException(e);
         }
         
+    }
+    
+    /**
+     * Determines whether a field has been tokenized by looking for the tf column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
+    public boolean isTokenized(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
+        
+        Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
+        
+        try {
+            return this.allFieldMetadataHelper.isIndexed(ColumnFamilyConstants.COLF_TF, entry);
+        } catch (InstantiationException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     /**
