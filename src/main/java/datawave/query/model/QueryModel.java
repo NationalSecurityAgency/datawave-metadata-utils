@@ -28,20 +28,24 @@ public class QueryModel implements Serializable {
     public static final String PARAM_VALUE_SEP_STR = new String(new char[] {PARAM_VALUE_SEP});
     public static final String LIMIT_FIELDS_ORIGINAL_COUNT_SUFFIX = "ORIGINAL_COUNT";
     
+    // forward mappings map a field name to a list of database fields
     protected final Multimap<String,String> forwardQueryMapping;
+    // reverse mappings map a database field to a (hopefully) user understandable field name
     protected final Map<String,String> reverseQueryMapping;
-    protected Set<String> unevalFields;
+    // lenient forward mappings are those that are best effort in that if the underlying
+    // database field cannot be found in the index, then it can be dropped.
+    protected final Set<String> lenientForwardMappings;
     
     public QueryModel() {
         this.forwardQueryMapping = HashMultimap.create();
+        this.lenientForwardMappings = new HashSet();
         this.reverseQueryMapping = Maps.newHashMap();
-        this.unevalFields = Sets.newHashSet();
     }
     
     public QueryModel(QueryModel other) {
         this.forwardQueryMapping = HashMultimap.create(other.getForwardQueryMapping());
+        this.lenientForwardMappings = new HashSet(other.lenientForwardMappings);
         this.reverseQueryMapping = Maps.newHashMap(other.getReverseQueryMapping());
-        this.unevalFields = Sets.newHashSet(other.getUnevaluatedFields());
     }
     
     public Multimap<String,String> getForwardQueryMapping() {
@@ -60,10 +64,6 @@ public class QueryModel implements Serializable {
         reverseQueryMapping.put(nameOnDisk, alias);
     }
     
-    public Set<String> getUnevaluatedFields() {
-        return this.unevalFields;
-    }
-    
     public Collection<String> getMappingsForAlias(String field) {
         return forwardQueryMapping.get(field);
     }
@@ -72,16 +72,23 @@ public class QueryModel implements Serializable {
         return reverseQueryMapping.get(field);
     }
     
-    public void setUnevaluatedFields(Set<String> uneval) {
-        this.unevalFields = uneval;
+    public Set<String> getLenientForwardMappings() {
+        return lenientForwardMappings;
     }
     
-    public void addUnevaluatedField(String uneval) {
-        this.unevalFields.add(uneval);
+    public void setLenientForwardMappings(Set<String> fields) {
+        lenientForwardMappings.clear();
+        if (fields != null) {
+            lenientForwardMappings.addAll(fields);
+        }
     }
     
-    public boolean isUnevaluatedField(String field) {
-        return this.unevalFields.contains(field);
+    public void addLenientForwardMappings(String field) {
+        lenientForwardMappings.add(field);
+    }
+    
+    public boolean isLenientForwardMapping(String field) {
+        return lenientForwardMappings.contains(field);
     }
     
     /**
@@ -188,11 +195,7 @@ public class QueryModel implements Serializable {
         out.println("# Query Model Forward Mapping - " + System.currentTimeMillis());
         for (Entry<String,String> mapping : this.forwardQueryMapping.entries()) {
             out.print(mapping.getKey() + ":" + mapping.getValue());
-            if (this.unevalFields.contains(mapping.getValue())) {
-                out.println(":index_only");
-            } else {
-                out.println();
-            }
+            out.println();
         }
     }
     
@@ -222,4 +225,5 @@ public class QueryModel implements Serializable {
             throw new RuntimeException(e);
         }
     }
+    
 }
