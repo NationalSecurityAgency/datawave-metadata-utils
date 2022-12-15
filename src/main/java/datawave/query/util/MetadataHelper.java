@@ -446,20 +446,24 @@ public class MetadataHelper {
         final Set<String> allFields = this.getAllFields(ingestTypeFilter);
         
         for (Map.Entry<Key,Value> entry : scan) {
-            FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey());
-            if (mapping.isLenient()) {
-                queryModel.addLenientForwardMappings(mapping.getModelFieldName());
-            } else if (mapping.getDirection() == Direction.FORWARD) {
-                // Do not add a forward mapping entry
-                // when the replacement does not exist in the database
-                if (allFields.contains(mapping.getFieldName())) {
-                    queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
-                } else if (log.isTraceEnabled()) {
-                    log.trace("Ignoring forward mapping of " + mapping.getFieldName() + " for " + mapping.getModelFieldName()
-                                    + " because the metadata table has no reference to it");
+            try {
+                FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey());
+                if (mapping.isLenient()) {
+                    queryModel.addLenientForwardMappings(mapping.getModelFieldName());
+                } else if (mapping.getDirection() == Direction.FORWARD) {
+                    // Do not add a forward mapping entry
+                    // when the replacement does not exist in the database
+                    if (allFields.contains(mapping.getFieldName())) {
+                        queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
+                    } else if (log.isTraceEnabled()) {
+                        log.trace("Ignoring forward mapping of " + mapping.getFieldName() + " for " + mapping.getModelFieldName()
+                                        + " because the metadata table has no reference to it");
+                    }
+                } else {
+                    queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
                 }
-            } else {
-                queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
+            } catch (IllegalArgumentException iae) {
+                log.warn("Ignoring unparseable key " + entry.getKey());
             }
         }
         
