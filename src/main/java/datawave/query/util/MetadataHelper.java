@@ -1252,7 +1252,9 @@ public class MetadataHelper {
         
         try {
             Map<String,Long> countsByType = getCountsByFieldInDayWithTypes(Maps.immutableEntry(fieldName, date));
-            Iterable<Entry<String,Long>> filteredByType = Iterables.filter(countsByType.entrySet(), input -> datatypes.contains(input.getKey()));
+            
+            Iterable<Entry<String,Long>> filteredByType = datatypes == null ? countsByType.entrySet()
+                            : Iterables.filter(countsByType.entrySet(), input -> datatypes.contains(input.getKey()));
             
             long sum = 0;
             for (Entry<String,Long> entry : filteredByType) {
