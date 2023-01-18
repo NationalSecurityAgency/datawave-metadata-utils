@@ -997,18 +997,9 @@ public class MetadataHelper {
      */
     @Cacheable(value = "getTermFrequencyFields", key = "{#root.target.auths,#root.target.metadataTableName,#p0}", cacheManager = "metadataHelperCacheManager")
     public Set<String> getTermFrequencyFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
-        
         Multimap<String,String> termFrequencyFields = loadTermFrequencyFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(termFrequencyFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(termFrequencyFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(termFrequencyFields, ingestTypeFilter);
     }
     
     /**
@@ -1019,18 +1010,9 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getIndexedFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
-        
         Multimap<String,String> indexedFields = this.allFieldMetadataHelper.loadIndexedFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(indexedFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(indexedFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(indexedFields, ingestTypeFilter);
     }
     
     /**
@@ -1041,18 +1023,9 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getReverseIndexedFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        Multimap<String,String> reverseIndexedFields = this.allFieldMetadataHelper.loadReverseIndexedFields();
         
-        Multimap<String,String> indexedFields = this.allFieldMetadataHelper.loadReverseIndexedFields();
-        
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(indexedFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(indexedFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(reverseIndexedFields, ingestTypeFilter);
     }
     
     /**
@@ -1063,18 +1036,9 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getExpansionFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
-        
         Multimap<String,String> expansionFields = this.allFieldMetadataHelper.loadExpansionFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(expansionFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(expansionFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(expansionFields, ingestTypeFilter);
     }
     
     /**
@@ -1085,18 +1049,21 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getContentFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
-        
         Multimap<String,String> contentFields = this.allFieldMetadataHelper.loadContentFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(contentFields.values());
-        } else {
+        return getFields(contentFields, ingestTypeFilter);
+    }
+    
+    private Set<String> getFields(Multimap<String,String> fields, Set<String> ingestTypeFilter) {
+        Set<String> returnedFields = new HashSet<>();
+        if (ingestTypeFilter == null) {
+            returnedFields.addAll(fields.values());
+        } else if (!ingestTypeFilter.isEmpty()) {
             for (String datatype : ingestTypeFilter) {
-                fields.addAll(contentFields.get(datatype));
+                returnedFields.addAll(fields.get(datatype));
             }
-        }
-        return Collections.unmodifiableSet(fields);
+        } // non-null but empty typeFilters allow nothing
+        return Collections.unmodifiableSet(returnedFields);
     }
     
     /**
