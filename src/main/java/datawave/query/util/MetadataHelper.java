@@ -17,6 +17,9 @@ import datawave.iterators.EdgeMetadataCombiner;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
+import datawave.query.model.Direction;
+import datawave.query.model.FieldMapping;
+import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
@@ -59,7 +62,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
@@ -433,7 +435,6 @@ public class MetadataHelper {
         TraceStopwatch stopWatch = new TraceStopwatch("MetadataHelper -- Building Query Model from instance");
         stopWatch.start();
         
-        Set<String> unevalFields = null;
         if (log.isTraceEnabled())
             log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
                             + " looking at model " + modelName + " unevaluatedFields " + unevaluatedFields);
@@ -441,43 +442,26 @@ public class MetadataHelper {
         Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
         scan.setRange(new Range());
         scan.fetchColumnFamily(new Text(modelName));
-        Set<String> indexOnlyFields = new HashSet<>(); // will hold index only
-                                                       // fields
         // We need the entire Model so we can do both directions.
         final Set<String> allFields = this.getAllFields(ingestTypeFilter);
         
         for (Map.Entry<Key,Value> entry : scan) {
-            String original = entry.getKey().getRow().toString();
-            Text cq = entry.getKey().getColumnQualifier();
-            String[] parts = StringUtils.split(cq.toString(), "\0");
-            if (parts.length > 1 && null != parts[0] && !parts[0].isEmpty()) {
-                String replacement = parts[0];
-                
-                for (String part : parts) {
-                    if ("forward".equalsIgnoreCase(part)) {
-                        // Do not add a forward mapping entry
-                        // when the replacement does not exist in the database
-                        if (allFields.contains(replacement)) {
-                            queryModel.addTermToModel(original, replacement);
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("Ignoring forward mapping of " + replacement + " for " + original + " because the metadata table has no reference to it");
-                        }
-                    } else if ("reverse".equalsIgnoreCase(part)) {
-                        queryModel.addTermToReverseModel(original, replacement);
-                    } else if ("index_only".equalsIgnoreCase(part)) {
-                        indexOnlyFields.add(replacement);
-                    }
+            FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey());
+            if (mapping.isLenient()) {
+                queryModel.addLenientForwardMappings(mapping.getModelFieldName());
+            } else if (mapping.getDirection() == Direction.FORWARD) {
+                // Do not add a forward mapping entry
+                // when the replacement does not exist in the database
+                if (allFields.contains(mapping.getFieldName())) {
+                    queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
+                } else if (log.isTraceEnabled()) {
+                    log.trace("Ignoring forward mapping of " + mapping.getFieldName() + " for " + mapping.getModelFieldName()
+                                    + " because the metadata table has no reference to it");
                 }
+            } else {
+                queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
             }
         }
-        
-        if (unevaluatedFields != null)
-            unevalFields = new HashSet<>(unevaluatedFields);
-        else
-            unevalFields = new HashSet<>();
-        
-        unevalFields.addAll(indexOnlyFields);
-        queryModel.setUnevaluatedFields(unevalFields);
         
         if (queryModel.getReverseQueryMapping().isEmpty()) {
             if (log.isTraceEnabled()) {
@@ -544,6 +528,14 @@ public class MetadataHelper {
         return modelNames;
     }
     
+    /**
+     * Determines whether a field has been reverse indexed by looking for the ri column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
     public boolean isReverseIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(ingestTypeFilter);
@@ -557,6 +549,14 @@ public class MetadataHelper {
         }
     }
     
+    /**
+     * Determines whether a field has been indexed by looking for the i column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
     public boolean isIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(ingestTypeFilter);
@@ -569,6 +569,27 @@ public class MetadataHelper {
             throw new RuntimeException(e);
         }
         
+    }
+    
+    /**
+     * Determines whether a field has been tokenized by looking for the tf column in the metadata table
+     * 
+     * @param fieldName
+     * @param ingestTypeFilter
+     * @return
+     * @throws TableNotFoundException
+     */
+    public boolean isTokenized(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
+        Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
+        
+        Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
+        
+        try {
+            return this.allFieldMetadataHelper.isIndexed(ColumnFamilyConstants.COLF_TF, entry);
+        } catch (InstantiationException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     /**
@@ -793,6 +814,20 @@ public class MetadataHelper {
     
     public Map<String,Date> getCompositeTransitionDateMap(Set<String> ingestTypeFilter) throws TableNotFoundException {
         return this.allFieldMetadataHelper.getCompositeTransitionDateMap(ingestTypeFilter);
+    }
+    
+    /**
+     * A map of whindex field to creation date.
+     *
+     * @return An unmodifiable Map
+     * @throws TableNotFoundException
+     */
+    public Map<String,Date> getWhindexCreationDateMap() throws TableNotFoundException {
+        return this.allFieldMetadataHelper.getWhindexCreationDateMap();
+    }
+    
+    public Map<String,Date> getWhindexCreationDateMap(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        return this.allFieldMetadataHelper.getWhindexCreationDateMap(ingestTypeFilter);
     }
     
     /**
