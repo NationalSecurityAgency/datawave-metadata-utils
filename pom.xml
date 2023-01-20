@@ -8,7 +8,7 @@
         <relativePath />
     </parent>
     <artifactId>metadata-utils</artifactId>
-    <version>1.13</version>
+    <version>1.14-SNAPSHOT</version>
     <url>https://code.nsa.gov/datawave-metadata-utils</url>
     <licenses>
         <license>
