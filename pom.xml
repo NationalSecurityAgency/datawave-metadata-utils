@@ -24,7 +24,7 @@
     </scm>
     <properties>
         <spotbugs.excludes.file>${project.basedir}/src/main/spotbugs/excludes.xml</spotbugs.excludes.file>
-        <version.accumulo-utils>1.5-SNAPSHOT</version.accumulo-utils>
+        <version.accumulo-utils>1.6-SNAPSHOT</version.accumulo-utils>
         <version.caffeine>2.6.2</version.caffeine>
         <version.easymock>4.0.2</version.easymock>
         <version.kryo>2.20</version.kryo>
