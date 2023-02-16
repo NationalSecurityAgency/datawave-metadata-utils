@@ -83,14 +83,15 @@ import java.util.stream.StreamSupport;
  * <p>
  * Helper class to fetch the set of field names which are only indexed, i.e. do not occur as attributes in the event.
  * </p>
- *
+ * 
  * <p>
  * This set would normally includes all tokenized content fields. In terms of keys in the DatawaveMetadata table, this set would contain all rows in the
  * {@code DatawaveMetadata} table which have a {@link ColumnFamilyConstants#COLF_I} but not a {@link ColumnFamilyConstants#COLF_E}
  * </p>
- * <p>
- * <p>
+ * 
+ * 
  * TODO -- Break this class apart
+ * 
  */
 @EnableCaching
 @Component("metadataHelper")
@@ -161,7 +162,7 @@ public class MetadataHelper {
     /**
      * allMetadataAuths is a singleton Collection of one Authorizations instance that contains all of the auths required to see everything in the Metadata
      * table. userAuths is a Collection of Authorizations, every one of which must contain th
-     *
+     * 
      * @param usersAuthsCollection
      * @param allMetadataAuthsCollection
      * @return
@@ -350,7 +351,7 @@ public class MetadataHelper {
     /**
      * Get the fields that have values not in the same form as the event (excluding normalization). This would include index only fields, term frequency fields
      * (as the index may contain tokens), and composite fields.
-     *
+     * 
      * @param ingestTypeFilter
      * @return the non-event fields
      */
@@ -387,7 +388,7 @@ public class MetadataHelper {
     
     /**
      * Fetch the {@link Set} of index-only fields.
-     *
+     * 
      * @return
      * @throws TableNotFoundException
      */
@@ -533,7 +534,7 @@ public class MetadataHelper {
     
     /**
      * Determines whether a field has been reverse indexed by looking for the ri column in the metadata table
-     *
+     * 
      * @param fieldName
      * @param ingestTypeFilter
      * @return
@@ -541,6 +542,7 @@ public class MetadataHelper {
      */
     public boolean isReverseIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
         
         Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
         
@@ -553,7 +555,7 @@ public class MetadataHelper {
     
     /**
      * Determines whether a field has been indexed by looking for the i column in the metadata table
-     *
+     * 
      * @param fieldName
      * @param ingestTypeFilter
      * @return
@@ -561,6 +563,7 @@ public class MetadataHelper {
      */
     public boolean isIndexed(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
         
         Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
         
@@ -574,7 +577,7 @@ public class MetadataHelper {
     
     /**
      * Determines whether a field has been tokenized by looking for the tf column in the metadata table
-     *
+     * 
      * @param fieldName
      * @param ingestTypeFilter
      * @return
@@ -582,6 +585,7 @@ public class MetadataHelper {
      */
     public boolean isTokenized(String fieldName, Set<String> ingestTypeFilter) throws TableNotFoundException {
         Preconditions.checkNotNull(fieldName);
+        Preconditions.checkNotNull(ingestTypeFilter);
         
         Entry<String,Entry<String,Set<String>>> entry = Maps.immutableEntry(metadataTableName, Maps.immutableEntry(fieldName, ingestTypeFilter));
         
@@ -594,7 +598,7 @@ public class MetadataHelper {
     
     /**
      * Returns a Set of all TextNormalizers in use by any type in Accumulo
-     *
+     * 
      * @return
      * @throws InstantiationException
      * @throws IllegalAccessException
@@ -733,8 +737,9 @@ public class MetadataHelper {
     
     /**
      * Returns a Set of all TextNormalizers in use by any type in Accumulo
-     *
+     * 
      * @return
+     * 
      * @throws InstantiationException
      * @throws IllegalAccessException
      * @throws TableNotFoundException
@@ -788,7 +793,7 @@ public class MetadataHelper {
     /**
      * A map of composite name to the ordered list of it for example, mapping of {@code COLOR -> ['COLOR_WHEELS,0', 'MAKE_COLOR,1' ]}. If called multiple time,
      * it returns the same cached map.
-     *
+     * 
      * @return An unmodifiable Multimap
      * @throws TableNotFoundException
      */
@@ -963,7 +968,7 @@ public class MetadataHelper {
     
     /**
      * Scans the metadata table and returns the set of fields that use the supplied normalizer.
-     * <p>
+     *
      * This method allows a client to specify data types to filter out. If the set is null, then it assumed the user wants all data types. If the set is empty,
      * then it assumed the user wants no data types. Otherwise, values that occur in the set will be used as a white list of data types.
      *
@@ -997,9 +1002,18 @@ public class MetadataHelper {
      */
     @Cacheable(value = "getTermFrequencyFields", key = "{#root.target.auths,#root.target.metadataTableName,#p0}", cacheManager = "metadataHelperCacheManager")
     public Set<String> getTermFrequencyFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        
         Multimap<String,String> termFrequencyFields = loadTermFrequencyFields();
         
-        return getFields(termFrequencyFields, ingestTypeFilter);
+        Set<String> fields = new HashSet<>();
+        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
+            fields.addAll(termFrequencyFields.values());
+        } else {
+            for (String datatype : ingestTypeFilter) {
+                fields.addAll(termFrequencyFields.get(datatype));
+            }
+        }
+        return Collections.unmodifiableSet(fields);
     }
     
     /**
@@ -1010,9 +1024,18 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getIndexedFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        
         Multimap<String,String> indexedFields = this.allFieldMetadataHelper.loadIndexedFields();
         
-        return getFields(indexedFields, ingestTypeFilter);
+        Set<String> fields = new HashSet<>();
+        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
+            fields.addAll(indexedFields.values());
+        } else {
+            for (String datatype : ingestTypeFilter) {
+                fields.addAll(indexedFields.get(datatype));
+            }
+        }
+        return Collections.unmodifiableSet(fields);
     }
     
     /**
@@ -1023,47 +1046,62 @@ public class MetadataHelper {
      * @throws TableNotFoundException
      */
     public Set<String> getReverseIndexedFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
-        Multimap<String,String> reverseIndexedFields = this.allFieldMetadataHelper.loadReverseIndexedFields();
         
-        return getFields(reverseIndexedFields, ingestTypeFilter);
+        Multimap<String,String> indexedFields = this.allFieldMetadataHelper.loadReverseIndexedFields();
+        
+        Set<String> fields = new HashSet<>();
+        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
+            fields.addAll(indexedFields.values());
+        } else {
+            for (String datatype : ingestTypeFilter) {
+                fields.addAll(indexedFields.get(datatype));
+            }
+        }
+        return Collections.unmodifiableSet(fields);
     }
     
     /**
      * Get expansion fields using the data type filter.
-     *
+     * 
      * @param ingestTypeFilter
      * @return
      * @throws TableNotFoundException
      */
     public Set<String> getExpansionFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        
         Multimap<String,String> expansionFields = this.allFieldMetadataHelper.loadExpansionFields();
         
-        return getFields(expansionFields, ingestTypeFilter);
+        Set<String> fields = new HashSet<>();
+        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
+            fields.addAll(expansionFields.values());
+        } else {
+            for (String datatype : ingestTypeFilter) {
+                fields.addAll(expansionFields.get(datatype));
+            }
+        }
+        return Collections.unmodifiableSet(fields);
     }
     
     /**
      * Get the content fields which are those to be queried when using the content functions.
-     *
+     * 
      * @param ingestTypeFilter
      * @return
      * @throws TableNotFoundException
      */
     public Set<String> getContentFields(Set<String> ingestTypeFilter) throws TableNotFoundException {
+        
         Multimap<String,String> contentFields = this.allFieldMetadataHelper.loadContentFields();
         
-        return getFields(contentFields, ingestTypeFilter);
-    }
-    
-    private Set<String> getFields(Multimap<String,String> fields, Set<String> ingestTypeFilter) {
-        Set<String> returnedFields = new HashSet<>();
-        if (ingestTypeFilter == null) {
-            returnedFields.addAll(fields.values());
-        } else if (!ingestTypeFilter.isEmpty()) {
+        Set<String> fields = new HashSet<>();
+        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
+            fields.addAll(contentFields.values());
+        } else {
             for (String datatype : ingestTypeFilter) {
-                returnedFields.addAll(fields.get(datatype));
+                fields.addAll(contentFields.get(datatype));
             }
-        } // non-null but empty typeFilters allow nothing
-        return Collections.unmodifiableSet(returnedFields);
+        }
+        return Collections.unmodifiableSet(fields);
     }
     
     /**
@@ -1167,6 +1205,7 @@ public class MetadataHelper {
         Preconditions.checkNotNull(begin);
         Preconditions.checkNotNull(end);
         Preconditions.checkArgument(begin.before(end));
+        Preconditions.checkNotNull(ingestTypeFilter);
         
         Date truncatedBegin = DateUtils.truncate(begin, Calendar.DATE);
         Date truncatedEnd = DateUtils.truncate(end, Calendar.DATE);
@@ -1216,12 +1255,11 @@ public class MetadataHelper {
     public Long getCountsByFieldInDayWithTypes(String fieldName, String date, final Set<String> datatypes) {
         Preconditions.checkNotNull(fieldName);
         Preconditions.checkNotNull(date);
+        Preconditions.checkNotNull(datatypes);
         
         try {
             Map<String,Long> countsByType = getCountsByFieldInDayWithTypes(Maps.immutableEntry(fieldName, date));
-            
-            Iterable<Entry<String,Long>> filteredByType = datatypes == null ? countsByType.entrySet()
-                            : Iterables.filter(countsByType.entrySet(), input -> datatypes.contains(input.getKey()));
+            Iterable<Entry<String,Long>> filteredByType = Iterables.filter(countsByType.entrySet(), input -> datatypes.contains(input.getKey()));
             
             long sum = 0;
             for (Entry<String,Long> entry : filteredByType) {
@@ -1459,7 +1497,7 @@ public class MetadataHelper {
     /**
      * Fetches the first entry from each row in the table. This equates to the set of all fields that have occurred in the database. Returns a multimap of
      * datatype to field
-     *
+     * 
      * @throws TableNotFoundException
      */
     protected Multimap<String,String> loadAllFields() throws TableNotFoundException {
@@ -1498,7 +1536,7 @@ public class MetadataHelper {
     /**
      * Fetches results from metadata table and calculates the set of fieldNames which are indexed but do not appear as an attribute on the Event Returns a
      * multimap of datatype to field
-     *
+     * 
      * @throws TableNotFoundException
      */
     protected Multimap<String,String> loadIndexOnlyFields() throws TableNotFoundException {
