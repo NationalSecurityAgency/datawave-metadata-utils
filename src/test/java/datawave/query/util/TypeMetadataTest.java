@@ -19,11 +19,21 @@ public class TypeMetadataTest {
         typeMetadata.put("field2", "ingest3", "NumberType");
         typeMetadata.put("field3", "ingest3", "LcType");
         
-        Set<String> bar = typeMetadata.getDataTypesForField("field2");
-        assertEquals(3, bar.size());
-        assertTrue(bar.contains("[IntegerType]"));
-        assertTrue(bar.contains("[LcType]"));
-        assertTrue(bar.contains("[NumberType]"));
+        Set<String> types1 = typeMetadata.getDataTypesForField("field2");
+        assertEquals(3, types1.size());
+        assertTrue(types1.contains("[IntegerType]"));
+        assertTrue(types1.contains("[LcType]"));
+        assertTrue(types1.contains("[NumberType]"));
+        
+        Set<String> types2 = typeMetadata.getDataTypesForField("field42");
+        assertEquals(1, types2.size());
+        assertTrue(types2.contains("[]"));
+        
+        Set<String> types3 = typeMetadata.getDataTypesForField("");
+        assertEquals(0, types3.size());
+        
+        Set<String> types4 = typeMetadata.getDataTypesForField();
+        assertEquals(0, types4.size());
     }
     
 }

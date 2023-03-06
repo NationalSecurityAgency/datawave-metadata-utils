@@ -123,6 +123,10 @@ public class TypeMetadata implements Serializable {
         return dataTypes;
     }
     
+    public Set<String> getDataTypesForField() {
+        return getDataTypesForField(null);
+    }
+    
     /**
      * returns a multimap of field name to datatype name ingest type names are not included
      *
