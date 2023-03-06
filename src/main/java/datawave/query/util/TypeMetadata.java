@@ -105,6 +105,29 @@ public class TypeMetadata implements Serializable {
     }
     
     /**
+     * Returns a set of all Normalizer names associated with the given fieldName
+     *
+     * @param fieldName
+     * @return
+     */
+    public Set<String> getNormalizerNamesForField(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        Set<String> normalizers = new HashSet<>();
+        for (Multimap<String,String> entry : this.typeMetadata.values()) {
+            normalizers.add(String.valueOf(entry.get(fieldName)));
+        }
+        
+        return normalizers;
+    }
+    
+    public Set<String> getNormalizerNamesForField() {
+        return getNormalizerNamesForField(null);
+    }
+    
+    /**
      * Returns a set of all dataType names associated with the given fieldName
      *
      * @param fieldName
@@ -116,8 +139,10 @@ public class TypeMetadata implements Serializable {
         }
         
         Set<String> dataTypes = new HashSet<>();
-        for (Multimap<String,String> entry : this.typeMetadata.values()) {
-            dataTypes.add(String.valueOf(entry.get(fieldName)));
+        for (Entry<String,Multimap<String,String>> entry : this.typeMetadata.entrySet()) {
+            if (entry.getValue().containsKey(fieldName)) {
+                dataTypes.add(String.valueOf(entry.getKey()));
+            }
         }
         
         return dataTypes;
