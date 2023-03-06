@@ -5,9 +5,10 @@ import org.junit.Test;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TypeMetadataTest {
-    
+
     @Test
     public void testGetDataTypes() {
         TypeMetadata typeMetadata = new TypeMetadata();
@@ -17,9 +18,12 @@ public class TypeMetadataTest {
         typeMetadata.put("field2", "ingest2", "LcType");
         typeMetadata.put("field2", "ingest3", "NumberType");
         typeMetadata.put("field3", "ingest3", "LcType");
-        
+
         Set<String> bar = typeMetadata.getDataTypesForField("field2");
         assertEquals(3, bar.size());
+        assertTrue(bar.contains("[IntegerType]"));
+        assertTrue(bar.contains("[LcType]"));
+        assertTrue(bar.contains("[NumberType]"));
     }
-    
+
 }
