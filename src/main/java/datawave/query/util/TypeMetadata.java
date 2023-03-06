@@ -14,6 +14,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -101,6 +102,25 @@ public class TypeMetadata implements Serializable {
         }
         // defensive copy
         return Sets.newHashSet(map.get(fieldName));
+    }
+    
+    /**
+     * Returns a set of all dataType names associated with the given fieldName
+     *
+     * @param fieldName
+     * @return
+     */
+    public Set<String> getDataTypesForField(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        Set<String> dataTypes = new HashSet<>();
+        for (Multimap<String,String> entry : this.typeMetadata.values()) {
+            dataTypes.add(String.valueOf(entry.get(fieldName)));
+        }
+        
+        return dataTypes;
     }
     
     /**
@@ -317,7 +337,7 @@ public class TypeMetadata implements Serializable {
         
         /**
          * returns a multimap of field name to datatype name ingest type names are not included
-         * 
+         *
          * @return
          */
         public Multimap<String,String> fold() {
@@ -326,7 +346,7 @@ public class TypeMetadata implements Serializable {
         
         /**
          * returns a multimap of field name to datatype name, filtered on provided ingest type names ingest type names are not included
-         * 
+         *
          * @param ingestTypeFilter
          * @return
          */
