@@ -15,17 +15,17 @@ public class TypeMetadataTest {
     @Before
     public void setup() {
         typeMetadata = new TypeMetadata();
-        typeMetadata.put("field1", "ingest1", "LcType");
-        typeMetadata.put("field1", "ingest2", "DateType");
-        typeMetadata.put("field2", "ingest1", "IntegerType");
-        typeMetadata.put("field2", "ingest2", "LcType");
-        typeMetadata.put("field2", "ingest3", "NumberType");
-        typeMetadata.put("field3", "ingest3", "LcType");
+        typeMetadata.put("FIELD1", "datatypeA", "LcType");
+        typeMetadata.put("FIELD1", "datatypeB", "DateType");
+        typeMetadata.put("FIELD2", "datatypeA", "IntegerType");
+        typeMetadata.put("FIELD2", "datatypeB", "LcType");
+        typeMetadata.put("FIELD2", "datatypeC", "NumberType");
+        typeMetadata.put("FIELD3", "datatypeC", "LcType");
     }
     
     @Test
     public void testGetNormalizers() {
-        Set<String> norms1 = typeMetadata.getNormalizerNamesForField("field2");
+        Set<String> norms1 = typeMetadata.getNormalizerNamesForField("FIELD2");
         assertEquals(3, norms1.size());
         assertTrue(norms1.contains("[IntegerType]"));
         assertTrue(norms1.contains("[LcType]"));
@@ -38,30 +38,22 @@ public class TypeMetadataTest {
         // empty request should return empty set
         Set<String> norms3 = typeMetadata.getNormalizerNamesForField("");
         assertEquals(0, norms3.size());
-        
-        // null request should return empty set - in theory, calling this makes no sense
-        Set<String> norms4 = typeMetadata.getNormalizerNamesForField();
-        assertEquals(0, norms4.size());
     }
     
     @Test
     public void testGetDataTypes() {
-        Set<String> types1 = typeMetadata.getDataTypesForField("field1");
+        Set<String> types1 = typeMetadata.getDataTypesForField("FIELD1");
         assertEquals(2, types1.size());
-        assertTrue(types1.contains("ingest1"));
-        assertTrue(types1.contains("ingest2"));
+        assertTrue(types1.contains("datatypeA"));
+        assertTrue(types1.contains("datatypeB"));
         
-        Set<String> types2 = typeMetadata.getDataTypesForField("field3");
+        Set<String> types2 = typeMetadata.getDataTypesForField("FIELD3");
         assertEquals(1, types2.size());
-        assertTrue(types2.contains("ingest3"));
+        assertTrue(types2.contains("datatypeC"));
         
         // empty request should return empty set
         Set<String> types3 = typeMetadata.getDataTypesForField("");
         assertEquals(0, types3.size());
-        
-        // null request should return empty set - in theory, calling this makes no sense
-        Set<String> types4 = typeMetadata.getDataTypesForField();
-        assertEquals(0, types4.size());
     }
     
 }
