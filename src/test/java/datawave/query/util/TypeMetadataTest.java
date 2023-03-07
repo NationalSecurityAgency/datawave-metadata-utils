@@ -35,9 +35,11 @@ public class TypeMetadataTest {
         assertEquals(1, norms2.size());
         assertTrue(norms2.contains("[]"));
         
+        // empty request should return empty set
         Set<String> norms3 = typeMetadata.getNormalizerNamesForField("");
         assertEquals(0, norms3.size());
         
+        // null request should return empty set - in theory, calling this makes no sense
         Set<String> norms4 = typeMetadata.getNormalizerNamesForField();
         assertEquals(0, norms4.size());
     }
@@ -53,9 +55,11 @@ public class TypeMetadataTest {
         assertEquals(1, types2.size());
         assertTrue(types2.contains("ingest3"));
         
+        // empty request should return empty set
         Set<String> types3 = typeMetadata.getDataTypesForField("");
         assertEquals(0, types3.size());
         
+        // null request should return empty set - in theory, calling this makes no sense
         Set<String> types4 = typeMetadata.getDataTypesForField();
         assertEquals(0, types4.size());
     }
