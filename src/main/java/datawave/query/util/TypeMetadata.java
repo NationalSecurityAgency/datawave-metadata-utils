@@ -105,10 +105,11 @@ public class TypeMetadata implements Serializable {
     }
     
     /**
-     * Returns a set of all Normalizer names associated with the given fieldName
+     * Returns a set of all Normalizer names associated with the given fieldName. This is similar to calling .fold().get(fieldName)
      *
      * @param fieldName
-     * @return
+     *            a field name against which to search for any associated Normalizer Types
+     * @return a set of strings of associated Normalizer Types
      */
     public Set<String> getNormalizerNamesForField(String fieldName) {
         if (fieldName == null || fieldName.isEmpty()) {
@@ -123,15 +124,12 @@ public class TypeMetadata implements Serializable {
         return normalizers;
     }
     
-    public Set<String> getNormalizerNamesForField() {
-        return getNormalizerNamesForField(null);
-    }
-    
     /**
      * Returns a set of all dataType names associated with the given fieldName
      *
      * @param fieldName
-     * @return
+     *            a field name against which to search for any associated Datatypes
+     * @return a set of strings of associated Datatypes
      */
     public Set<String> getDataTypesForField(String fieldName) {
         if (fieldName == null || fieldName.isEmpty()) {
@@ -146,10 +144,6 @@ public class TypeMetadata implements Serializable {
         }
         
         return dataTypes;
-    }
-    
-    public Set<String> getDataTypesForField() {
-        return getDataTypesForField(null);
     }
     
     /**
