@@ -1,8 +1,7 @@
 package datawave.query.util;
 
-import com.google.common.collect.Maps;
 import datawave.query.composite.CompositeMetadataHelper;
-import org.apache.accumulo.core.client.Connector;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.security.Authorizations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,16 +34,16 @@ public class MetadataHelperFactory {
         this.typeMetadataHelperFactory = typeMetadataHelperFactory;
     }
     
-    public MetadataHelper createMetadataHelper(Connector connector, String metadataTableName, Set<Authorizations> fullUserAuths) {
-        return createMetadataHelper(connector, metadataTableName, fullUserAuths, false);
+    public MetadataHelper createMetadataHelper(AccumuloClient client, String metadataTableName, Set<Authorizations> fullUserAuths) {
+        return createMetadataHelper(client, metadataTableName, fullUserAuths, false);
     }
     
     /**
      * Creates a {@link MetadataHelper} by retrieving the necessary beans from the injected {@link BeanFactory} and passing along the additional supplied
      * arguments to the constructor(s). The returned bean will be a Spring-managed proxy that wraps certain methods with caching.
      *
-     * @param connector
-     *            the connector to use when talking to Accumulo
+     * @param client
+     *            the client to use when talking to Accumulo
      * @param metadataTableName
      *            the name of the metadata table in Accumulo
      * @param fullUserAuths
@@ -53,19 +52,20 @@ public class MetadataHelperFactory {
      * @return a new MetadataHelper
      */
     @SuppressWarnings("unchecked")
-    public MetadataHelper createMetadataHelper(Connector connector, String metadataTableName, Set<Authorizations> fullUserAuths, boolean useTypeSubstitution) {
+    public MetadataHelper createMetadataHelper(AccumuloClient client, String metadataTableName, Set<Authorizations> fullUserAuths,
+                    boolean useTypeSubstitution) {
         if (beanFactory != null) {
             Set<Authorizations> allMetadataAuths = (Set<Authorizations>) beanFactory.getBean("allMetadataAuths",
                             ResolvableType.forClassWithGenerics(Set.class, Authorizations.class).resolve());
             Collection<String> mergedAuths = MetadataHelper.getUsersMetadataAuthorizationSubset(fullUserAuths, allMetadataAuths);
             Set<Authorizations> authSubset = Collections.singleton(new Authorizations(mergedAuths.toArray(new String[0])));
             
-            TypeMetadataHelper typeMetadataHelper = typeMetadataHelperFactory.createTypeMetadataHelper(connector, metadataTableName, authSubset,
+            TypeMetadataHelper typeMetadataHelper = typeMetadataHelperFactory.createTypeMetadataHelper(client, metadataTableName, authSubset,
                             useTypeSubstitution);
-            CompositeMetadataHelper compositeMetadataHelper = beanFactory.getBean(CompositeMetadataHelper.class, connector, metadataTableName, authSubset);
+            CompositeMetadataHelper compositeMetadataHelper = beanFactory.getBean(CompositeMetadataHelper.class, client, metadataTableName, authSubset);
             AllFieldMetadataHelper allFieldMetadataHelper = beanFactory.getBean(AllFieldMetadataHelper.class, typeMetadataHelper, compositeMetadataHelper,
-                            connector, metadataTableName, authSubset, fullUserAuths);
-            return beanFactory.getBean(MetadataHelper.class, allFieldMetadataHelper, allMetadataAuths, connector, metadataTableName, authSubset, fullUserAuths);
+                            client, metadataTableName, authSubset, fullUserAuths);
+            return beanFactory.getBean(MetadataHelper.class, allFieldMetadataHelper, allMetadataAuths, client, metadataTableName, authSubset, fullUserAuths);
         } else {
             log.warn("MetadataHelper created outside of dependency-injection context. This is fine for unit testing, but this is an error in production code");
             if (log.isDebugEnabled())
@@ -77,12 +77,11 @@ public class MetadataHelperFactory {
             Set<Authorizations> allMetadataAuths = Collections.singleton(MetadataDefaultsFactory.getDefaultAuthorizations());
             Collection<String> mergedAuths = MetadataHelper.getUsersMetadataAuthorizationSubset(fullUserAuths, allMetadataAuths);
             Set<Authorizations> authSubset = Collections.singleton(new Authorizations(mergedAuths.toArray(new String[0])));
-            TypeMetadataHelper typeMetadataHelper = new TypeMetadataHelper(Maps.newHashMap(), allMetadataAuths, connector, metadataTableName, authSubset,
-                            false);
-            CompositeMetadataHelper compositeMetadataHelper = new CompositeMetadataHelper(connector, metadataTableName, authSubset);
-            AllFieldMetadataHelper allFieldMetadataHelper = new AllFieldMetadataHelper(typeMetadataHelper, compositeMetadataHelper, connector,
-                            metadataTableName, authSubset, fullUserAuths);
-            return new MetadataHelper(allFieldMetadataHelper, allMetadataAuths, connector, metadataTableName, authSubset, fullUserAuths);
+            TypeMetadataHelper typeMetadataHelper = new TypeMetadataHelper(typeSubstitutions, allMetadataAuths, client, metadataTableName, authSubset, false);
+            CompositeMetadataHelper compositeMetadataHelper = new CompositeMetadataHelper(client, metadataTableName, authSubset);
+            AllFieldMetadataHelper allFieldMetadataHelper = new AllFieldMetadataHelper(typeMetadataHelper, compositeMetadataHelper, client, metadataTableName,
+                            authSubset, fullUserAuths);
+            return new MetadataHelper(allFieldMetadataHelper, allMetadataAuths, client, metadataTableName, authSubset, fullUserAuths);
         }
     }
     

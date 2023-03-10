@@ -1,18 +1,17 @@
 package datawave.iterators.filter;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-
+import datawave.accumulo.inmemory.InMemoryAccumuloClient;
+import datawave.accumulo.inmemory.InMemoryInstance;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 import datawave.util.time.DateHelper;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
-import org.apache.accumulo.core.client.Connector;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.MutationsRejectedException;
-import datawave.accumulo.inmemory.InMemoryInstance;
 import org.apache.accumulo.core.client.Scanner;
-import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
@@ -20,7 +19,6 @@ import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,9 +27,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class EdgeMetadataCQStripperCombinerTest {
     private static final Logger log = Logger.getLogger(EdgeMetadataCQStripperCombinerTest.class);
-    private Connector connector;
+    private AccumuloClient accumuloClient;
     private static String EDGE_TABLE_NAME = "DatawaveMetadata";
     private static String ROW_VISIBILITY = "IN_VISIBLE";
     
@@ -44,13 +44,13 @@ public class EdgeMetadataCQStripperCombinerTest {
     public void init() throws Exception {
         
         InMemoryInstance i = new InMemoryInstance(EdgeMetadataCQStripperCombinerTest.class.toString());
-        connector = i.getConnector("root", new PasswordToken());
+        accumuloClient = new InMemoryAccumuloClient("root", i);
         
         // Create a table
-        connector.tableOperations().create(EDGE_TABLE_NAME);
+        accumuloClient.tableOperations().create(EDGE_TABLE_NAME);
         
         // Create a BatchWriter to the table
-        BatchWriter recordWriter = connector.createBatchWriter(EDGE_TABLE_NAME, new BatchWriterConfig());
+        BatchWriter recordWriter = accumuloClient.createBatchWriter(EDGE_TABLE_NAME, new BatchWriterConfig());
         
         loadSomeData(recordWriter);
         
@@ -60,7 +60,7 @@ public class EdgeMetadataCQStripperCombinerTest {
     
     @AfterEach
     public void tearDown() {
-        connector = null;
+        accumuloClient = null;
     }
     
     private static Value getMetadata(int i) {
@@ -115,7 +115,7 @@ public class EdgeMetadataCQStripperCombinerTest {
                         EdgeMetadataCQStripperCombiner.class);
         combinerSetting.addOption("columns", "edge");
         
-        Scanner scan = connector.createScanner(EDGE_TABLE_NAME, new Authorizations(ROW_VISIBILITY));
+        Scanner scan = accumuloClient.createScanner(EDGE_TABLE_NAME, new Authorizations(ROW_VISIBILITY));
         
         scan.addScanIterator(cqStripingSetting);
         scan.addScanIterator(combinerSetting);
@@ -124,14 +124,14 @@ public class EdgeMetadataCQStripperCombinerTest {
         for (Map.Entry<Key,Value> entry : scan) {
             
             if (counter % 2 == 0) {
-                Assertions.assertEquals((startTime + day * 8L), entry.getKey().getTimestamp(), "Wrong timestamp");
+                assertEquals((startTime + day * 8L), entry.getKey().getTimestamp(), "Wrong timestamp");
             } else {
-                Assertions.assertEquals((startTime + day * 10L), entry.getKey().getTimestamp(), "Wrong timestamp");
+                assertEquals((startTime + day * 10L), entry.getKey().getTimestamp(), "Wrong timestamp");
             }
             
             MetadataValue meta = MetadataValue.parseFrom(entry.getValue().get());
             
-            Assertions.assertEquals((numAttributeEntries / 2), meta.getMetadataCount(), "Unexpected amount of metadata.");
+            assertEquals((numAttributeEntries / 2), meta.getMetadataCount(), "Unexpected amount of metadata.");
             counter++;
         }
         
@@ -142,7 +142,7 @@ public class EdgeMetadataCQStripperCombinerTest {
     }
     
     private void printEdgeTable(List<IteratorSetting> iterators) throws Exception {
-        Scanner scan = connector.createScanner(EDGE_TABLE_NAME, new Authorizations(ROW_VISIBILITY));
+        Scanner scan = accumuloClient.createScanner(EDGE_TABLE_NAME, new Authorizations(ROW_VISIBILITY));
         
         if (iterators != null) {
             for (IteratorSetting iteratorSetting : iterators) {

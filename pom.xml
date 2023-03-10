@@ -4,11 +4,11 @@
     <parent>
         <groupId>gov.nsa.datawave.microservice</groupId>
         <artifactId>datawave-microservice-parent</artifactId>
-        <version>2.0</version>
+        <version>2.1-SNAPSHOT</version>
         <relativePath>../../../microservices/microservice-parent/pom.xml</relativePath>
     </parent>
     <artifactId>metadata-utils</artifactId>
-    <version>1.14-SNAPSHOT</version>
+    <version>3.0-SNAPSHOT</version>
     <url>https://code.nsa.gov/datawave-metadata-utils</url>
     <licenses>
         <license>
@@ -24,12 +24,12 @@
     </scm>
     <properties>
         <spotbugs.excludes.file>${project.basedir}/src/main/spotbugs/excludes.xml</spotbugs.excludes.file>
-        <version.accumulo-utils>1.6-SNAPSHOT</version.accumulo-utils>
-        <version.caffeine>2.6.2</version.caffeine>
+        <version.accumulo-utils>3.0-SNAPSHOT</version.accumulo-utils>
+        <version.caffeine>2.8.0</version.caffeine>
         <version.easymock>4.0.2</version.easymock>
         <version.kryo>2.20</version.kryo>
         <version.powermock>2.0.2</version.powermock>
-        <version.type-utils>1.13-SNAPSHOT</version.type-utils>
+        <version.type-utils>2.0-SNAPSHOT</version.type-utils>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -44,6 +44,11 @@
                 <version>${version.caffeine}</version>
             </dependency>
             <dependency>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-impl</artifactId>
+                <version>2.3.3</version>
+            </dependency>
+            <dependency>
                 <groupId>gov.nsa.datawave.microservice</groupId>
                 <artifactId>accumulo-utils</artifactId>
                 <version>${version.accumulo-utils}</version>
@@ -52,6 +57,17 @@
                 <groupId>gov.nsa.datawave.microservice</groupId>
                 <artifactId>type-utils</artifactId>
                 <version>${version.type-utils}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>slf4j-log4j12</artifactId>
+                        <groupId>org.slf4j</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.xml.bind</groupId>
+                <artifactId>jakarta.xml.bind-api</artifactId>
+                <version>2.3.3</version>
             </dependency>
             <dependency>
                 <groupId>gov.nsa.datawave.microservice</groupId>
@@ -94,6 +110,10 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.xml.bind</groupId>
+            <artifactId>jaxb-impl</artifactId>
         </dependency>
         <dependency>
             <groupId>gov.nsa.datawave.microservice</groupId>
