@@ -29,6 +29,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class EdgeMetadataCQStripperCombinerTest {
     private static final Logger log = Logger.getLogger(EdgeMetadataCQStripperCombinerTest.class);
     private Connector connector;
@@ -124,14 +126,14 @@ public class EdgeMetadataCQStripperCombinerTest {
         for (Map.Entry<Key,Value> entry : scan) {
             
             if (counter % 2 == 0) {
-                Assertions.assertEquals((startTime + day * 8L), entry.getKey().getTimestamp(), "Wrong timestamp");
+                assertEquals((startTime + day * 8L), entry.getKey().getTimestamp(), "Wrong timestamp");
             } else {
-                Assertions.assertEquals((startTime + day * 10L), entry.getKey().getTimestamp(), "Wrong timestamp");
+                assertEquals((startTime + day * 10L), entry.getKey().getTimestamp(), "Wrong timestamp");
             }
             
             MetadataValue meta = MetadataValue.parseFrom(entry.getValue().get());
             
-            Assertions.assertEquals((numAttributeEntries / 2), meta.getMetadataCount(), "Unexpected amount of metadata.");
+            assertEquals((numAttributeEntries / 2), meta.getMetadataCount(), "Unexpected amount of metadata.");
             counter++;
         }
         
