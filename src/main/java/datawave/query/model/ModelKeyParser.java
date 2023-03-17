@@ -4,18 +4,14 @@ import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.ColumnVisibility;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
 public class ModelKeyParser {
     
     public static final String NULL_BYTE = "\0";
     public static final Value NULL_VALUE = new Value(new byte[0]);
-    
-    @Deprecated
-    public static final String INDEX_ONLY = "index_only";
-    
-    private static Logger log = Logger.getLogger(ModelKeyParser.class);
+    private static final Logger log = Logger.getLogger(ModelKeyParser.class);
     
     public static FieldMapping parseKey(Key key) {
         String row = key.getRow().toString();
@@ -100,7 +96,7 @@ public class ModelKeyParser {
         } else {
             m = new Mutation(mapping.getModelFieldName());
             m.putDelete(modelName + dataType, mapping.getFieldName() + NULL_BYTE + mapping.getDirection().getValue(), cv, System.currentTimeMillis());
-            m.putDelete(modelName + dataType, mapping.getFieldName() + NULL_BYTE + INDEX_ONLY + NULL_BYTE + mapping.getDirection().getValue(), cv,
+            m.putDelete(modelName + dataType, mapping.getFieldName() + NULL_BYTE + "index_only" + NULL_BYTE + mapping.getDirection().getValue(), cv,
                             System.currentTimeMillis());
             return m;
         }
