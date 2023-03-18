@@ -15,8 +15,7 @@ import datawave.query.composite.CompositeMetadata;
 import datawave.query.composite.CompositeMetadataHelper;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.TableNotFoundException;
@@ -69,8 +68,7 @@ public class AllFieldMetadataHelper {
     protected final List<Text> metadataTypeColfs = Arrays.asList(ColumnFamilyConstants.COLF_T);
     protected final List<Text> metadataCompositeIndexColfs = Arrays.asList(ColumnFamilyConstants.COLF_CI);
     
-    protected final Connector connector;
-    protected final Instance instance;
+    protected final AccumuloClient accumuloClient;
     protected final String metadataTableName;
     protected final Set<Authorizations> auths;
     protected final Set<Authorizations> fullUserAuths;
@@ -81,14 +79,14 @@ public class AllFieldMetadataHelper {
     /**
      * Initializes the instance with a provided update interval.
      *
-     * @param connector
-     *            A Connector to Accumulo
+     * @param client
+     *            A client connection to Accumulo
      * @param metadataTableName
      *            The name of the DatawaveMetadata table
      * @param auths
      *            Any {@link Authorizations} to use
      */
-    public AllFieldMetadataHelper(TypeMetadataHelper typeMetadataHelper, CompositeMetadataHelper compositeMetadataHelper, Connector connector,
+    public AllFieldMetadataHelper(TypeMetadataHelper typeMetadataHelper, CompositeMetadataHelper compositeMetadataHelper, AccumuloClient client,
                     String metadataTableName, Set<Authorizations> auths, Set<Authorizations> fullUserAuths) {
         Preconditions.checkNotNull(typeMetadataHelper, "A TypeMetadataHelper is required by AllFieldMetadataHelper");
         this.typeMetadataHelper = typeMetadataHelper;
@@ -96,9 +94,8 @@ public class AllFieldMetadataHelper {
         Preconditions.checkNotNull(compositeMetadataHelper, "A CompositeMetadataHelper is required by AllFieldMetadataHelper");
         this.compositeMetadataHelper = compositeMetadataHelper;
         
-        Preconditions.checkNotNull(connector, "A valid Accumulo Connector is required by AllFieldMetadataHelper");
-        this.connector = connector;
-        this.instance = connector.getInstance();
+        Preconditions.checkNotNull(client, "A valid AccumuloClient is required by AllFieldMetadataHelper");
+        this.accumuloClient = client;
         
         Preconditions.checkNotNull(metadataTableName, "The name of the metadata table is required by AllFieldMetadataHelper");
         this.metadataTableName = metadataTableName;
@@ -109,7 +106,7 @@ public class AllFieldMetadataHelper {
         Preconditions.checkNotNull(fullUserAuths, "The full set of user authorizations is required by AllFieldMetadataHelper");
         this.fullUserAuths = fullUserAuths;
         
-        log.trace("Constructor  connector: {} and metadata table name: {}", connector.getClass().getCanonicalName(), metadataTableName);
+        log.trace("Constructor  connector: {} and metadata table name: {}", accumuloClient.getClass().getCanonicalName(), metadataTableName);
     }
     
     protected String getDatatype(Key k) {
@@ -177,7 +174,7 @@ public class AllFieldMetadataHelper {
         String upCaseFieldName = fieldName.toUpperCase();
         
         // Scanner to the provided metadata table
-        Scanner scanner = ScannerHelper.createScanner(connector, tableName, auths);
+        Scanner scanner = ScannerHelper.createScanner(accumuloClient, tableName, auths);
         
         Range range = new Range(upCaseFieldName);
         scanner.setRange(range);
@@ -223,7 +220,7 @@ public class AllFieldMetadataHelper {
         Set<Type<?>> datatypes = Sets.newHashSetWithExpectedSize(10);
         if (log.isTraceEnabled())
             log.trace("getAllDatatypes from table: " + metadataTableName);
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -283,7 +280,7 @@ public class AllFieldMetadataHelper {
         
         ArrayListMultimap<String,String> compositeToFieldMap = ArrayListMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -343,7 +340,7 @@ public class AllFieldMetadataHelper {
         
         SimpleDateFormat dateFormat = new SimpleDateFormat(CompositeMetadataHelper.transitionDateFormat);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -404,7 +401,7 @@ public class AllFieldMetadataHelper {
         // Note: Intentionally using the same transition date format as the composite fields.
         SimpleDateFormat dateFormat = new SimpleDateFormat(CompositeMetadataHelper.transitionDateFormat);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -463,7 +460,7 @@ public class AllFieldMetadataHelper {
         
         Map<String,String> sepMap = new HashMap<>();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -680,7 +677,7 @@ public class AllFieldMetadataHelper {
         String fieldName = identifier.getKey();
         String date = identifier.getValue();
         
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         scanner.setRange(Range.exact(fieldName));
         
@@ -763,7 +760,7 @@ public class AllFieldMetadataHelper {
         }
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         if (log.isTraceEnabled())
             log.trace("loadAllFields from table: " + metadataTableName);
         
@@ -806,7 +803,7 @@ public class AllFieldMetadataHelper {
         
         final Map<String,Multimap<Text,Text>> metadata = new HashMap<>();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         if (log.isTraceEnabled())
             log.trace("loadIndexOnlyFields from table: " + metadataTableName);
@@ -875,7 +872,7 @@ public class AllFieldMetadataHelper {
         if (log.isTraceEnabled())
             log.trace("loadTermFrequencyFields from table: " + metadataTableName);
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
@@ -898,7 +895,7 @@ public class AllFieldMetadataHelper {
         log.debug("cache fault for loadIndexedFields(" + this.auths + "," + this.metadataTableName + ")");
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
@@ -925,7 +922,7 @@ public class AllFieldMetadataHelper {
         log.debug("cache fault for loadReverseIndexedFields(" + this.auths + "," + this.metadataTableName + ")");
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_RI);
@@ -952,7 +949,7 @@ public class AllFieldMetadataHelper {
         log.debug("cache fault for loadIndexedFields(" + this.auths + "," + this.metadataTableName + ")");
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, fullUserAuths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
@@ -979,7 +976,7 @@ public class AllFieldMetadataHelper {
         log.debug("cache fault for loadExpansionFields(" + this.auths + "," + this.metadataTableName + ")");
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_EXP);
@@ -1005,7 +1002,7 @@ public class AllFieldMetadataHelper {
         log.debug("cache fault for loadContentFields(" + this.auths + "," + this.metadataTableName + ")");
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CONTENT);
@@ -1036,7 +1033,7 @@ public class AllFieldMetadataHelper {
         HashSet<String> datatypes = new HashSet<>();
         final Text holder = new Text();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
@@ -1050,15 +1047,15 @@ public class AllFieldMetadataHelper {
         return Collections.unmodifiableSet(datatypes);
     }
     
-    private static String getKey(Instance instance, String metadataTableName) {
+    private static String getKey(String instanceID, String metadataTableName) {
         StringBuilder builder = new StringBuilder();
-        builder.append(instance != null ? instance.getInstanceID() : null).append('\0');
+        builder.append(instanceID).append('\0');
         builder.append(metadataTableName).append('\0');
         return builder.toString();
     }
     
     private static String getKey(AllFieldMetadataHelper helper) {
-        return getKey(helper.instance, helper.metadataTableName);
+        return getKey(helper.accumuloClient.instanceOperations().getInstanceID(), helper.metadataTableName);
     }
     
     @Override

@@ -6,8 +6,7 @@ import com.google.common.collect.Sets;
 import datawave.data.ColumnFamilyConstants;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.data.Key;
@@ -43,10 +42,9 @@ public class TypeMetadataHelper {
     
     public static final String NULL_BYTE = "\0";
     
-    protected final List<Text> metadataTypeColfs = Arrays.asList(ColumnFamilyConstants.COLF_T);
+    protected final List<Text> metadataTypeColfs = Collections.singletonList(ColumnFamilyConstants.COLF_T);
     
-    protected final Connector connector;
-    protected final Instance instance;
+    protected final AccumuloClient accumuloClient;
     protected final String metadataTableName;
     protected final Set<Authorizations> auths;
     protected final boolean useTypeSubstitution;
@@ -56,22 +54,21 @@ public class TypeMetadataHelper {
     /**
      * Initializes the instance with a provided update interval.
      *
-     * @param connector
-     *            A Connector to Accumulo
+     * @param client
+     *            A client connection to Accumulo
      * @param metadataTableName
      *            The name of the DatawaveMetadata table
      * @param auths
      *            Any {@link Authorizations} to use
      */
     public TypeMetadataHelper(@Qualifier("typeSubstitutions") Map<String,String> typeSubstitutions,
-                    @Qualifier("allMetadataAuths") Set<Authorizations> allMetadataAuths, Connector connector, String metadataTableName,
+                    @Qualifier("allMetadataAuths") Set<Authorizations> allMetadataAuths, AccumuloClient client, String metadataTableName,
                     Set<Authorizations> auths, boolean useTypeSubstitution) {
         this.typeSubstitutions = (typeSubstitutions == null) ? Maps.newHashMap() : typeSubstitutions;
         this.allMetadataAuths = (allMetadataAuths == null) ? Collections.emptySet() : allMetadataAuths;
         
-        Preconditions.checkNotNull(connector, "A valid Accumulo Connector is required by TypeMetadataHelper");
-        this.connector = connector;
-        this.instance = connector.getInstance();
+        Preconditions.checkNotNull(client, "A valid AccumuloClient is required by TypeMetadataHelper");
+        this.accumuloClient = client;
         
         Preconditions.checkNotNull(metadataTableName, "The metadata table name is required by TypeMetadataHelper");
         this.metadataTableName = metadataTableName;
@@ -81,7 +78,8 @@ public class TypeMetadataHelper {
         
         this.useTypeSubstitution = useTypeSubstitution;
         
-        log.trace("Constructor connector: {} with auths: {} and metadata table name: {}", connector.getClass().getCanonicalName(), auths, metadataTableName);
+        log.trace("Constructor connector: {} with auths: {} and metadata table name: {}", accumuloClient.getClass().getCanonicalName(), auths,
+                        metadataTableName);
     }
     
     public Set<Authorizations> getAuths() {
@@ -162,12 +160,12 @@ public class TypeMetadataHelper {
         
         // Scanner to the provided metadata table
         if (log.isTraceEnabled()) {
-            log.trace("connector:" + connector + ", metadataTableName:" + metadataTableName + ", auths:" + auths);
+            log.trace("client:" + accumuloClient + ", metadataTableName:" + metadataTableName + ", auths:" + auths);
             Collection<Authorizations> got = AuthorizationsMinimizer.minimize(auths);
             log.trace("got:" + got + " and it is a " + (got == null ? null : got.getClass()));
         }
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         Range range = new Range();
         bs.setRange(range);
@@ -227,17 +225,17 @@ public class TypeMetadataHelper {
         }
         
         @SuppressWarnings("unchecked")
-        public TypeMetadataHelper createTypeMetadataHelper(Connector connector, String metadataTableName, Set<Authorizations> auths,
+        public TypeMetadataHelper createTypeMetadataHelper(AccumuloClient client, String metadataTableName, Set<Authorizations> auths,
                         boolean useTypeSubstitution) {
             if (beanFactory == null) {
                 log.info("TypeMetadataHelper created without a beanFactory. This is fine for unit tests, but an error in production.");
-                return new TypeMetadataHelper(Maps.newHashMap(), Collections.emptySet(), connector, metadataTableName, auths, useTypeSubstitution);
+                return new TypeMetadataHelper(Maps.newHashMap(), Collections.emptySet(), client, metadataTableName, auths, useTypeSubstitution);
             } else {
                 Map<String,String> typeSubstitutions = (Map<String,String>) beanFactory.getBean("typeSubstitutions",
                                 ResolvableType.forClassWithGenerics(Map.class, String.class, String.class).resolve());
                 Set<Authorizations> allMetadataAuths = (Set<Authorizations>) beanFactory.getBean("allMetadataAuths",
                                 ResolvableType.forClassWithGenerics(Set.class, Authorizations.class).resolve());
-                return new TypeMetadataHelper(typeSubstitutions, allMetadataAuths, connector, metadataTableName, auths, useTypeSubstitution);
+                return new TypeMetadataHelper(typeSubstitutions, allMetadataAuths, client, metadataTableName, auths, useTypeSubstitution);
             }
         }
     }

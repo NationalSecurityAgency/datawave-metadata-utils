@@ -27,12 +27,12 @@ import datawave.util.StringUtils;
 import datawave.util.UniversalSet;
 import datawave.util.time.DateHelper;
 import datawave.util.time.TraceStopwatch;
-import datawave.webservice.common.connection.WrappedConnector;
+import datawave.webservice.common.connection.WrappedAccumuloClient;
+import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
 import org.apache.accumulo.core.client.BatchWriter;
-import org.apache.accumulo.core.client.Connector;
-import org.apache.accumulo.core.client.Instance;
+import org.apache.accumulo.core.client.BatchWriterConfig;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.MutationsRejectedException;
 import org.apache.accumulo.core.client.Scanner;
@@ -76,6 +76,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -121,8 +122,7 @@ public class MetadataHelper {
     protected final List<Text> metadataCompositeIndexColfs = Arrays.asList(ColumnFamilyConstants.COLF_CI);
     protected final List<Text> metadataCardinalityColfs = Arrays.asList(ColumnFamilyConstants.COLF_COUNT);
     
-    protected final Connector connector;
-    protected final Instance instance;
+    protected final AccumuloClient accumuloClient;
     protected final String metadataTableName;
     protected final Set<Authorizations> auths;
     protected Set<Authorizations> fullUserAuths;
@@ -133,7 +133,7 @@ public class MetadataHelper {
     // a set of fields that are dynamically created at evaluation time, and are not registered in the metadata table
     protected Set<String> evaluationOnlyFields = Collections.emptySet();
     
-    public MetadataHelper(AllFieldMetadataHelper allFieldMetadataHelper, Collection<Authorizations> allMetadataAuths, Connector connector,
+    public MetadataHelper(AllFieldMetadataHelper allFieldMetadataHelper, Collection<Authorizations> allMetadataAuths, AccumuloClient client,
                     String metadataTableName, Set<Authorizations> auths, Set<Authorizations> fullUserAuths) {
         Preconditions.checkNotNull(allFieldMetadataHelper, "An AllFieldMetadataHelper is required by MetadataHelper");
         this.allFieldMetadataHelper = allFieldMetadataHelper;
@@ -141,9 +141,8 @@ public class MetadataHelper {
         Preconditions.checkNotNull(allMetadataAuths, "The set of all metadata authorization is required by MetadataHelper");
         this.allMetadataAuths = allMetadataAuths;
         
-        Preconditions.checkNotNull(connector, "A valid Accumulo Connector is required by MetadataHelper");
-        this.connector = connector;
-        this.instance = connector.getInstance();
+        Preconditions.checkNotNull(client, "A valid AccumuloClient is required by MetadataHelper");
+        this.accumuloClient = client;
         
         Preconditions.checkNotNull(metadataTableName, "The name of the metadata table is required by MetadataHelper");
         this.metadataTableName = metadataTableName;
@@ -155,7 +154,7 @@ public class MetadataHelper {
         this.fullUserAuths = fullUserAuths;
         log.debug("initialized with auths subset: {}", this.auths);
         
-        log.trace("Constructor connector: {} with auths: {} and metadata table name: {}", connector.getClass().getCanonicalName(), auths, metadataTableName);
+        log.trace("Constructor client: {} with auths: {} and metadata table name: {}", accumuloClient.getClass().getCanonicalName(), auths, metadataTableName);
     }
     
     /**
@@ -435,10 +434,10 @@ public class MetadataHelper {
         stopWatch.start();
         
         if (log.isTraceEnabled())
-            log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
+            log.trace("using client: " + accumuloClient.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName
                             + " looking at model " + modelName + " unevaluatedFields " + unevaluatedFields);
         
-        Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
+        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
         scan.setRange(new Range());
         scan.fetchColumnFamily(new Text(modelName));
         // We need the entire Model so we can do both directions.
@@ -496,9 +495,9 @@ public class MetadataHelper {
         stopWatch.start();
         
         if (log.isTraceEnabled())
-            log.trace("using connector: " + connector.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName);
+            log.trace("using client: " + accumuloClient.getClass().getCanonicalName() + " with auths: " + auths + " and model table name: " + modelTableName);
         
-        Scanner scan = ScannerHelper.createScanner(connector, modelTableName, auths);
+        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
         scan.setRange(new Range());
         Set<String> modelNames = new HashSet<>();
         Set<Text> ignoreColfs = new HashSet<>();
@@ -605,7 +604,7 @@ public class MetadataHelper {
         log.debug("cache fault for getFacets(" + this.auths + "," + table + ")");
         Multimap<String,String> fieldPivots = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, table, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -646,7 +645,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getTermCounts from table: " + metadataTableName);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -662,11 +661,7 @@ public class MetadataHelper {
                 
                 if (null != key.getRow()) {
                     MetadataCardinalityCounts counts = new MetadataCardinalityCounts(key, entry.getValue());
-                    Map<String,MetadataCardinalityCounts> values = allCounts.get(counts.getField());
-                    if (values == null) {
-                        values = Maps.newHashMapWithExpectedSize(5);
-                        allCounts.put(counts.getField(), values);
-                    }
+                    Map<String,MetadataCardinalityCounts> values = allCounts.computeIfAbsent(counts.getField(), k -> Maps.newHashMapWithExpectedSize(5));
                     values.put(counts.getFieldValue(), counts);
                 } else {
                     log.warn("Row null in ColumnFamilyConstants for key: " + key);
@@ -680,7 +675,7 @@ public class MetadataHelper {
     }
     
     /**
-     * Returns a Set of all Counts using the connector's principal's auths. This resulting informations cannot be exposed outside of the system.
+     * Returns a Set of all Counts using the client's principal's auths. This resulting informations cannot be exposed outside of the system.
      *
      * @return
      * @throws InstantiationException
@@ -696,9 +691,9 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getTermCounts from table: " + metadataTableName);
         
-        Authorizations rootAuths = connector.securityOperations().getUserAuthorizations(connector.whoami());
+        Authorizations rootAuths = accumuloClient.securityOperations().getUserAuthorizations(accumuloClient.whoami());
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, Collections.singleton(rootAuths));
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths));
         Range range = new Range();
         
         bs.setRange(range);
@@ -714,11 +709,7 @@ public class MetadataHelper {
                 
                 if (null != key.getRow()) {
                     MetadataCardinalityCounts counts = new MetadataCardinalityCounts(key, entry.getValue());
-                    Map<String,MetadataCardinalityCounts> values = allCounts.get(counts.getField());
-                    if (values == null) {
-                        values = Maps.newHashMapWithExpectedSize(5);
-                        allCounts.put(counts.getField(), values);
-                    }
+                    Map<String,MetadataCardinalityCounts> values = allCounts.computeIfAbsent(counts.getField(), k -> Maps.newHashMapWithExpectedSize(5));
                     values.put(counts.getFieldValue(), counts);
                 } else {
                     log.warn("Row null in ColumnFamilyConstants for key: " + key);
@@ -746,7 +737,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("getAllNormalized from table: " + metadataTableName);
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         Range range = new Range();
         
         bs.setRange(range);
@@ -911,7 +902,7 @@ public class MetadataHelper {
             log.trace("getEdges from table: " + metadataTableName);
         // unlike other entries, the edges colf entries have many auths set. We'll use the fullUserAuths in the scanner instead
         // of the minimal set in this.auths
-        Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, fullUserAuths);
+        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths);
         
         scanner.setRange(new Range());
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
@@ -1095,7 +1086,7 @@ public class MetadataHelper {
         
         // Get all the rows in DatawaveMetadata for the field, only in the 'f'
         // colfam
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         Key startKey = new Key(row);
         bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
@@ -1239,18 +1230,18 @@ public class MetadataHelper {
         String date = identifier.getValue();
         
         // try to get the counts by field using the original (cached) connector
-        HashMap<String,Long> datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, connector, null);
+        HashMap<String,Long> datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, accumuloClient, null);
         
         // if we don't get a hit, try the real connector
-        if (datatypeToCounts.isEmpty() && connector instanceof WrappedConnector) {
-            WrappedConnector wrappedConnector = ((WrappedConnector) connector);
-            datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, wrappedConnector.getReal(), wrappedConnector);
+        if (datatypeToCounts.isEmpty() && accumuloClient instanceof WrappedAccumuloClient) {
+            WrappedAccumuloClient wrappedClient = ((WrappedAccumuloClient) accumuloClient);
+            datatypeToCounts = getCountsByFieldInDayWithTypes(fieldName, date, wrappedClient.getReal(), wrappedClient);
         }
         
         return datatypeToCounts;
     }
     
-    protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, Connector connector, WrappedConnector wrappedConnector)
+    protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, AccumuloClient client, WrappedAccumuloClient wrappedClient)
                     throws TableNotFoundException, IOException {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         
@@ -1258,7 +1249,7 @@ public class MetadataHelper {
         
         try {
             // we have to use the real connector since the f column is not cached
-            Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1271,8 +1262,8 @@ public class MetadataHelper {
                 // if this is the real connector, and wrapped connector is not null, it means
                 // that we didn't get a hit in the cache. So, we will update the cache with the
                 // entries from the real table
-                if (wrappedConnector != null && connector == wrappedConnector.getReal()) {
-                    writer = updateCache(entry, writer, wrappedConnector);
+                if (wrappedClient != null && client == wrappedClient.getReal()) {
+                    writer = updateCache(entry, writer, wrappedClient);
                 }
                 
                 ByteArrayInputStream bais = new ByteArrayInputStream(entry.getValue().get());
@@ -1308,23 +1299,23 @@ public class MetadataHelper {
     
     public Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType) {
         // try to get the date using the original (cached) connector
-        Date date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, connector, null);
+        Date date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, accumuloClient, null);
         
         // if we don't get a hit, try the real connector
-        if (date == null && connector instanceof WrappedConnector) {
-            WrappedConnector wrappedConnector = ((WrappedConnector) connector);
-            date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, wrappedConnector.getReal(), wrappedConnector);
+        if (date == null && accumuloClient instanceof WrappedAccumuloClient) {
+            WrappedAccumuloClient wrappedClient = ((WrappedAccumuloClient) accumuloClient);
+            date = getEarliestOccurrenceOfFieldWithType(fieldName, dataType, wrappedClient.getReal(), wrappedClient);
         }
         
         return date;
     }
     
-    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType, Connector connector, WrappedConnector wrappedConnector) {
+    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType, AccumuloClient client, WrappedAccumuloClient wrappedClient) {
         String dateString = null;
         BatchWriter writer = null;
         
         try {
-            Scanner scanner = ScannerHelper.createScanner(connector, metadataTableName, auths);
+            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1341,8 +1332,8 @@ public class MetadataHelper {
                     // if this is the real connector, and wrapped connector is not null, it means
                     // that we didn't get a hit in the cache. So, we will update the cache with the
                     // entries from the real table
-                    if (wrappedConnector != null && connector == wrappedConnector.getReal()) {
-                        writer = updateCache(entry, writer, wrappedConnector);
+                    if (wrappedClient != null && client == wrappedClient.getReal()) {
+                        writer = updateCache(entry, writer, wrappedClient);
                     }
                     
                     entry.getKey().getColumnQualifier(holder);
@@ -1392,14 +1383,16 @@ public class MetadataHelper {
      *            the entry to add
      * @param writer
      *            the batch writer
-     * @param wrappedConnector
-     *            the wrapped connector
+     * @param wrappedClient
+     *            the wrapped client
      * @return a batch writer
      */
-    private BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, WrappedConnector wrappedConnector) {
+    private BatchWriter updateCache(Entry<Key,Value> entry, BatchWriter writer, WrappedAccumuloClient wrappedClient) {
         try {
             if (writer == null) {
-                writer = wrappedConnector.getMock().createBatchWriter(metadataTableName, 10L * (1024L * 1024L), 100L, 1);
+                BatchWriterConfig bwConfig = new BatchWriterConfig().setMaxMemory(10L * (1024L * 1024L)).setMaxLatency(100L, TimeUnit.MILLISECONDS)
+                                .setMaxWriteThreads(1);
+                writer = wrappedClient.getMock().createBatchWriter(metadataTableName, bwConfig);
             }
             
             Key valueKey = entry.getKey();
@@ -1465,7 +1458,7 @@ public class MetadataHelper {
     protected Multimap<String,String> loadAllFields() throws TableNotFoundException {
         Multimap<String,String> fields = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         if (log.isTraceEnabled())
             log.trace("loadAllFields from table: " + metadataTableName);
         
@@ -1517,7 +1510,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("loadTermFrequencyFields from table: " + metadataTableName);
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(connector, metadataTableName, auths);
+        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         bs.setRange(new Range());
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
@@ -1529,15 +1522,15 @@ public class MetadataHelper {
         return Multimaps.unmodifiableMultimap(fields);
     }
     
-    private static String getKey(Instance instance, String metadataTableName) {
+    private static String getKey(String instanceID, String metadataTableName) {
         StringBuilder builder = new StringBuilder();
-        builder.append(instance != null ? instance.getInstanceID() : null).append('\0');
+        builder.append(instanceID).append('\0');
         builder.append(metadataTableName).append('\0');
         return builder.toString();
     }
     
     private static String getKey(MetadataHelper helper) {
-        return getKey(helper.instance, helper.metadataTableName);
+        return getKey(helper.accumuloClient.instanceOperations().getInstanceID(), helper.metadataTableName);
     }
     
     @Override
@@ -1545,11 +1538,11 @@ public class MetadataHelper {
         return getKey(this);
     }
     
-    public static void basicIterator(Connector connector, String tableName, Collection<Authorizations> auths)
+    public static void basicIterator(AccumuloClient client, String tableName, Collection<Authorizations> auths)
                     throws TableNotFoundException, InvalidProtocolBufferException {
         if (log.isTraceEnabled())
             log.trace("--- basicIterator ---" + tableName);
-        Scanner scanner = connector.createScanner(tableName, auths.iterator().next());
+        Scanner scanner = client.createScanner(tableName, auths.iterator().next());
         Range range = new Range();
         scanner.setRange(range);
         Iterator<Entry<Key,Value>> iter = scanner.iterator();
