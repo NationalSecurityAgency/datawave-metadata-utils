@@ -322,14 +322,7 @@ public class MetadataHelper {
         if (log.isTraceEnabled())
             log.trace("loadAllFields() with auths:" + this.allFieldMetadataHelper.getAuths() + " returned " + allFields);
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(allFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(allFields.get(datatype));
-            }
-        }
+        Set<String> fields = getFields(allFields, ingestTypeFilter);
         
         // Add any additional fields that are created at evaluation time and are hence not in the metadata table.
         fields.addAll(evaluationOnlyFields);
@@ -395,15 +388,7 @@ public class MetadataHelper {
         
         Multimap<String,String> indexOnlyFields = this.allFieldMetadataHelper.getIndexOnlyFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(indexOnlyFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(indexOnlyFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(indexOnlyFields, ingestTypeFilter);
     }
     
     public QueryModel getQueryModel(String modelTableName, String modelName) throws TableNotFoundException, ExecutionException {
