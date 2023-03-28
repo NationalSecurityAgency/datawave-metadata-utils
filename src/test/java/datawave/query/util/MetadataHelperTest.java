@@ -1,6 +1,7 @@
 package datawave.query.util;
 
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import datawave.accumulo.inmemory.InMemoryAccumuloClient;
 import datawave.accumulo.inmemory.InMemoryInstance;
 import datawave.query.composite.CompositeMetadataHelper;
@@ -27,8 +28,8 @@ public class MetadataHelperTest {
     
     private static final String TABLE_METADATA = "testMetadataTable";
     private static final String[] AUTHS = {"FOO"};
-    private static MetadataHelper mdh;
     private static AccumuloClient accumuloClient;
+    private static MetadataHelper mdh;
     
     private static AllFieldMetadataHelper createAllFieldMetadataHelper() {
         final Set<Authorizations> allMetadataAuths = Collections.emptySet();
@@ -60,14 +61,29 @@ public class MetadataHelperTest {
                         Collections.emptySet());
     }
     
-    @Test // we expect our row to be filtered out
+    @Test
     public void testSingleFieldFilter() throws TableNotFoundException {
         Mutation m = new Mutation("rowA");
         m.put("t", "dataTypeA", new Value("value"));
         addFields(m);
         
-        testFilter(Collections.EMPTY_SET, mdh.getAllFields(Collections.singleton("rowA")));
+        testFilter(Collections.singleton("rowA"), mdh.getAllFields(Collections.singleton("dataTypeA")));
         testFilter(Collections.singleton("rowA"), mdh.getAllFields(null));
+        testFilter(Collections.EMPTY_SET, mdh.getAllFields(Collections.EMPTY_SET));
+    }
+    
+    @Test
+    public void testMultipleFieldFilter() throws TableNotFoundException {
+        Mutation m1 = new Mutation("rowA");
+        m1.put("t", "dataTypeA", new Value("value"));
+        addFields(m1);
+        
+        Mutation m2 = new Mutation("rowB");
+        m2.put("t", "dataTypeB", new Value("value"));
+        addFields(m2);
+        
+        testFilter(Collections.singleton("rowB"), mdh.getAllFields(Collections.singleton("dataTypeB")));
+        testFilter(Sets.newHashSet("rowA", "rowB"), mdh.getAllFields(null));
         testFilter(Collections.EMPTY_SET, mdh.getAllFields(Collections.EMPTY_SET));
     }
     
