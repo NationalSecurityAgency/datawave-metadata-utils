@@ -4,11 +4,13 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 import org.apache.accumulo.core.data.Value;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class EdgeMetadataCombinerTest {
     
@@ -57,8 +59,8 @@ public class EdgeMetadataCombinerTest {
         
         MetadataValue metadataVal = MetadataValue.parseFrom(reducedValue.get());
         
-        Assert.assertEquals(3, metadataVal.getMetadataCount());
-        Assert.assertTrue(expectedMetadata.containsAll(metadataVal.getMetadataList()));
+        assertEquals(3, metadataVal.getMetadataCount());
+        assertTrue(expectedMetadata.containsAll(metadataVal.getMetadataList()));
         
     }
 }
