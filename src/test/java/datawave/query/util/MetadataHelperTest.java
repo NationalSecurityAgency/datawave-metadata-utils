@@ -51,6 +51,10 @@ public class MetadataHelperTest {
         }
     }
     
+    private static void clearTable() throws TableNotFoundException, AccumuloException, AccumuloSecurityException {
+        accumuloClient.tableOperations().deleteRows(TABLE_METADATA, null, null);
+    }
+    
     @Before
     public void setup() throws TableNotFoundException, AccumuloException, TableExistsException, AccumuloSecurityException {
         accumuloClient = new InMemoryAccumuloClient("root", new InMemoryInstance(MetadataHelperTest.class.toString()));
@@ -62,7 +66,8 @@ public class MetadataHelperTest {
     }
     
     @Test
-    public void testSingleFieldFilter() throws TableNotFoundException {
+    public void testSingleFieldFilter() throws TableNotFoundException, AccumuloException, AccumuloSecurityException {
+        clearTable();
         Mutation m = new Mutation("rowA");
         m.put("t", "dataTypeA", new Value("value"));
         addFields(m);
@@ -73,7 +78,8 @@ public class MetadataHelperTest {
     }
     
     @Test
-    public void testMultipleFieldFilter() throws TableNotFoundException {
+    public void testMultipleFieldFilter() throws TableNotFoundException, AccumuloException, AccumuloSecurityException {
+        clearTable();
         Mutation m1 = new Mutation("rowA");
         m1.put("t", "dataTypeA", new Value("value"));
         addFields(m1);
@@ -83,6 +89,26 @@ public class MetadataHelperTest {
         addFields(m2);
         
         testFilter(Collections.singleton("rowB"), mdh.getAllFields(Collections.singleton("dataTypeB")));
+        testFilter(Sets.newHashSet("rowA", "rowB"), mdh.getAllFields(null));
+        testFilter(Collections.EMPTY_SET, mdh.getAllFields(Collections.EMPTY_SET));
+    }
+    
+    @Test
+    public void testMultipleFieldFilter2() throws TableNotFoundException, AccumuloException, AccumuloSecurityException {
+        clearTable();
+        Mutation m1 = new Mutation("rowA");
+        m1.put("t", "dataTypeA", new Value("value"));
+        addFields(m1);
+        
+        Mutation m2 = new Mutation("rowA");
+        m2.put("t", "dataTypeB", new Value("value"));
+        addFields(m2);
+        
+        Mutation m3 = new Mutation("rowB");
+        m3.put("t", "dataTypeC", new Value("value"));
+        addFields(m3);
+        
+        testFilter(Collections.singleton("rowA"), mdh.getAllFields(Collections.singleton("dataTypeB")));
         testFilter(Sets.newHashSet("rowA", "rowB"), mdh.getAllFields(null));
         testFilter(Collections.EMPTY_SET, mdh.getAllFields(Collections.EMPTY_SET));
     }
