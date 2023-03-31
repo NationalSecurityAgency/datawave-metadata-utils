@@ -27,13 +27,12 @@ public class TypeMetadataTest {
     public void testGetNormalizers() {
         Set<String> norms1 = typeMetadata.getNormalizerNamesForField("FIELD2");
         assertEquals(3, norms1.size());
-        assertTrue(norms1.contains("[IntegerType]"));
-        assertTrue(norms1.contains("[LcType]"));
-        assertTrue(norms1.contains("[NumberType]"));
+        assertTrue(norms1.contains("IntegerType"));
+        assertTrue(norms1.contains("LcType"));
+        assertTrue(norms1.contains("NumberType"));
         
         Set<String> norms2 = typeMetadata.getNormalizerNamesForField("field42");
-        assertEquals(1, norms2.size());
-        assertTrue(norms2.contains("[]"));
+        assertEquals(0, norms2.size());
         
         // empty request should return empty set
         Set<String> norms3 = typeMetadata.getNormalizerNamesForField("");

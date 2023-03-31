@@ -118,7 +118,7 @@ public class TypeMetadata implements Serializable {
         
         Set<String> normalizers = new HashSet<>();
         for (Multimap<String,String> entry : this.typeMetadata.values()) {
-            normalizers.add(String.valueOf(entry.get(fieldName)));
+            normalizers.addAll(entry.get(fieldName));
         }
         
         return normalizers;
@@ -139,7 +139,7 @@ public class TypeMetadata implements Serializable {
         Set<String> dataTypes = new HashSet<>();
         for (Entry<String,Multimap<String,String>> entry : this.typeMetadata.entrySet()) {
             if (entry.getValue().containsKey(fieldName)) {
-                dataTypes.add(String.valueOf(entry.getKey()));
+                dataTypes.add(entry.getKey());
             }
         }
         
