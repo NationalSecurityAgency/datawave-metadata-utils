@@ -325,9 +325,7 @@ public class MetadataHelper {
         fields.addAll(getFields(allFields, ingestTypeFilter));
         
         // Add any additional fields that are created at evaluation time and are hence not in the metadata table.
-        if (!evaluationOnlyFields.isEmpty()) {
-            fields.addAll(evaluationOnlyFields);
-        }
+        fields.addAll(evaluationOnlyFields);
         
         if (log.isTraceEnabled())
             log.trace("getAllFields(" + ingestTypeFilter + ") returning " + fields);
