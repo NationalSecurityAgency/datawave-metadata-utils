@@ -55,4 +55,44 @@ public class TypeMetadataTest {
         assertEquals(0, types3.size());
     }
     
+    @Test
+    public void testCreateSerializedMap() {
+        TypeMetadata typeMetadata = new TypeMetadata();
+
+        typeMetadata.put("field1", "ingest1", "LcType");
+        typeMetadata.put("field1", "ingest2", "DateType");
+
+        typeMetadata.put("field2", "ingest1", "IntegerType");
+        typeMetadata.put("field2", "ingest2", "LcType");
+
+        String asString = typeMetadata.toString();
+        
+        TypeMetadata fromString = new TypeMetadata(asString);
+        
+        System.out.println(asString);
+    }
+
+    @Test
+    public void testReadOldSerializedFormat() {
+        TypeMetadata typeMetadata = new TypeMetadata();
+
+        typeMetadata.put("field1", "ingest1", "LcType");
+        typeMetadata.put("field1", "ingest2", "DateType");
+
+        typeMetadata.put("field2", "ingest1", "IntegerType");
+        typeMetadata.put("field2", "ingest2", "LcType");
+
+        String asString = typeMetadata.toString();
+
+        TypeMetadata fromString = new TypeMetadata(asString);
+    }
+
+    @Test
+    public void testReadNewSerializedFormat() throws Exception {
+        TypeMetadata typeMetadata = new TypeMetadata();
+
+        String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[1:0,0:2];FIELD2:[1:2,0:1]";
+
+        TypeMetadata fromString = new TypeMetadata(newFormat, true);
+    }
 }
