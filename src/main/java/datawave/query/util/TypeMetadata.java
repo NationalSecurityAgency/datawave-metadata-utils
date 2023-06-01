@@ -1,230 +1,226 @@
 package datawave.query.util;
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 public class TypeMetadata implements Serializable {
-    
+
     private Set<String> ingestTypes = Sets.newHashSet();
-    
+
     private Set<String> fieldNames = Sets.newHashSet();
-    
-    protected Map<String,Multimap<String,String>> typeMetadata;
-    
-    public static final Multimap<String,String> emptyMap = HashMultimap.create();
-    
+
+    protected Map<String, Multimap<String, String>> typeMetadata;
+
+    public static final Multimap<String, String> emptyMap = HashMultimap.create();
+
     public TypeMetadata() {
         typeMetadata = Maps.newHashMap();
     }
-    
+
     public TypeMetadata(String in) {
         typeMetadata = Maps.newHashMap();
         this.fromString(in);
     }
-    
+
+    public TypeMetadata(String in, boolean newFormat) throws Exception {
+        typeMetadata = Maps.newHashMap();
+        if (newFormat) {
+            this.fromNewString(in);
+        } else {
+            this.fromString(in);
+        }
+    }
+
     public TypeMetadata(TypeMetadata in) {
         typeMetadata = Maps.newHashMap();
         // make sure we do a deep copy to avoid access issues later
-        for (Map.Entry<String,Multimap<String,String>> entry : in.typeMetadata.entrySet()) {
+        for (Map.Entry<String, Multimap<String, String>> entry : in.typeMetadata.entrySet()) {
             this.typeMetadata.put(entry.getKey(), HashMultimap.create(entry.getValue()));
         }
         this.ingestTypes.addAll(in.ingestTypes);
         this.fieldNames.addAll(in.fieldNames);
     }
-    
-    public void addForAllIngestTypes(Map<String,Set<String>> map) {
+
+    public void addForAllIngestTypes(Map<String, Set<String>> map) {
         for (String fieldName : map.keySet()) {
             for (String ingestType : ingestTypes) {
                 this.put(fieldName, ingestType, map.get(fieldName));
             }
         }
     }
-    
+
     private TypeMetadata put(String fieldName, String ingestType, Collection<String> types) {
         addTypeMetadata(fieldName, ingestType, types);
         return this;
     }
-    
+
     public TypeMetadata put(String fieldName, String ingestType, String type) {
         if (null == this.typeMetadata.get(ingestType)) {
-            Multimap<String,String> map = HashMultimap.create();
+            Multimap<String, String> map = HashMultimap.create();
             this.typeMetadata.put(ingestType, map);
         }
         addTypeMetadata(fieldName, ingestType, type);
         return this;
     }
-    
+
     private void addTypeMetadata(String fieldName, String ingestType, Collection<String> types) {
         this.ingestTypes.add(ingestType);
         fieldNames.add(fieldName);
         if (null == this.typeMetadata.get(ingestType)) {
-            Multimap<String,String> typeMap = HashMultimap.create();
+            Multimap<String, String> typeMap = HashMultimap.create();
             typeMap.putAll(fieldName, types);
             this.typeMetadata.put(ingestType, typeMap);
         } else {
             this.typeMetadata.get(ingestType).putAll(fieldName, types);
         }
     }
-    
+
     private void addTypeMetadata(String fieldName, String ingestType, String type) {
         this.ingestTypes.add(ingestType);
         fieldNames.add(fieldName);
         if (null == this.typeMetadata.get(ingestType)) {
-            Multimap<String,String> typeMap = HashMultimap.create();
+            Multimap<String, String> typeMap = HashMultimap.create();
             typeMap.put(fieldName, type);
             this.typeMetadata.put(ingestType, typeMap);
         } else {
             this.typeMetadata.get(ingestType).put(fieldName, type);
         }
     }
-    
+
     public Collection<String> getTypeMetadata(String fieldName, String ingestType) {
-        Multimap<String,String> map = this.typeMetadata.get(ingestType);
+        Multimap<String, String> map = this.typeMetadata.get(ingestType);
         if (null == map) {
             return Collections.EMPTY_SET;
         }
         // defensive copy
         return Sets.newHashSet(map.get(fieldName));
     }
-    
+
     /**
      * Returns a set of all Normalizer names associated with the given fieldName. This is similar to calling .fold().get(fieldName)
      *
-     * @param fieldName
-     *            a field name against which to search for any associated Normalizer Types
+     * @param fieldName a field name against which to search for any associated Normalizer Types
      * @return a set of strings of associated Normalizer Types
      */
     public Set<String> getNormalizerNamesForField(String fieldName) {
         if (fieldName == null || fieldName.isEmpty()) {
             return Collections.emptySet();
         }
-        
+
         Set<String> normalizers = new HashSet<>();
-        for (Multimap<String,String> entry : this.typeMetadata.values()) {
+        for (Multimap<String, String> entry : this.typeMetadata.values()) {
             normalizers.addAll(entry.get(fieldName));
         }
-        
+
         return normalizers;
     }
-    
+
     /**
      * Returns a set of all dataType names associated with the given fieldName
      *
-     * @param fieldName
-     *            a field name against which to search for any associated Datatypes
+     * @param fieldName a field name against which to search for any associated Datatypes
      * @return a set of strings of associated Datatypes
      */
     public Set<String> getDataTypesForField(String fieldName) {
         if (fieldName == null || fieldName.isEmpty()) {
             return Collections.emptySet();
         }
-        
+
         Set<String> dataTypes = new HashSet<>();
-        for (Entry<String,Multimap<String,String>> entry : this.typeMetadata.entrySet()) {
+        for (Entry<String, Multimap<String, String>> entry : this.typeMetadata.entrySet()) {
             if (entry.getValue().containsKey(fieldName)) {
                 dataTypes.add(entry.getKey());
             }
         }
-        
+
         return dataTypes;
     }
-    
+
     /**
      * returns a multimap of field name to datatype name ingest type names are not included
      *
      * @return
      */
-    public Multimap<String,String> fold() {
-        Multimap<String,String> map = HashMultimap.create();
-        for (Multimap<String,String> entry : this.typeMetadata.values()) {
+    public Multimap<String, String> fold() {
+        Multimap<String, String> map = HashMultimap.create();
+        for (Multimap<String, String> entry : this.typeMetadata.values()) {
             // defensive copy
             map.putAll(HashMultimap.create(entry));
         }
         return map;
     }
-    
+
     /**
      * returns a multimap of field name to datatype name, filtered on provided ingest type names ingest type names are not included
      *
      * @param ingestTypeFilter
      * @return
      */
-    public Multimap<String,String> fold(Set<String> ingestTypeFilter) {
+    public Multimap<String, String> fold(Set<String> ingestTypeFilter) {
         if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
             return this.fold();
         }
-        Multimap<String,String> map = HashMultimap.create();
-        
+        Multimap<String, String> map = HashMultimap.create();
+
         for (String type : ingestTypeFilter) {
             // defensive copy
             map.putAll(HashMultimap.create(this.typeMetadata.get(type)));
         }
         return map;
     }
-    
+
     public int size() {
         return this.typeMetadata.size();
     }
-    
+
     public Set<String> keySet() {
         return fieldNames;
     }
-    
+
     public TypeMetadata filter(Set<String> datatypeFilter) {
         if (datatypeFilter == null || datatypeFilter.isEmpty())
             return new TypeMetadata(this);
-        Map<String,Multimap<String,String>> localMap = Maps.newHashMap();
-        
+        Map<String, Multimap<String, String>> localMap = Maps.newHashMap();
+
         for (String type : datatypeFilter) {
-            
-            Multimap<String,String> map = HashMultimap.create();
+
+            Multimap<String, String> map = HashMultimap.create();
             if (null != (this.typeMetadata.get(type))) {
                 // defensive copy
                 map.putAll(HashMultimap.create(this.typeMetadata.get(type)));
             }
             localMap.put(type, map);
         }
-        
+
         TypeMetadata typeMetadata = new TypeMetadata();
         typeMetadata.ingestTypes = datatypeFilter;
         typeMetadata.typeMetadata.putAll(localMap);
         return typeMetadata;
     }
-    
+
     public boolean isEmpty() {
         return this.keySet().isEmpty();
     }
-    
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        
+
         Set<String> fieldNames = Sets.newHashSet();
         for (String ingestType : typeMetadata.keySet()) {
             fieldNames.addAll(typeMetadata.get(ingestType).keySet());
         }
-        
+
         for (String fieldName : fieldNames) {
             if (sb.length() > 0) {
                 sb.append(';');
             }
-            
+
             sb.append(fieldName).append(':');
             sb.append('[');
             boolean firstField = true;
@@ -246,14 +242,14 @@ public class TypeMetadata implements Serializable {
             }
             sb.append(']');
         }
-        
+
         return sb.toString();
     }
-    
+
     private void fromString(String data) {
         // was:
         // field1:a,b;field2:d,e;field3:y,z
-        
+
         // post-fix: String should look like this:
         // field1:[type1:a,b;type2:b];field2:[type1:a,b;type2:a,c]
         fieldNames = Sets.newHashSet();
@@ -268,17 +264,17 @@ public class TypeMetadata implements Serializable {
                 // get rid of the leading and trailing brackets:
                 entrySplits[1] = entrySplits[1].substring(1, entrySplits[1].length() - 1);
                 String[] values = parse(entrySplits[1], ';');
-                
+
                 for (String value : values) {
-                    
+
                     String[] vs = Iterables.toArray(Splitter.on(':').omitEmptyStrings().trimResults().split(value), String.class);
-                    
-                    Multimap<String,String> mm = typeMetadata.get(vs[0]);
+
+                    Multimap<String, String> mm = typeMetadata.get(vs[0]);
                     if (null == mm) {
                         mm = HashMultimap.create();
                         typeMetadata.put(vs[0], mm);
                     }
-                    
+
                     String[] rhs = Iterables.toArray(Splitter.on(',').omitEmptyStrings().trimResults().split(vs[1]), String.class);
                     this.ingestTypes.add(vs[0]);
                     for (String r : rhs) {
@@ -289,7 +285,7 @@ public class TypeMetadata implements Serializable {
             }
         }
     }
-    
+
     private static String[] parse(String in, char c) {
         List<String> list = Lists.newArrayList();
         boolean inside = false;
@@ -307,7 +303,88 @@ public class TypeMetadata implements Serializable {
         list.add(in.substring(start));
         return Iterables.toArray(list, String.class);
     }
-    
+
+    private static Map<Integer, String> parseTypes(String typeEntry) {
+        // dts:[0:ingest1,1:ingest2]
+        // types:[0:DateType,1:IntegerType,2:LcType]
+
+        // remove type designation and leading/trailing brackets
+        String types = typeEntry.split(":\\[")[1];
+        String typeEntries = types.substring(0, types.length() - 1);
+
+        Map<Integer, String> typeMap = new HashMap<>();
+
+        for (String entry : typeEntries.split(",")) {
+            String[] entryParts = entry.split(":");
+            typeMap.put(Integer.valueOf(entryParts[0]), entryParts[1]);
+        }
+
+        return typeMap;
+    }
+
+    public String toNewString() {
+        return null;
+    }
+
+    private void fromNewString(String data) throws Exception {
+        fieldNames = Sets.newHashSet();
+        String[] entries = parse(data, ';');
+        Map<Integer, String> ingestTypes = new HashMap<>();
+        Map<Integer, String> dataTypes = new HashMap<>();
+
+        if (entries.length > 2) {
+            for (String entry : entries) {
+                if (entry.startsWith("dts")) {
+                    ingestTypes = parseTypes(entry);
+                } else if (entry.startsWith("types")) {
+                    dataTypes = parseTypes(entry);
+                } else {
+                    String[] entrySplits = parse(entry, ':');
+
+                    // get rid of the leading and trailing brackets:
+                    entrySplits[1] = entrySplits[1].substring(1, entrySplits[1].length() - 1);
+                    String[] values = parse(entrySplits[1], ',');
+
+                    for (String value : values) {
+                        // @formatter:off
+                        String[] vs = Iterables
+                                .toArray(Splitter.on(':')
+                                        .omitEmptyStrings()
+                                        .trimResults()
+                                        .split(value), String.class);
+                        // @formatter:on
+                        
+                        String ingestType = ingestTypes.get(Integer.valueOf(vs[0]));
+                        String dataType = dataTypes.get(Integer.valueOf(vs[1]));
+                        
+                        Multimap<String, String> mm = typeMetadata.get(ingestType);
+                        if (null == mm) {
+                            mm = HashMultimap.create();
+                            typeMetadata.put(ingestType, mm);
+                        }
+
+                        // @formatter:off
+                        String[] rhs = Iterables
+                                .toArray(Splitter.on(',')
+                                        .omitEmptyStrings()
+                                        .trimResults()
+                                        .split(dataType), String.class);
+                        // @formatter:on
+                        
+                        this.ingestTypes.add(ingestType);
+                        for (String r : rhs) {
+                            mm.put(entrySplits[0], r);
+                        }
+                    }
+                    fieldNames.add(entrySplits[0]);
+                }
+            }
+        } else {
+            throw new Exception("Unable to parse string using mini-map format");
+        }
+
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -315,7 +392,7 @@ public class TypeMetadata implements Serializable {
         result = prime * result + ((typeMetadata == null) ? 0 : typeMetadata.hashCode());
         return result;
     }
-    
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
@@ -326,77 +403,73 @@ public class TypeMetadata implements Serializable {
             return false;
         TypeMetadata other = (TypeMetadata) obj;
         if (typeMetadata == null) {
-            if (other.typeMetadata != null)
-                return false;
-        } else if (!toString().equals(obj.toString())) {
-            return false;
-        }
-        return true;
+            return other.typeMetadata == null;
+        } else return toString().equals(obj.toString());
     }
-    
+
     private void writeObject(ObjectOutputStream out) throws Exception {
         out.writeObject(this.toString());
     }
-    
+
     private void readObject(ObjectInputStream in) throws Exception {
         this.ingestTypes = Sets.newHashSet();
         this.typeMetadata = Maps.newHashMap();
         this.fromString((String) in.readObject());
     }
-    
+
     public static final TypeMetadata EMPTY_TYPE_METADATA = new EmptyTypeMetadata();
-    
+
     public static TypeMetadata emptyTypeMetadata() {
         return EMPTY_TYPE_METADATA;
     }
-    
+
     private static class EmptyTypeMetadata extends TypeMetadata implements Serializable {
-        
-        final Multimap<String,String> EMPTY_MULTIMAP = new ImmutableMultimap.Builder().build();
-        
+
+        final Multimap<String, String> EMPTY_MULTIMAP = new ImmutableMultimap.Builder().build();
+
         public Collection<String> getTypeMetadata(String fieldName, String ingestType) {
             return Collections.emptySet();
         }
-        
+
         /**
          * returns a multimap of field name to datatype name ingest type names are not included
          *
          * @return
          */
-        public Multimap<String,String> fold() {
+        public Multimap<String, String> fold() {
             return EMPTY_MULTIMAP;
         }
-        
+
         /**
          * returns a multimap of field name to datatype name, filtered on provided ingest type names ingest type names are not included
          *
          * @param ingestTypeFilter
          * @return
          */
-        public Multimap<String,String> fold(Set<String> ingestTypeFilter) {
+        public Multimap<String, String> fold(Set<String> ingestTypeFilter) {
             return EMPTY_MULTIMAP;
         }
-        
-        public Set<Entry<String,Multimap<String,String>>> entrySet() {
+
+        public Set<Entry<String, Multimap<String, String>>> entrySet() {
             return Collections.emptySet();
         }
-        
+
         public Set<String> keySet() {
             return Collections.emptySet();
         }
-        
+
         public TypeMetadata filter(Set<String> datatypeFilter) {
             return this;
         }
-        
+
         public boolean equals(Object o) {
             return (o instanceof TypeMetadata) && ((TypeMetadata) o).isEmpty();
         }
-        
+
         public int hashCode() {
             return 0;
         }
-        
+
         // Preserves singleton property
         private Object readResolve() {
             return EMPTY_TYPE_METADATA;
