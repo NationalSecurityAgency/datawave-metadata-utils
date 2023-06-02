@@ -1,13 +1,26 @@
 package datawave.query.util;
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.*;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 public class TypeMetadata implements Serializable {
 
@@ -15,6 +28,7 @@ public class TypeMetadata implements Serializable {
 
     private Set<String> fieldNames = Sets.newHashSet();
 
+    // <ingestType, <fieldName, DataType(s)>>
     protected Map<String, Multimap<String, String>> typeMetadata;
 
     public static final Multimap<String, String> emptyMap = HashMultimap.create();
@@ -323,21 +337,47 @@ public class TypeMetadata implements Serializable {
     }
 
     public String toNewString() {
-        return null;
+        StringBuilder sb = new StringBuilder();
+        
+        // append ingestTypes mini-map
+        sb.append("dts:[");
+        Iterator<String> ingestIter = ingestTypes.iterator();
+        for (int i = 0; i < ingestTypes.size(); i++) {
+            sb.append(i).append(":");
+            sb.append(ingestIter.next());
+            sb.append(ingestIter.hasNext() ? "," : "];");
+        }
+        
+        // append dataTypes mini-map
+        sb.append("types:[");
+        Iterator<Multimap<String, String>> typesIter = typeMetadata.values().iterator();
+        Set<String> dataTypes = new HashSet<>();
+        while (typesIter.hasNext()) {
+            dataTypes.addAll(typesIter.next().values());
+        }
+        
+        Iterator<String> dataIter = dataTypes.iterator();
+        for (int i = 0; i < dataTypes.size(); i++) {
+            sb.append(i).append(":");
+            sb.append(dataIter.next());
+            sb.append(dataIter.hasNext() ? "," : "];");
+        }
+        
+        return sb.toString();
     }
 
     private void fromNewString(String data) throws Exception {
         fieldNames = Sets.newHashSet();
         String[] entries = parse(data, ';');
-        Map<Integer, String> ingestTypes = new HashMap<>();
-        Map<Integer, String> dataTypes = new HashMap<>();
+        Map<Integer, String> ingestTypesMiniMap = new HashMap<>();
+        Map<Integer, String> dataTypesMiniMap = new HashMap<>();
 
         if (entries.length > 2) {
             for (String entry : entries) {
                 if (entry.startsWith("dts")) {
-                    ingestTypes = parseTypes(entry);
+                    ingestTypesMiniMap = parseTypes(entry);
                 } else if (entry.startsWith("types")) {
-                    dataTypes = parseTypes(entry);
+                    dataTypesMiniMap = parseTypes(entry);
                 } else {
                     String[] entrySplits = parse(entry, ':');
 
@@ -353,10 +393,10 @@ public class TypeMetadata implements Serializable {
                                         .trimResults()
                                         .split(value), String.class);
                         // @formatter:on
-                        
-                        String ingestType = ingestTypes.get(Integer.valueOf(vs[0]));
-                        String dataType = dataTypes.get(Integer.valueOf(vs[1]));
-                        
+
+                        String ingestType = ingestTypesMiniMap.get(Integer.valueOf(vs[0]));
+                        String dataType = dataTypesMiniMap.get(Integer.valueOf(vs[1]));
+
                         Multimap<String, String> mm = typeMetadata.get(ingestType);
                         if (null == mm) {
                             mm = HashMultimap.create();
@@ -370,7 +410,7 @@ public class TypeMetadata implements Serializable {
                                         .trimResults()
                                         .split(dataType), String.class);
                         // @formatter:on
-                        
+
                         this.ingestTypes.add(ingestType);
                         for (String r : rhs) {
                             mm.put(entrySplits[0], r);

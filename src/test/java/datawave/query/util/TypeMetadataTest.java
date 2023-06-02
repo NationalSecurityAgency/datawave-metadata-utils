@@ -31,7 +31,7 @@ public class TypeMetadataTest {
         assertTrue(norms1.contains("LcType"));
         assertTrue(norms1.contains("NumberType"));
         
-        Set<String> norms2 = typeMetadata.getNormalizerNamesForField("field42");
+        Set<String> norms2 = typeMetadata.getNormalizerNamesForField("FIELD42");
         assertEquals(0, norms2.size());
         
         // empty request should return empty set
@@ -56,31 +56,14 @@ public class TypeMetadataTest {
     }
     
     @Test
-    public void testCreateSerializedMap() {
-        TypeMetadata typeMetadata = new TypeMetadata();
-
-        typeMetadata.put("field1", "ingest1", "LcType");
-        typeMetadata.put("field1", "ingest2", "DateType");
-
-        typeMetadata.put("field2", "ingest1", "IntegerType");
-        typeMetadata.put("field2", "ingest2", "LcType");
-
-        String asString = typeMetadata.toString();
-        
-        TypeMetadata fromString = new TypeMetadata(asString);
-        
-        System.out.println(asString);
-    }
-
-    @Test
     public void testReadOldSerializedFormat() {
         TypeMetadata typeMetadata = new TypeMetadata();
 
-        typeMetadata.put("field1", "ingest1", "LcType");
-        typeMetadata.put("field1", "ingest2", "DateType");
+        typeMetadata.put("FIELD1", "ingest1", "LcType");
+        typeMetadata.put("FIELD1", "ingest2", "DateType");
 
-        typeMetadata.put("field2", "ingest1", "IntegerType");
-        typeMetadata.put("field2", "ingest2", "LcType");
+        typeMetadata.put("FIELD2", "ingest1", "IntegerType");
+        typeMetadata.put("FIELD2", "ingest2", "LcType");
 
         String asString = typeMetadata.toString();
 
@@ -89,10 +72,34 @@ public class TypeMetadataTest {
 
     @Test
     public void testReadNewSerializedFormat() throws Exception {
-        TypeMetadata typeMetadata = new TypeMetadata();
-
         String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[1:0,0:2];FIELD2:[1:2,0:1]";
 
         TypeMetadata fromString = new TypeMetadata(newFormat, true);
+
+        Set<String> types1 = fromString.getDataTypesForField("FIELD1");
+        assertEquals(2, types1.size());
+        assertTrue(types1.contains("ingest1"));
+        assertTrue(types1.contains("ingest2"));
+        
+        Set<String> normalizers = fromString.getNormalizerNamesForField("FIELD1");
+        assertEquals(2, normalizers.size());
+        assertTrue(normalizers.contains("DateType"));
+        assertTrue(normalizers.contains("LcType"));
     }
+    
+    @Test
+    public void testWriteNewSerializedFormat() {
+        TypeMetadata typeMetadata = new TypeMetadata();
+
+        typeMetadata.put("FIELD1", "ingest1", "LcType");
+        typeMetadata.put("FIELD1", "ingest2", "DateType");
+
+        typeMetadata.put("FIELD2", "ingest1", "IntegerType");
+        typeMetadata.put("FIELD2", "ingest2", "LcType");
+
+        String newString = typeMetadata.toNewString();
+        
+        System.out.println(newString);
+    }
+    
 }
