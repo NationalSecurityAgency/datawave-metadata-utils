@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class TypeMetadata implements Serializable {
 
@@ -341,7 +342,7 @@ public class TypeMetadata implements Serializable {
         
         // append ingestTypes mini-map
         sb.append("dts:[");
-        Iterator<String> ingestIter = ingestTypes.iterator();
+        Iterator ingestIter = new TreeSet(ingestTypes).iterator();
         for (int i = 0; i < ingestTypes.size(); i++) {
             sb.append(i).append(":");
             sb.append(ingestIter.next());
@@ -351,7 +352,7 @@ public class TypeMetadata implements Serializable {
         // append dataTypes mini-map
         sb.append("types:[");
         Iterator<Multimap<String, String>> typesIter = typeMetadata.values().iterator();
-        Set<String> dataTypes = new HashSet<>();
+        Set<String> dataTypes = new TreeSet<>();
         while (typesIter.hasNext()) {
             dataTypes.addAll(typesIter.next().values());
         }
