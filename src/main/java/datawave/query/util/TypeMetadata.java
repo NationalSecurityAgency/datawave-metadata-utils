@@ -25,9 +25,12 @@ import java.util.TreeSet;
 
 public class TypeMetadata implements Serializable {
 
-    private Set<String> ingestTypes = Sets.newHashSet();
+    private Set<String> ingestTypes = new TreeSet<>();
 
-    private Set<String> fieldNames = Sets.newHashSet();
+    private Set<String> fieldNames = new TreeSet<>();
+    
+    private Map<String, Integer> ingestTypesMiniMap = new HashMap<>();
+    private Map<String, Integer> dataTypesMiniMap = new HashMap<>();
 
     // <ingestType, <fieldName, DataType(s)>>
     protected Map<String, Multimap<String, String>> typeMetadata;
@@ -319,7 +322,7 @@ public class TypeMetadata implements Serializable {
         return Iterables.toArray(list, String.class);
     }
 
-    private static Map<Integer, String> parseTypes(String typeEntry) {
+    private static Map<String, Integer> parseTypes(String typeEntry) {
         // dts:[0:ingest1,1:ingest2]
         // types:[0:DateType,1:IntegerType,2:LcType]
 
@@ -327,11 +330,11 @@ public class TypeMetadata implements Serializable {
         String types = typeEntry.split(":\\[")[1];
         String typeEntries = types.substring(0, types.length() - 1);
 
-        Map<Integer, String> typeMap = new HashMap<>();
+        Map<String,Integer> typeMap = new HashMap<>();
 
         for (String entry : typeEntries.split(",")) {
             String[] entryParts = entry.split(":");
-            typeMap.put(Integer.valueOf(entryParts[0]), entryParts[1]);
+            typeMap.put(entryParts[1], Integer.valueOf(entryParts[0]));
         }
 
         return typeMap;
@@ -340,16 +343,18 @@ public class TypeMetadata implements Serializable {
     public String toNewString() {
         StringBuilder sb = new StringBuilder();
         
-        // append ingestTypes mini-map
+        // create and append ingestTypes mini-map
         sb.append("dts:[");
-        Iterator ingestIter = new TreeSet(ingestTypes).iterator();
+        Iterator<String> ingestIter = ingestTypes.iterator();
         for (int i = 0; i < ingestTypes.size(); i++) {
+            String ingestType = ingestIter.next();
             sb.append(i).append(":");
-            sb.append(ingestIter.next());
+            sb.append(ingestType);
             sb.append(ingestIter.hasNext() ? "," : "];");
+            ingestTypesMiniMap.put(ingestType, i);
         }
         
-        // append dataTypes mini-map
+        // create and append dataTypes mini-map
         sb.append("types:[");
         Iterator<Multimap<String, String>> typesIter = typeMetadata.values().iterator();
         Set<String> dataTypes = new TreeSet<>();
@@ -359,10 +364,24 @@ public class TypeMetadata implements Serializable {
         
         Iterator<String> dataIter = dataTypes.iterator();
         for (int i = 0; i < dataTypes.size(); i++) {
+            String dataType = dataIter.next();
             sb.append(i).append(":");
-            sb.append(dataIter.next());
+            sb.append(dataType);
             sb.append(dataIter.hasNext() ? "," : "];");
+            dataTypesMiniMap.put(dataType, i);
         }
+        
+        // append fieldNames and their associated ingestTypes and Normalizers
+        for (Entry<String, Multimap<String, String>> entry: typeMetadata.entrySet()) {
+            for (Entry<String, String> subEntry : entry.getValue().entries()) {
+                sb.append(subEntry.getKey());
+                sb.append(":[");
+                sb.append(dataTypesMiniMap.get(subEntry.getValue()));
+                sb.append(":");
+                sb.append(ingestTypesMiniMap.get(entry.getKey()));
+            }
+        }
+//        sb.append(typeMetadata);
         
         return sb.toString();
     }
@@ -370,8 +389,6 @@ public class TypeMetadata implements Serializable {
     private void fromNewString(String data) throws Exception {
         fieldNames = Sets.newHashSet();
         String[] entries = parse(data, ';');
-        Map<Integer, String> ingestTypesMiniMap = new HashMap<>();
-        Map<Integer, String> dataTypesMiniMap = new HashMap<>();
 
         if (entries.length > 2) {
             for (String entry : entries) {
@@ -386,17 +403,28 @@ public class TypeMetadata implements Serializable {
                     entrySplits[1] = entrySplits[1].substring(1, entrySplits[1].length() - 1);
                     String[] values = parse(entrySplits[1], ',');
 
-                    for (String value : values) {
+                    for (String aValue : values) {
                         // @formatter:off
                         String[] vs = Iterables
                                 .toArray(Splitter.on(':')
                                         .omitEmptyStrings()
                                         .trimResults()
-                                        .split(value), String.class);
-                        // @formatter:on
+                                        .split(aValue), String.class);
 
-                        String ingestType = ingestTypesMiniMap.get(Integer.valueOf(vs[0]));
-                        String dataType = dataTypesMiniMap.get(Integer.valueOf(vs[1]));
+                        String ingestType = ingestTypesMiniMap
+                                .entrySet()
+                                .stream()
+                                .filter(e -> e.getValue().equals(Integer.valueOf(vs[0])))
+                                .map(Map.Entry::getKey)
+                                .findFirst().get();
+
+                        String dataType = dataTypesMiniMap
+                                .entrySet()
+                                .stream()
+                                .filter(e -> e.getValue().equals(Integer.valueOf(vs[1])))
+                                .map(Map.Entry::getKey)
+                                .findFirst().get();
+                        
 
                         Multimap<String, String> mm = typeMetadata.get(ingestType);
                         if (null == mm) {
@@ -404,7 +432,6 @@ public class TypeMetadata implements Serializable {
                             typeMetadata.put(ingestType, mm);
                         }
 
-                        // @formatter:off
                         String[] rhs = Iterables
                                 .toArray(Splitter.on(',')
                                         .omitEmptyStrings()
