@@ -57,10 +57,10 @@ public class TypeMetadataTest {
     
     @Test
     public void testReadNewSerializedFormatMultipleFieldsAndTypes() throws Exception {
-        String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[1:0,0:2];FIELD2:[1:2,0:1]";
-
+        String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[0:2,1:0];FIELD2:[0:1,1:2]";
+        
         TypeMetadata fromString = new TypeMetadata(newFormat, true);
-
+        
         Set<String> types1 = fromString.getDataTypesForField("FIELD1");
         assertEquals(2, types1.size());
         assertTrue(types1.contains("ingest1"));
@@ -71,32 +71,32 @@ public class TypeMetadataTest {
         assertTrue(normalizers.contains("DateType"));
         assertTrue(normalizers.contains("LcType"));
     }
-
+    
     @Test
     public void testReadNewSerializedFormatSingleFieldAndType() throws Exception {
         String newFormat = "dts:[0:ingest1];types:[0:DateType];FIELD1:[0:0]";
-
+        
         TypeMetadata fromString = new TypeMetadata(newFormat, true);
-
+        
         Set<String> types1 = fromString.getDataTypesForField("FIELD1");
         assertEquals(1, types1.size());
         assertTrue(types1.contains("ingest1"));
-
+        
         Set<String> normalizers = fromString.getNormalizerNamesForField("FIELD1");
         assertEquals(1, normalizers.size());
         assertTrue(normalizers.contains("DateType"));
     }
-
+    
     @Test
     public void testReadNewSerializedFormat2() throws Exception {
         String newFormat = "dts:[0:ingest1];types:[0:DateType];FIELD1:[0:0]";
-
+        
         TypeMetadata fromString = new TypeMetadata(newFormat, true);
-
+        
         Set<String> types1 = fromString.getDataTypesForField("FIELD1");
         assertEquals(1, types1.size());
         assertTrue(types1.contains("ingest1"));
-
+        
         Set<String> normalizers = fromString.getNormalizerNamesForField("FIELD1");
         assertEquals(1, normalizers.size());
         assertTrue(normalizers.contains("DateType"));
@@ -105,17 +105,17 @@ public class TypeMetadataTest {
     @Test
     public void testWriteNewSerializedFormat() {
         TypeMetadata typeMetadata = new TypeMetadata();
-
+        
         typeMetadata.put("FIELD1", "ingest1", "LcType");
         typeMetadata.put("FIELD1", "ingest2", "DateType");
-
+        
         typeMetadata.put("FIELD2", "ingest1", "IntegerType");
         typeMetadata.put("FIELD2", "ingest2", "LcType");
-
+        
         String newString = typeMetadata.toNewString();
-
-        String expectedString = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[1:0,0:2];FIELD2:[1:2,0:1]";
-
+        
+        String expectedString = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[0:2,1:0];FIELD2:[0:1,1:2]";
+        
         assertEquals(expectedString, newString);
     }
     
