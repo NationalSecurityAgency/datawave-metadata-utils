@@ -115,7 +115,7 @@ public class ModelKeyParserTest {
     public void testForwardKeyParse() throws Exception {
         FieldMapping mapping = ModelKeyParser.parseKey(FORWARD_KEY);
         Assert.assertEquals(FORWARD_FIELD_MAPPING, mapping);
-        Assert.assertFalse(mapping.isLenient());
+        Assert.assertFalse(mapping.isLenientMarker());
         
         // Test ForwardKeyParse with no datatype
         FORWARD_FIELD_MAPPING.setDatatype(null);
@@ -129,7 +129,7 @@ public class ModelKeyParserTest {
     public void testLenientKeyParse() throws Exception {
         FieldMapping mapping = ModelKeyParser.parseKey(LENIENT_KEY);
         Assert.assertEquals(LENIENT_MAPPING, mapping);
-        Assert.assertTrue(mapping.isLenient());
+        Assert.assertTrue(mapping.isLenientMarker());
         
         // Test ForwardKeyParse with no datatype
         LENIENT_MAPPING.setDatatype(null);

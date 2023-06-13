@@ -47,7 +47,7 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     }
     
     public void validate() {
-        if (isLenient() && direction != Direction.FORWARD) {
+        if (isLenientMarker() && direction != Direction.FORWARD) {
             throw new IllegalArgumentException("Cannot have a non-" + Direction.FORWARD + ' ' + LENIENT + " mapping");
         }
     }
@@ -94,7 +94,15 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
         this.columnVisibility = columnVisibility;
     }
     
+    /**
+     * deprecated: use isLenientMarker()
+     */
+    @Deprecated
     public boolean isLenient() {
+        return isLenientMarker();
+    }
+    
+    public boolean isLenientMarker() {
         return (fieldName != null && fieldName.equals(LENIENT));
     }
     
