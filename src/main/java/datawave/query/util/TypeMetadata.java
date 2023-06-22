@@ -14,6 +14,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -101,6 +102,48 @@ public class TypeMetadata implements Serializable {
         }
         // defensive copy
         return Sets.newHashSet(map.get(fieldName));
+    }
+    
+    /**
+     * Returns a set of all Normalizer names associated with the given fieldName. This is similar to calling .fold().get(fieldName)
+     *
+     * @param fieldName
+     *            a field name against which to search for any associated Normalizer Types
+     * @return a set of strings of associated Normalizer Types
+     */
+    public Set<String> getNormalizerNamesForField(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        Set<String> normalizers = new HashSet<>();
+        for (Multimap<String,String> entry : this.typeMetadata.values()) {
+            normalizers.addAll(entry.get(fieldName));
+        }
+        
+        return normalizers;
+    }
+    
+    /**
+     * Returns a set of all dataType names associated with the given fieldName
+     *
+     * @param fieldName
+     *            a field name against which to search for any associated Datatypes
+     * @return a set of strings of associated Datatypes
+     */
+    public Set<String> getDataTypesForField(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        Set<String> dataTypes = new HashSet<>();
+        for (Entry<String,Multimap<String,String>> entry : this.typeMetadata.entrySet()) {
+            if (entry.getValue().containsKey(fieldName)) {
+                dataTypes.add(entry.getKey());
+            }
+        }
+        
+        return dataTypes;
     }
     
     /**
@@ -317,7 +360,7 @@ public class TypeMetadata implements Serializable {
         
         /**
          * returns a multimap of field name to datatype name ingest type names are not included
-         * 
+         *
          * @return
          */
         public Multimap<String,String> fold() {
@@ -326,7 +369,7 @@ public class TypeMetadata implements Serializable {
         
         /**
          * returns a multimap of field name to datatype name, filtered on provided ingest type names ingest type names are not included
-         * 
+         *
          * @param ingestTypeFilter
          * @return
          */

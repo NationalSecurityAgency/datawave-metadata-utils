@@ -447,7 +447,7 @@ public class MetadataHelper {
         for (Map.Entry<Key,Value> entry : scan) {
             try {
                 FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey());
-                if (mapping.isLenient()) {
+                if (mapping.isLenientMarker()) {
                     queryModel.addLenientForwardMappings(mapping.getModelFieldName());
                 } else if (mapping.getDirection() == Direction.FORWARD) {
                     // Do not add a forward mapping entry
