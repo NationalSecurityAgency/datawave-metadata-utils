@@ -38,7 +38,7 @@ public class TypeMetadata implements Serializable {
     protected Map<String,Multimap<String,String>> typeMetadata;
     
     public static final Multimap<String,String> emptyMap = HashMultimap.create();
-            
+    
     private static final String INGESTTYPE_PREFIX = "dts";
     private static final String DATATYPES_PREFIX = "types";
     
