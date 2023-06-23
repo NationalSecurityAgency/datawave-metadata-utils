@@ -38,6 +38,9 @@ public class TypeMetadata implements Serializable {
     protected Map<String,Multimap<String,String>> typeMetadata;
     
     public static final Multimap<String,String> emptyMap = HashMultimap.create();
+            
+    private static final String INGESTTYPE_PREFIX = "dts";
+    private static final String DATATYPES_PREFIX = "types";
     
     public TypeMetadata() {
         typeMetadata = Maps.newHashMap();
@@ -411,9 +414,9 @@ public class TypeMetadata implements Serializable {
         
         if (entries.length > 2) {
             for (String entry : entries) {
-                if (entry.startsWith("dts")) {
+                if (entry.startsWith(INGESTTYPE_PREFIX)) {
                     ingestTypesMiniMap = parseTypes(entry);
-                } else if (entry.startsWith("types")) {
+                } else if (entry.startsWith(DATATYPES_PREFIX)) {
                     dataTypesMiniMap = parseTypes(entry);
                 } else {
                     String[] entrySplits = parse(entry, ':');
