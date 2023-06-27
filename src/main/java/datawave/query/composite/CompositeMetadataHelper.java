@@ -1,8 +1,13 @@
 package datawave.query.composite;
 
-import com.google.common.base.Preconditions;
-import datawave.data.ColumnFamilyConstants;
-import datawave.security.util.ScannerHelper;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
+
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.client.TableNotFoundException;
@@ -18,13 +23,10 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
+import com.google.common.base.Preconditions;
+
+import datawave.data.ColumnFamilyConstants;
+import datawave.security.util.ScannerHelper;
 
 @EnableCaching
 @Component("compositeMetadataHelper")

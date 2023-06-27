@@ -10,11 +10,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
-import datawave.util.StringUtils;
 import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.iterators.OptionDescriber;
 
 import com.google.common.collect.Sets;
+
+import datawave.util.StringUtils;
 
 public class Metadata implements Serializable, OptionDescriber {
     

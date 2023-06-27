@@ -1,11 +1,12 @@
 package datawave.iterators.filter;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import datawave.accumulo.inmemory.InMemoryAccumuloClient;
-import datawave.accumulo.inmemory.InMemoryInstance;
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
-import datawave.util.time.DateHelper;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
@@ -22,12 +23,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import com.google.protobuf.InvalidProtocolBufferException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import datawave.accumulo.inmemory.InMemoryAccumuloClient;
+import datawave.accumulo.inmemory.InMemoryInstance;
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
+import datawave.util.time.DateHelper;
 
 public class EdgeMetadataCQStripperCombinerTest {
     private static final Logger log = Logger.getLogger(EdgeMetadataCQStripperCombinerTest.class);

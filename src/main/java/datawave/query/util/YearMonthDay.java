@@ -1,8 +1,8 @@
 package datawave.query.util;
 
-import datawave.util.time.DateHelper;
-
 import java.util.Calendar;
+
+import datawave.util.time.DateHelper;
 
 public class YearMonthDay implements Comparable<YearMonthDay> {
     public static final int DAYS_IN_LEAP_YEAR = 366;

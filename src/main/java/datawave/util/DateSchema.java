@@ -1,11 +1,11 @@
 package datawave.util;
 
+import java.io.IOException;
+import java.util.Date;
+
 import io.protostuff.Input;
 import io.protostuff.Output;
 import io.protostuff.Schema;
-
-import java.io.IOException;
-import java.util.Date;
 
 /**
  * This schema can be used by the protostuff api to serialize/deserialize a date object, internally represented as a long

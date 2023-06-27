@@ -1,5 +1,8 @@
 package datawave.query.model;
 
+import java.util.Collections;
+import java.util.Set;
+
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.security.Authorizations;
@@ -14,9 +17,6 @@ import org.powermock.api.easymock.PowerMock;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
-
-import java.util.Collections;
-import java.util.Set;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(ModelKeyParser.class)

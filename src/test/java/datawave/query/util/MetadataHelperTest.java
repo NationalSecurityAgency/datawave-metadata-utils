@@ -1,10 +1,10 @@
 package datawave.query.util;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import datawave.accumulo.inmemory.InMemoryAccumuloClient;
-import datawave.accumulo.inmemory.InMemoryInstance;
-import datawave.query.composite.CompositeMetadataHelper;
+import static org.junit.Assert.assertEquals;
+
+import java.util.Collections;
+import java.util.Set;
+
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -19,10 +19,12 @@ import org.apache.accumulo.core.security.Authorizations;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.Collections;
-import java.util.Set;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
-import static org.junit.Assert.assertEquals;
+import datawave.accumulo.inmemory.InMemoryAccumuloClient;
+import datawave.accumulo.inmemory.InMemoryInstance;
+import datawave.query.composite.CompositeMetadataHelper;
 
 public class MetadataHelperTest {
     

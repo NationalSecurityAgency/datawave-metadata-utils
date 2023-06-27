@@ -2,12 +2,12 @@ package datawave.query.util;
 
 import java.util.Map.Entry;
 
-import datawave.data.ColumnFamilyConstants;
-
 import org.apache.accumulo.core.data.Key;
 import org.apache.hadoop.io.Text;
 
 import com.google.common.collect.Maps;
+
+import datawave.data.ColumnFamilyConstants;
 
 /**
  * A unique entry in the DatawaveMetadata is defined by the combination of fieldname and datatype

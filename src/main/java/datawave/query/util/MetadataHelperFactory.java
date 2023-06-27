@@ -1,6 +1,11 @@
 package datawave.query.util;
 
-import datawave.query.composite.CompositeMetadataHelper;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.security.Authorizations;
 import org.slf4j.Logger;
@@ -9,11 +14,7 @@ import org.springframework.beans.factory.BeanFactory;
 import org.springframework.core.ResolvableType;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import datawave.query.composite.CompositeMetadataHelper;
 
 @Component
 public class MetadataHelperFactory {

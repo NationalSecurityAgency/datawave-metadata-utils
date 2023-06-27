@@ -1,8 +1,17 @@
 package datawave.query.composite;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
+
 import datawave.util.DateSchema;
 import datawave.util.StringMultimapSchema;
 import io.protostuff.Input;
@@ -12,14 +21,6 @@ import io.protostuff.Output;
 import io.protostuff.ProtobufIOUtil;
 import io.protostuff.Schema;
 import io.protostuff.StringMapSchema;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Composite metadata is used when determining how to treat composite terms and ranges when they are encountered in the QueryIterator. This metadata represents

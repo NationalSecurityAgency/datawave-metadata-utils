@@ -1,13 +1,13 @@
 package datawave.query.util;
 
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * A utility to help with evicting entries from the caches used by {@link MetadataHelper}, {@link TypeMetadataHelper},
