@@ -23,6 +23,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class QueryModel implements Serializable {
     private static final long serialVersionUID = -7618411736250884135L;
     
+    public static final String LENIENT = "lenient";
+    public static final String STRICT = "strict";
+    
     private static final String EMPTY_STR = "";
     public static final char PARAM_VALUE_SEP = ',';
     public static final String PARAM_VALUE_SEP_STR = new String(new char[] {PARAM_VALUE_SEP});
@@ -32,19 +35,18 @@ public class QueryModel implements Serializable {
     protected final Multimap<String,String> forwardQueryMapping;
     // reverse mappings map a database field to a (hopefully) user understandable field name
     protected final Map<String,String> reverseQueryMapping;
-    // lenient forward mappings are those that are best effort in that if the underlying
-    // database field cannot be found in the index, then it can be dropped.
-    protected final Set<String> lenientForwardMappings;
+    // model field attributes
+    protected final Multimap<String,String> modelFieldAttributes;
     
     public QueryModel() {
         this.forwardQueryMapping = HashMultimap.create();
-        this.lenientForwardMappings = new HashSet();
+        this.modelFieldAttributes = HashMultimap.create();
         this.reverseQueryMapping = Maps.newHashMap();
     }
     
     public QueryModel(QueryModel other) {
         this.forwardQueryMapping = HashMultimap.create(other.getForwardQueryMapping());
-        this.lenientForwardMappings = new HashSet(other.lenientForwardMappings);
+        this.modelFieldAttributes = HashMultimap.create(other.getModelFieldAttributes());
         this.reverseQueryMapping = Maps.newHashMap(other.getReverseQueryMapping());
     }
     
@@ -72,23 +74,20 @@ public class QueryModel implements Serializable {
         return reverseQueryMapping.get(field);
     }
     
-    public Set<String> getLenientForwardMappings() {
-        return lenientForwardMappings;
+    public void setModelFieldAttributes(String modelField, Collection<String> attributes) {
+        this.modelFieldAttributes.putAll(modelField, attributes);
     }
     
-    public void setLenientForwardMappings(Set<String> fields) {
-        lenientForwardMappings.clear();
-        if (fields != null) {
-            lenientForwardMappings.addAll(fields);
-        }
+    public void setModelFieldAttribute(String modelField, String attribute) {
+        this.modelFieldAttributes.put(modelField, attribute);
     }
     
-    public void addLenientForwardMappings(String field) {
-        lenientForwardMappings.add(field);
+    public Collection<String> getModelFieldAttributes(String modelField) {
+        return this.modelFieldAttributes.get(modelField);
     }
     
-    public boolean isLenientForwardMapping(String field) {
-        return lenientForwardMappings.contains(field);
+    public Multimap<String,String> getModelFieldAttributes() {
+        return this.modelFieldAttributes;
     }
     
     /**

@@ -7,6 +7,11 @@ import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class ModelKeyParser {
     
     public static final String NULL_BYTE = "\0";
@@ -15,9 +20,15 @@ public class ModelKeyParser {
     @Deprecated
     public static final String INDEX_ONLY = "index_only";
     
+    public static final String ATTRIBUTES = "attrs";
+    
     private static Logger log = Logger.getLogger(ModelKeyParser.class);
     
     public static FieldMapping parseKey(Key key) {
+        return parseKey(key, NULL_VALUE);
+    }
+    
+    public static FieldMapping parseKey(Key key, Value value) {
         String row = key.getRow().toString();
         String[] colf = key.getColumnFamily().toString().split(NULL_BYTE);
         String[] colq = key.getColumnQualifier().toString().split(NULL_BYTE);
@@ -27,15 +38,28 @@ public class ModelKeyParser {
         Direction direction;
         String dataField;
         String modelField;
+        List<String> attributes = new ArrayList<>();
         
         if (colf.length == 1) {
-            // Older style, no datatype
+            // no datatype, this is only the model name
         } else if (colf.length == 2) {
             datatype = colf[1];
         } else {
             throw new IllegalArgumentException("Key in unknown format, colf parts: " + colf.length);
         }
-        if (2 == colq.length) {
+        
+        // we can have attributes no matter the mapping
+        attributes.addAll(Arrays.asList(StringUtils.split(new String(value.get(), StandardCharsets.UTF_8), ',')));
+        
+        if (1 == colq.length) {
+            // in this case we expect model field attributes (not specific to a mapping)
+            if (!colq[0].equals(ATTRIBUTES)) {
+                throw new IllegalArgumentException("Expected " + ATTRIBUTES + " for the column qualifier");
+            }
+            modelField = row;
+            dataField = null;
+            direction = null;
+        } else if (2 == colq.length) {
             direction = Direction.getDirection(colq[1]);
             if (Direction.REVERSE.equals(direction)) {
                 dataField = row;
@@ -53,7 +77,7 @@ public class ModelKeyParser {
             throw new IllegalArgumentException("Key in unknown format, colq parts: " + colq.length);
         }
         
-        return new FieldMapping(datatype, dataField, modelField, direction, cv);
+        return new FieldMapping(datatype, dataField, modelField, direction, cv, attributes);
     }
     
     public static Key createKey(FieldMapping mapping, String modelName) {
