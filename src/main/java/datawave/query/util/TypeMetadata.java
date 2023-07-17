@@ -28,8 +28,6 @@ public class TypeMetadata implements Serializable {
     
     protected Map<String,Multimap<String,String>> typeMetadata;
     
-    public static final Multimap<String,String> emptyMap = HashMultimap.create();
-    
     public TypeMetadata() {
         typeMetadata = Maps.newHashMap();
     }
@@ -73,7 +71,7 @@ public class TypeMetadata implements Serializable {
     
     private void addTypeMetadata(String fieldName, String ingestType, Collection<String> types) {
         this.ingestTypes.add(ingestType);
-        fieldNames.add(fieldName);
+        this.fieldNames.add(fieldName);
         if (null == this.typeMetadata.get(ingestType)) {
             Multimap<String,String> typeMap = HashMultimap.create();
             typeMap.putAll(fieldName, types);
@@ -85,7 +83,7 @@ public class TypeMetadata implements Serializable {
     
     private void addTypeMetadata(String fieldName, String ingestType, String type) {
         this.ingestTypes.add(ingestType);
-        fieldNames.add(fieldName);
+        this.fieldNames.add(fieldName);
         if (null == this.typeMetadata.get(ingestType)) {
             Multimap<String,String> typeMap = HashMultimap.create();
             typeMap.put(fieldName, type);
@@ -98,7 +96,7 @@ public class TypeMetadata implements Serializable {
     public Collection<String> getTypeMetadata(String fieldName, String ingestType) {
         Multimap<String,String> map = this.typeMetadata.get(ingestType);
         if (null == map) {
-            return Collections.EMPTY_SET;
+            return Collections.emptySet();
         }
         // defensive copy
         return Sets.newHashSet(map.get(fieldName));
@@ -354,6 +352,7 @@ public class TypeMetadata implements Serializable {
         
         final Multimap<String,String> EMPTY_MULTIMAP = new ImmutableMultimap.Builder().build();
         
+        @Override
         public Collection<String> getTypeMetadata(String fieldName, String ingestType) {
             return Collections.emptySet();
         }
@@ -363,6 +362,7 @@ public class TypeMetadata implements Serializable {
          *
          * @return
          */
+        @Override
         public Multimap<String,String> fold() {
             return EMPTY_MULTIMAP;
         }
@@ -373,6 +373,7 @@ public class TypeMetadata implements Serializable {
          * @param ingestTypeFilter
          * @return
          */
+        @Override
         public Multimap<String,String> fold(Set<String> ingestTypeFilter) {
             return EMPTY_MULTIMAP;
         }
@@ -381,18 +382,22 @@ public class TypeMetadata implements Serializable {
             return Collections.emptySet();
         }
         
+        @Override
         public Set<String> keySet() {
             return Collections.emptySet();
         }
         
+        @Override
         public TypeMetadata filter(Set<String> datatypeFilter) {
             return this;
         }
         
+        @Override
         public boolean equals(Object o) {
             return (o instanceof TypeMetadata) && ((TypeMetadata) o).isEmpty();
         }
         
+        @Override
         public int hashCode() {
             return 0;
         }
