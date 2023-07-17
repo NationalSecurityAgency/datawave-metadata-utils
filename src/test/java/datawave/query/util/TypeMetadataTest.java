@@ -14,7 +14,7 @@ import static org.junit.Assert.assertTrue;
 public class TypeMetadataTest {
     
     private TypeMetadata typeMetadata;
-
+    
     @Before
     public void setup() {
         typeMetadata = new TypeMetadata();
@@ -57,29 +57,29 @@ public class TypeMetadataTest {
         Set<String> types3 = typeMetadata.getDataTypesForField("");
         assertEquals(0, types3.size());
     }
-
+    
     @Test
-    public void testReduceEmptyTypeMetadata(){
+    public void testReduceEmptyTypeMetadata() {
         TypeMetadata reduced = typeMetadata.reduce(Collections.emptySet());
         assertTrue(reduced.typeMetadata.isEmpty());
     }
-
+    
     @Test
-    public void testReductionNoFieldsMatch(){
+    public void testReductionNoFieldsMatch() {
         TypeMetadata reduced = typeMetadata.reduce(Collections.singleton("FIELD4"));
         assertTrue(reduced.typeMetadata.isEmpty());
     }
-
+    
     @Test
-    public void testReductionSomeFieldsMatch(){
+    public void testReductionSomeFieldsMatch() {
         TypeMetadata reduced = typeMetadata.reduce(Sets.newHashSet("FIELD1", "FIELD2"));
         assertTrue(reduced.keySet().contains("FIELD1"));
         assertTrue(reduced.keySet().contains("FIELD2"));
         assertFalse(reduced.keySet().contains("FIELD3"));
     }
-
+    
     @Test
-    public void testReductionAllFieldsMatch(){
+    public void testReductionAllFieldsMatch() {
         TypeMetadata reduced = typeMetadata.reduce(Sets.newHashSet("FIELD1", "FIELD2", "FIELD3"));
         assertTrue(reduced.keySet().contains("FIELD1"));
         assertTrue(reduced.keySet().contains("FIELD2"));

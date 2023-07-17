@@ -46,14 +46,15 @@ public class TypeMetadata implements Serializable {
         this.ingestTypes.addAll(in.ingestTypes);
         this.fieldNames.addAll(in.fieldNames);
     }
-
+    
     /**
      * Creates a copy of this type metadata object, reducing it down to the set of provided fields
      *
-     * @param fields a set of fields which act as a filter
+     * @param fields
+     *            a set of fields which act as a filter
      * @return a copy of the TypeMetadata filtered down to a set of fields
      */
-    public TypeMetadata reduce(Set<String> fields){
+    public TypeMetadata reduce(Set<String> fields) {
         TypeMetadata reduced = new TypeMetadata();
         for (Entry<String,Multimap<String,String>> entry : typeMetadata.entrySet()) {
             final String ingestType = entry.getKey();
