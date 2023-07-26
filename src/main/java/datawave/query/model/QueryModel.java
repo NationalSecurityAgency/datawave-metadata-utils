@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.collect.HashMultimap;
@@ -185,8 +186,24 @@ public class QueryModel implements Serializable {
         return fieldName;
     }
     
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        QueryModel that = (QueryModel) o;
+        return forwardQueryMapping.equals(that.forwardQueryMapping) && reverseQueryMapping.equals(that.reverseQueryMapping)
+                        && modelFieldAttributes.equals(that.modelFieldAttributes);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(forwardQueryMapping, reverseQueryMapping, modelFieldAttributes);
+    }
+    
     /**
-     * Print the forward mapping of the model to the provided PrintStream in a form capable of being reloaded via WriteModelToAccumulo
+     * Print the forward mapping of the model to the provided PrintStream
      * 
      * @param out
      */
@@ -199,7 +216,7 @@ public class QueryModel implements Serializable {
     }
     
     /**
-     * Print the reverse mapping of the model to the provided PrintStream in a form capable of being reloaded via WriteModelToAccumulo
+     * Print the reverse mapping of the model to the provided PrintStream
      * 
      * @param out
      */
@@ -207,6 +224,19 @@ public class QueryModel implements Serializable {
         out.println("# Query Model Reverse Mapping - " + System.currentTimeMillis());
         for (Entry<String,String> mapping : this.reverseQueryMapping.entrySet()) {
             out.println(mapping.getKey() + ":" + mapping.getValue());
+        }
+    }
+    
+    /**
+     * Print the reverse mapping of the model to the provided PrintStream
+     *
+     * @param out
+     */
+    public void dumpAttributes(PrintStream out) {
+        out.println("# Query Model Attributes - " + System.currentTimeMillis());
+        for (Entry<String,String> mapping : this.modelFieldAttributes.entries()) {
+            out.print(mapping.getKey() + ":" + mapping.getValue());
+            out.println();
         }
     }
     
@@ -218,6 +248,7 @@ public class QueryModel implements Serializable {
             stream.println(super.toString());
             dumpForward(stream);
             dumpReverse(stream);
+            dumpAttributes(stream);
             stream.flush();
             return bytes.toString(UTF_8.name());
         } catch (UnsupportedEncodingException e) {

@@ -20,24 +20,24 @@ import java.util.TreeSet;
 public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     
     private static final long serialVersionUID = 1L;
-    @XmlAttribute(name = "datatype", required = true)
+    @XmlAttribute(name = "datatype")
     private String datatype = null;
     
-    @XmlAttribute(name = "fieldName", required = true)
+    @XmlAttribute(name = "fieldName")
     private String fieldName = null;
     
     @XmlAttribute(name = "modelFieldName", required = true)
     private String modelFieldName = null;
     
-    @XmlAttribute(name = "direction", required = true)
-    private Direction direction = Direction.FORWARD;
+    @XmlAttribute(name = "direction")
+    private Direction direction = null;
     
     @XmlAttribute(name = "columnVisibility", required = true)
     private String columnVisibility = null;
     
     @XmlElementWrapper(name = "attributes")
     @XmlElement(name = "attribute")
-    private final TreeSet<String> attributes = new TreeSet<>();
+    private TreeSet<String> attributes = new TreeSet<>();
     
     public FieldMapping() {
         super();
