@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.collect.HashMultimap;
@@ -24,6 +25,9 @@ import datawave.util.StringUtils;
 public class QueryModel implements Serializable {
     private static final long serialVersionUID = -7618411736250884135L;
     
+    public static final String LENIENT = "lenient";
+    public static final String STRICT = "strict";
+    
     private static final String EMPTY_STR = "";
     public static final char PARAM_VALUE_SEP = ',';
     public static final String PARAM_VALUE_SEP_STR = new String(new char[] {PARAM_VALUE_SEP});
@@ -33,19 +37,18 @@ public class QueryModel implements Serializable {
     protected final Multimap<String,String> forwardQueryMapping;
     // reverse mappings map a database field to a (hopefully) user understandable field name
     protected final Map<String,String> reverseQueryMapping;
-    // lenient forward mappings are those that are best effort in that if the underlying
-    // database field cannot be found in the index, then it can be dropped.
-    protected final Set<String> lenientForwardMappings;
+    // model field attributes
+    protected final Multimap<String,String> modelFieldAttributes;
     
     public QueryModel() {
         this.forwardQueryMapping = HashMultimap.create();
-        this.lenientForwardMappings = new HashSet();
+        this.modelFieldAttributes = HashMultimap.create();
         this.reverseQueryMapping = Maps.newHashMap();
     }
     
     public QueryModel(QueryModel other) {
         this.forwardQueryMapping = HashMultimap.create(other.getForwardQueryMapping());
-        this.lenientForwardMappings = new HashSet(other.lenientForwardMappings);
+        this.modelFieldAttributes = HashMultimap.create(other.getModelFieldAttributes());
         this.reverseQueryMapping = Maps.newHashMap(other.getReverseQueryMapping());
     }
     
@@ -73,23 +76,20 @@ public class QueryModel implements Serializable {
         return reverseQueryMapping.get(field);
     }
     
-    public Set<String> getLenientForwardMappings() {
-        return lenientForwardMappings;
+    public void setModelFieldAttributes(String modelField, Collection<String> attributes) {
+        this.modelFieldAttributes.putAll(modelField, attributes);
     }
     
-    public void setLenientForwardMappings(Set<String> fields) {
-        lenientForwardMappings.clear();
-        if (fields != null) {
-            lenientForwardMappings.addAll(fields);
-        }
+    public void setModelFieldAttribute(String modelField, String attribute) {
+        this.modelFieldAttributes.put(modelField, attribute);
     }
     
-    public void addLenientForwardMappings(String field) {
-        lenientForwardMappings.add(field);
+    public Collection<String> getModelFieldAttributes(String modelField) {
+        return this.modelFieldAttributes.get(modelField);
     }
     
-    public boolean isLenientForwardMapping(String field) {
-        return lenientForwardMappings.contains(field);
+    public Multimap<String,String> getModelFieldAttributes() {
+        return this.modelFieldAttributes;
     }
     
     /**
@@ -187,8 +187,24 @@ public class QueryModel implements Serializable {
         return fieldName;
     }
     
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        QueryModel that = (QueryModel) o;
+        return forwardQueryMapping.equals(that.forwardQueryMapping) && reverseQueryMapping.equals(that.reverseQueryMapping)
+                        && modelFieldAttributes.equals(that.modelFieldAttributes);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(forwardQueryMapping, reverseQueryMapping, modelFieldAttributes);
+    }
+    
     /**
-     * Print the forward mapping of the model to the provided PrintStream in a form capable of being reloaded via WriteModelToAccumulo
+     * Print the forward mapping of the model to the provided PrintStream
      * 
      * @param out
      */
@@ -201,7 +217,7 @@ public class QueryModel implements Serializable {
     }
     
     /**
-     * Print the reverse mapping of the model to the provided PrintStream in a form capable of being reloaded via WriteModelToAccumulo
+     * Print the reverse mapping of the model to the provided PrintStream
      * 
      * @param out
      */
@@ -209,6 +225,19 @@ public class QueryModel implements Serializable {
         out.println("# Query Model Reverse Mapping - " + System.currentTimeMillis());
         for (Entry<String,String> mapping : this.reverseQueryMapping.entrySet()) {
             out.println(mapping.getKey() + ":" + mapping.getValue());
+        }
+    }
+    
+    /**
+     * Print the reverse mapping of the model to the provided PrintStream
+     *
+     * @param out
+     */
+    public void dumpAttributes(PrintStream out) {
+        out.println("# Query Model Attributes - " + System.currentTimeMillis());
+        for (Entry<String,String> mapping : this.modelFieldAttributes.entries()) {
+            out.print(mapping.getKey() + ":" + mapping.getValue());
+            out.println();
         }
     }
     
@@ -220,6 +249,7 @@ public class QueryModel implements Serializable {
             stream.println(super.toString());
             dumpForward(stream);
             dumpReverse(stream);
+            dumpAttributes(stream);
             stream.flush();
             return bytes.toString(UTF_8.name());
         } catch (UnsupportedEncodingException e) {
