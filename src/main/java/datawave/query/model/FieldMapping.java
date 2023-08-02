@@ -91,7 +91,6 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     
     public void setFieldName(String fieldName) {
         this.fieldName = fieldName;
-        validate();
     }
     
     public String getModelFieldName() {
@@ -108,7 +107,6 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     
     public void setDirection(Direction direction) {
         this.direction = direction;
-        validate();
     }
     
     public String getColumnVisibility() {
