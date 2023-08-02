@@ -394,15 +394,7 @@ public class MetadataHelper {
         
         Multimap<String,String> indexOnlyFields = this.allFieldMetadataHelper.getIndexOnlyFields();
         
-        Set<String> fields = new HashSet<>();
-        if (ingestTypeFilter == null || ingestTypeFilter.isEmpty()) {
-            fields.addAll(indexOnlyFields.values());
-        } else {
-            for (String datatype : ingestTypeFilter) {
-                fields.addAll(indexOnlyFields.get(datatype));
-            }
-        }
-        return Collections.unmodifiableSet(fields);
+        return getFields(indexOnlyFields, ingestTypeFilter);
     }
     
     public QueryModel getQueryModel(String modelTableName, String modelName) throws TableNotFoundException, ExecutionException {
