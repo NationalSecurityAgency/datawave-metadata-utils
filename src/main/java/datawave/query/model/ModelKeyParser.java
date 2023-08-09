@@ -18,15 +18,30 @@ import java.util.stream.Collectors;
 /**
  * This class can be used to parse keys belonging to a model.
  *
- * Definitions: MODEL_NAME: the name of the model (e.g. "DATAWAVE") MODEL_FIELD: the model field name DB_FIELD: the field name as stored in the database
- * ATTR_NAME: an attribute ATTR_VALUE: an attribute value ATTR_VALUES: a comma delimited list of 0 or more ATTR_VALUE ATTRIBUTE: either ATTR_NAME or
- * ATTR_NAME=ATTR_VALUE ATTRIBUTES: a comma delimited list of 0 or more ATTRIBUTE
+ * @formatter:off
+ * Definitions:
+ *   MODEL_NAME: the name of the model (e.g. "DATAWAVE")
+ *   MODEL_FIELD: the model field name
+ *   DB_FIELD: the field name as stored in the database
+ *   ATTR_NAME: an attribute
+ *   ATTR_VALUE: an attribute value
+ *   ATTR_VALUES: a comma delimited list of 0 or more
+ *   ATTR_VALUE ATTRIBUTE: either ATTR_NAME or ATTR_NAME=ATTR_VALUE
+ *   ATTRIBUTES: a comma delimited list of 0 or more ATTRIBUTE
  *
- * Keys can have the following forms (row cf:cq value): MODEL_FIELD MODEL_NAME:DB_FIELD\x00"forward" ATTRIBUTES DB_FIELD MODEL_NAME:MODEL_FIELD\x00"reverse"
- * ATTRIBUTES "model" MODEL_NAME:ATTRIBUTE "model" MODEL_NAME:ATTR_NAME ATTR_VALUES "model" MODEL_NAME:"attrs" ATTRIBUTES MODEL_FIELD MODEL_NAME:ATTRIBUTE
- * MODEL_FIELD MODEL_NAME:ATTR_NAME ATTR_VALUES MODEL_FIELD MODEL_NAME:"attrs" ATTRIBUTES
+ * Keys can have the following forms (row cf:cq value):
+ *   MODEL_FIELD MODEL_NAME:DB_FIELD\x00"forward" ATTRIBUTES
+ *   DB_FIELD MODEL_NAME:MODEL_FIELD\x00"reverse" ATTRIBUTES
+ *   "model" MODEL_NAME:ATTRIBUTE
+ *   "model" MODEL_NAME:ATTR_NAME ATTR_VALUES
+ *   "model" MODEL_NAME:"attrs" ATTRIBUTES
+ *   MODEL_FIELD MODEL_NAME:ATTRIBUTE
+ *   MODEL_FIELD MODEL_NAME:ATTR_NAME ATTR_VALUES
+ *   MODEL_FIELD MODEL_NAME:"attrs" ATTRIBUTES
  *
- * deprecated but parsable format: MODEL_FIELD MODEL_NAME:DB_FIELD\x00"index_only\x00"forward" ATTRIBUTES
+ * deprecated but parsable format:
+ *   MODEL_FIELD MODEL_NAME:DB_FIELD\x00"index_only\x00"forward" ATTRIBUTES
+ * @formatter:on
  */
 public class ModelKeyParser {
     
