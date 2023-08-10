@@ -70,10 +70,6 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
             if (fieldName == null || modelFieldName == null || columnVisibility == null) {
                 throw new IllegalArgumentException("Cannot have a model mapping with without all members: " + this);
             }
-        } else {
-            if (fieldName != null || modelFieldName == null || columnVisibility == null) {
-                throw new IllegalArgumentException("Model field attributes can only have a model field and columnVisibility:" + this);
-            }
         }
     }
     
@@ -91,7 +87,6 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     
     public void setFieldName(String fieldName) {
         this.fieldName = fieldName;
-        validate();
     }
     
     public String getModelFieldName() {
@@ -108,7 +103,6 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
     
     public void setDirection(Direction direction) {
         this.direction = direction;
-        validate();
     }
     
     public String getColumnVisibility() {
