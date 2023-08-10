@@ -85,13 +85,7 @@ public class ModelKeyParser {
         attributes.addAll(Arrays.asList(StringUtils.split(new String(value.get(), StandardCharsets.UTF_8), ',')));
         
         if (0 == colq.length || (colq.length == 1 && colq[0].isEmpty())) {
-            if (row.equals(MODEL)) {
-                modelField = null;
-                dataField = null;
-                direction = null;
-            } else {
-                throw new IllegalArgumentException("Expected " + MODEL + " for the row: " + key);
-            }
+            throw new IllegalArgumentException("Expected a column qualifier for a model key: " + key);
         } else if (1 == colq.length) {
             // in this case we expect model or model field attributes
             if (!colq[0].equals(ATTRIBUTES)) {
