@@ -92,7 +92,7 @@ public class ModelKeyParserTest {
                         COLVIZ, TIMESTAMP);
         NULL_CV_KEY = new Key(FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, MODEL_FIELD_NAME + ModelKeyParser.NULL_BYTE + REVERSE.getValue(),
                         "", TIMESTAMP);
-        VERSION_KEY1 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "", COLVIZ, TIMESTAMP);
+        VERSION_KEY1 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "attrs", COLVIZ, TIMESTAMP);
         VERSION_VALUE1 = new Value("version=VER");
         VERSION_KEY2 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "version", COLVIZ, TIMESTAMP);
         VERSION_VALUE2 = new Value("VER");

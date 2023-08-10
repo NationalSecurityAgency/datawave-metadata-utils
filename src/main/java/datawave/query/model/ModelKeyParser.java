@@ -84,9 +84,10 @@ public class ModelKeyParser {
         // we can have attributes no matter the mapping
         attributes.addAll(Arrays.asList(StringUtils.split(new String(value.get(), StandardCharsets.UTF_8), ',')));
         
-        if (0 == colq.length || (colq.length == 1 && colq[0].isEmpty())) {
-            throw new IllegalArgumentException("Expected a column qualifier for a model key: " + key);
-        } else if (1 == colq.length) {
+        if (1 == colq.length) {
+            if (colq[0].isEmpty()) {
+                throw new IllegalArgumentException("Expected a column qualifier for a model key: " + key);
+            }
             // in this case we expect model or model field attributes
             if (!colq[0].equals(ATTRIBUTES)) {
                 // in this case the colq is an attribute, or all of the attributes are related to the name in the colq
