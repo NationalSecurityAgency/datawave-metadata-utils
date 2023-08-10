@@ -15,10 +15,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+// @formatter:off
 /**
  * This class can be used to parse keys belonging to a model.
  *
- * @formatter:off
  * Definitions:
  *   MODEL_NAME: the name of the model (e.g. "DATAWAVE")
  *   MODEL_FIELD: the model field name
@@ -41,8 +41,8 @@ import java.util.stream.Collectors;
  *
  * deprecated but parsable format:
  *   MODEL_FIELD MODEL_NAME:DB_FIELD\x00"index_only\x00"forward" ATTRIBUTES
- * @formatter:on
  */
+// @formatter:on
 public class ModelKeyParser {
     
     public static final String NULL_BYTE = "\0";
