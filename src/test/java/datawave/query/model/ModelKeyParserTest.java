@@ -2,6 +2,7 @@ package datawave.query.model;
 
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Mutation;
+import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.hadoop.io.Text;
@@ -15,6 +16,7 @@ import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Set;
 
@@ -32,17 +34,24 @@ public class ModelKeyParserTest {
     private static final Direction REVERSE = Direction.REVERSE;
     private static final Set<Authorizations> AUTHS = Collections.singleton(new Authorizations("PRIVATE, PUBLIC"));
     private static FieldMapping FORWARD_FIELD_MAPPING = null;
-    private static FieldMapping LENIENT_MAPPING = null;
+    private static FieldMapping STRICT_MAPPING = null;
     private static FieldMapping REVERSE_FIELD_MAPPING = null;
     private static FieldMapping NULL_CV_MAPPING = null;
+    private static FieldMapping VERSION_MAPPING = null;
     private static Key FORWARD_KEY = null;
-    private static Key LENIENT_KEY = null;
+    private static Key STRICT_KEY = null;
     private static Key REVERSE_KEY = null;
     private static Key NULL_CV_KEY = null;
+    private static Key VERSION_KEY1 = null;
+    private static Value VERSION_VALUE1 = null;
+    private static Key VERSION_KEY2 = null;
+    private static Value VERSION_VALUE2 = null;
+    private static Key VERSION_KEY3 = null;
+    private static Value VERSION_VALUE3 = null;
     private static Mutation FORWARD_MUTATION = null;
     private static Mutation FORWARD_DELETE_MUTATION = null;
-    private static Mutation LENIENT_MUTATION = null;
-    private static Mutation LENIENT_DELETE_MUTATION = null;
+    private static Mutation STRICT_MUTATION = null;
+    private static Mutation STRICT_DELETE_MUTATION = null;
     private static Mutation REVERSE_MUTATION = null;
     private static Mutation REVERSE_DELETE_MUTATION = null;
     
@@ -56,12 +65,11 @@ public class ModelKeyParserTest {
         FORWARD_FIELD_MAPPING.setDirection(FORWARD);
         FORWARD_FIELD_MAPPING.setFieldName(FIELD_NAME);
         FORWARD_FIELD_MAPPING.setModelFieldName(MODEL_FIELD_NAME);
-        LENIENT_MAPPING = new FieldMapping();
-        LENIENT_MAPPING.setColumnVisibility(COLVIZ);
-        LENIENT_MAPPING.setDatatype(DATATYPE);
-        LENIENT_MAPPING.setDirection(FORWARD);
-        LENIENT_MAPPING.setFieldName(FieldMapping.LENIENT);
-        LENIENT_MAPPING.setModelFieldName(MODEL_FIELD_NAME);
+        STRICT_MAPPING = new FieldMapping();
+        STRICT_MAPPING.setColumnVisibility(COLVIZ);
+        STRICT_MAPPING.setDatatype(DATATYPE);
+        STRICT_MAPPING.setModelFieldName(MODEL_FIELD_NAME);
+        STRICT_MAPPING.addAttribute(QueryModel.STRICT);
         REVERSE_FIELD_MAPPING = new FieldMapping();
         REVERSE_FIELD_MAPPING.setColumnVisibility(COLVIZ);
         REVERSE_FIELD_MAPPING.setDatatype(DATATYPE);
@@ -74,14 +82,22 @@ public class ModelKeyParserTest {
         NULL_CV_MAPPING.setDirection(REVERSE);
         NULL_CV_MAPPING.setFieldName(FIELD_NAME);
         NULL_CV_MAPPING.setModelFieldName(MODEL_FIELD_NAME);
+        VERSION_MAPPING = new FieldMapping();
+        VERSION_MAPPING.setColumnVisibility(COLVIZ);
+        VERSION_MAPPING.addAttribute("version=VER");
         FORWARD_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, FIELD_NAME + ModelKeyParser.NULL_BYTE + FORWARD.getValue(),
                         COLVIZ, TIMESTAMP);
-        LENIENT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE,
-                        FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), COLVIZ, TIMESTAMP);
+        STRICT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, QueryModel.STRICT, COLVIZ, TIMESTAMP);
         REVERSE_KEY = new Key(FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, MODEL_FIELD_NAME + ModelKeyParser.NULL_BYTE + REVERSE.getValue(),
                         COLVIZ, TIMESTAMP);
         NULL_CV_KEY = new Key(FIELD_NAME, MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, MODEL_FIELD_NAME + ModelKeyParser.NULL_BYTE + REVERSE.getValue(),
                         "", TIMESTAMP);
+        VERSION_KEY1 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "attrs", COLVIZ, TIMESTAMP);
+        VERSION_VALUE1 = new Value("version=VER");
+        VERSION_KEY2 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "version", COLVIZ, TIMESTAMP);
+        VERSION_VALUE2 = new Value("VER");
+        VERSION_KEY3 = new Key(ModelKeyParser.MODEL, MODEL_NAME, "version=VER", COLVIZ, TIMESTAMP);
+        VERSION_VALUE3 = new Value("");
         FORWARD_MUTATION = new Mutation(MODEL_FIELD_NAME);
         FORWARD_MUTATION.put(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, FIELD_NAME + ModelKeyParser.NULL_BYTE + FORWARD.getValue(),
                         new ColumnVisibility(COLVIZ), TIMESTAMP, ModelKeyParser.NULL_VALUE);
@@ -91,15 +107,12 @@ public class ModelKeyParserTest {
         FORWARD_DELETE_MUTATION.putDelete(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE,
                         FIELD_NAME + ModelKeyParser.NULL_BYTE + "index_only" + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), new ColumnVisibility(COLVIZ),
                         TIMESTAMP);
-        LENIENT_MUTATION = new Mutation(MODEL_FIELD_NAME);
-        LENIENT_MUTATION.put(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(),
-                        new ColumnVisibility(COLVIZ), TIMESTAMP, ModelKeyParser.NULL_VALUE);
-        LENIENT_DELETE_MUTATION = new Mutation(MODEL_FIELD_NAME);
-        LENIENT_DELETE_MUTATION.putDelete(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE,
-                        FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), new ColumnVisibility(COLVIZ), TIMESTAMP);
-        LENIENT_DELETE_MUTATION.putDelete(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE,
-                        FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + "index_only" + ModelKeyParser.NULL_BYTE + FORWARD.getValue(),
-                        new ColumnVisibility(COLVIZ), TIMESTAMP);
+        STRICT_MUTATION = new Mutation(MODEL_FIELD_NAME);
+        STRICT_MUTATION.put(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, QueryModel.STRICT, new ColumnVisibility(COLVIZ), TIMESTAMP,
+                        ModelKeyParser.NULL_VALUE);
+        STRICT_DELETE_MUTATION = new Mutation(MODEL_FIELD_NAME);
+        STRICT_DELETE_MUTATION.putDelete(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, ModelKeyParser.ATTRIBUTES, new ColumnVisibility(COLVIZ), TIMESTAMP);
+        STRICT_DELETE_MUTATION.putDelete(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, QueryModel.STRICT, new ColumnVisibility(COLVIZ), TIMESTAMP);
         
         REVERSE_MUTATION = new Mutation(FIELD_NAME);
         REVERSE_MUTATION.put(MODEL_NAME + ModelKeyParser.NULL_BYTE + DATATYPE, MODEL_FIELD_NAME + ModelKeyParser.NULL_BYTE + REVERSE.getValue(),
@@ -115,7 +128,6 @@ public class ModelKeyParserTest {
     public void testForwardKeyParse() throws Exception {
         FieldMapping mapping = ModelKeyParser.parseKey(FORWARD_KEY);
         Assert.assertEquals(FORWARD_FIELD_MAPPING, mapping);
-        Assert.assertFalse(mapping.isLenientMarker());
         
         // Test ForwardKeyParse with no datatype
         FORWARD_FIELD_MAPPING.setDatatype(null);
@@ -126,17 +138,26 @@ public class ModelKeyParserTest {
     }
     
     @Test
-    public void testLenientKeyParse() throws Exception {
-        FieldMapping mapping = ModelKeyParser.parseKey(LENIENT_KEY);
-        Assert.assertEquals(LENIENT_MAPPING, mapping);
-        Assert.assertTrue(mapping.isLenientMarker());
+    public void testStrictKeyParse() throws Exception {
+        FieldMapping mapping = ModelKeyParser.parseKey(STRICT_KEY);
+        Assert.assertEquals(STRICT_MAPPING, mapping);
         
         // Test ForwardKeyParse with no datatype
-        LENIENT_MAPPING.setDatatype(null);
-        LENIENT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME, FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), COLVIZ, TIMESTAMP);
+        STRICT_MAPPING.setDatatype(null);
+        STRICT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME, QueryModel.STRICT, COLVIZ, TIMESTAMP);
         
-        mapping = ModelKeyParser.parseKey(LENIENT_KEY);
-        Assert.assertEquals(LENIENT_MAPPING, mapping);
+        mapping = ModelKeyParser.parseKey(STRICT_KEY);
+        Assert.assertEquals(STRICT_MAPPING, mapping);
+    }
+    
+    @Test
+    public void testVersionKeyParse() throws Exception {
+        FieldMapping mapping = ModelKeyParser.parseKey(VERSION_KEY1, VERSION_VALUE1);
+        Assert.assertEquals(VERSION_MAPPING, mapping);
+        mapping = ModelKeyParser.parseKey(VERSION_KEY2, VERSION_VALUE2);
+        Assert.assertEquals(VERSION_MAPPING, mapping);
+        mapping = ModelKeyParser.parseKey(VERSION_KEY3, VERSION_VALUE3);
+        Assert.assertEquals(VERSION_MAPPING, mapping);
     }
     
     @Test
@@ -172,23 +193,23 @@ public class ModelKeyParserTest {
     }
     
     @Test
-    public void testLenientMappingParse() throws Exception {
+    public void testStrictMappingParse() throws Exception {
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP);
         PowerMock.replayAll();
-        Key k = ModelKeyParser.createKey(LENIENT_MAPPING, MODEL_NAME);
+        Key k = ModelKeyParser.createKey(STRICT_MAPPING, MODEL_NAME);
         PowerMock.verifyAll();
-        Assert.assertEquals(LENIENT_KEY, k);
+        Assert.assertEquals(STRICT_KEY, k);
         
-        // Test LENIENTMappingParse with null datatype
+        // Test StrictMappingParse with null datatype
         PowerMock.resetAll();
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP);
-        LENIENT_MAPPING.setDatatype(null);
+        STRICT_MAPPING.setDatatype(null);
         PowerMock.replayAll();
-        k = ModelKeyParser.createKey(LENIENT_MAPPING, MODEL_NAME);
+        k = ModelKeyParser.createKey(STRICT_MAPPING, MODEL_NAME);
         PowerMock.verifyAll();
-        LENIENT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME, FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), COLVIZ, TIMESTAMP);
+        STRICT_KEY = new Key(MODEL_FIELD_NAME, MODEL_NAME, QueryModel.STRICT, COLVIZ, TIMESTAMP);
         PowerMock.verifyAll();
-        Assert.assertEquals(LENIENT_KEY, k);
+        Assert.assertEquals(STRICT_KEY, k);
     }
     
     @Test
@@ -234,26 +255,25 @@ public class ModelKeyParserTest {
     }
     
     @Test
-    public void testLenientCreateMutation() throws Exception {
+    public void testStrictCreateMutation() throws Exception {
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP);
         PowerMock.replayAll();
-        Mutation m = ModelKeyParser.createMutation(LENIENT_MAPPING, MODEL_NAME);
+        Mutation m = ModelKeyParser.createMutation(STRICT_MAPPING, MODEL_NAME);
         PowerMock.verifyAll();
         m.getUpdates();
-        Assert.assertEquals(LENIENT_MUTATION, m);
+        Assert.assertEquals(STRICT_MUTATION, m);
         
         // Test with null datatype
         PowerMock.resetAll();
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP);
-        LENIENT_MAPPING.setDatatype(null);
+        STRICT_MAPPING.setDatatype(null);
         PowerMock.replayAll();
-        m = ModelKeyParser.createMutation(LENIENT_MAPPING, MODEL_NAME);
-        LENIENT_MUTATION = new Mutation(MODEL_FIELD_NAME);
-        LENIENT_MUTATION.put(MODEL_NAME, FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), new ColumnVisibility(COLVIZ), TIMESTAMP,
-                        ModelKeyParser.NULL_VALUE);
+        m = ModelKeyParser.createMutation(STRICT_MAPPING, MODEL_NAME);
+        STRICT_MUTATION = new Mutation(MODEL_FIELD_NAME);
+        STRICT_MUTATION.put(MODEL_NAME, QueryModel.STRICT, new ColumnVisibility(COLVIZ), TIMESTAMP, ModelKeyParser.NULL_VALUE);
         PowerMock.verifyAll();
         m.getUpdates();
-        Assert.assertEquals(LENIENT_MUTATION, m);
+        Assert.assertEquals(STRICT_MUTATION, m);
     }
     
     @Test
@@ -304,29 +324,26 @@ public class ModelKeyParserTest {
     }
     
     @Test
-    public void testLenientCreateDeleteMutation() throws Exception {
+    public void testStrictCreateDeleteMutation() throws Exception {
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP).times(2);
         PowerMock.replayAll();
-        Mutation m = ModelKeyParser.createDeleteMutation(LENIENT_MAPPING, MODEL_NAME);
+        Mutation m = ModelKeyParser.createDeleteMutation(STRICT_MAPPING, MODEL_NAME);
         PowerMock.verifyAll();
         m.getUpdates();
-        Assert.assertEquals(LENIENT_DELETE_MUTATION, m);
+        Assert.assertEquals(STRICT_DELETE_MUTATION, m);
         
         // Test with null datatype
         PowerMock.resetAll();
         EasyMock.expect(System.currentTimeMillis()).andReturn(TIMESTAMP).times(2);
-        LENIENT_MAPPING.setDatatype(null);
+        STRICT_MAPPING.setDatatype(null);
         PowerMock.replayAll();
-        LENIENT_DELETE_MUTATION = new Mutation(MODEL_FIELD_NAME);
-        LENIENT_DELETE_MUTATION.putDelete(MODEL_NAME, FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + FORWARD.getValue(), new ColumnVisibility(COLVIZ),
-                        TIMESTAMP);
-        LENIENT_DELETE_MUTATION.putDelete(MODEL_NAME,
-                        FieldMapping.LENIENT + ModelKeyParser.NULL_BYTE + "index_only" + ModelKeyParser.NULL_BYTE + FORWARD.getValue(),
-                        new ColumnVisibility(COLVIZ), TIMESTAMP);
-        m = ModelKeyParser.createDeleteMutation(LENIENT_MAPPING, MODEL_NAME);
+        STRICT_DELETE_MUTATION = new Mutation(MODEL_FIELD_NAME);
+        STRICT_DELETE_MUTATION.putDelete(MODEL_NAME, ModelKeyParser.ATTRIBUTES, new ColumnVisibility(COLVIZ), TIMESTAMP);
+        STRICT_DELETE_MUTATION.putDelete(MODEL_NAME, QueryModel.STRICT, new ColumnVisibility(COLVIZ), TIMESTAMP);
+        m = ModelKeyParser.createDeleteMutation(STRICT_MAPPING, MODEL_NAME);
         PowerMock.verifyAll();
         m.getUpdates();
-        Assert.assertEquals(LENIENT_DELETE_MUTATION, m);
+        Assert.assertEquals(STRICT_DELETE_MUTATION, m);
     }
     
     @Test
@@ -438,13 +455,6 @@ public class ModelKeyParserTest {
      * 
      * @throws Exception
      */
-    
-    @Test(expected = IllegalArgumentException.class)
-    public void testKeyWithNoDirection() throws Exception {
-        // Test key with no direction
-        Key keyNoDirection = new Key(MODEL_FIELD_NAME, MODEL_NAME, FIELD_NAME, COLVIZ, TIMESTAMP);
-        ModelKeyParser.parseKey(keyNoDirection);
-    }
     
     @Test(expected = IllegalArgumentException.class)
     public void testKeyWithInvalidDirection() throws Exception {
