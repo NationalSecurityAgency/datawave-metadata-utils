@@ -1,5 +1,6 @@
 package datawave.query.model;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Set;
 
@@ -18,10 +19,6 @@ import org.powermock.api.easymock.PowerMock;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Set;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(ModelKeyParser.class)
