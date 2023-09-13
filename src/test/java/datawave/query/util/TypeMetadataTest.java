@@ -1,12 +1,16 @@
 package datawave.query.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Collections;
 import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import com.google.common.collect.Sets;
 
 public class TypeMetadataTest {
     
@@ -55,4 +59,32 @@ public class TypeMetadataTest {
         assertEquals(0, types3.size());
     }
     
+    @Test
+    public void testReduceEmptyTypeMetadata() {
+        TypeMetadata reduced = typeMetadata.reduce(Collections.emptySet());
+        assertTrue(reduced.typeMetadata.isEmpty());
+    }
+    
+    @Test
+    public void testReductionNoFieldsMatch() {
+        TypeMetadata reduced = typeMetadata.reduce(Collections.singleton("FIELD4"));
+        assertTrue(reduced.typeMetadata.isEmpty());
+    }
+    
+    @Test
+    public void testReductionSomeFieldsMatch() {
+        TypeMetadata reduced = typeMetadata.reduce(Sets.newHashSet("FIELD1", "FIELD2"));
+        assertTrue(reduced.keySet().contains("FIELD1"));
+        assertTrue(reduced.keySet().contains("FIELD2"));
+        assertFalse(reduced.keySet().contains("FIELD3"));
+    }
+    
+    @Test
+    public void testReductionAllFieldsMatch() {
+        TypeMetadata reduced = typeMetadata.reduce(Sets.newHashSet("FIELD1", "FIELD2", "FIELD3"));
+        assertTrue(reduced.keySet().contains("FIELD1"));
+        assertTrue(reduced.keySet().contains("FIELD2"));
+        assertTrue(reduced.keySet().contains("FIELD3"));
+        assertEquals(reduced, typeMetadata);
+    }
 }
