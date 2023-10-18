@@ -1,5 +1,7 @@
 package datawave.query.model;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -17,9 +19,8 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
-import datawave.util.StringUtils;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import datawave.util.StringUtils;
 
 public class QueryModel implements Serializable {
     private static final long serialVersionUID = -7618411736250884135L;

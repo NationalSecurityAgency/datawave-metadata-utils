@@ -1,20 +1,23 @@
 package datawave.query.util;
 
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.collect.Sets;
-import datawave.data.ColumnFamilyConstants;
-import datawave.data.type.Type;
-import datawave.query.composite.CompositeMetadata;
-import datawave.query.composite.CompositeMetadataHelper;
-import datawave.security.util.AuthorizationsMinimizer;
-import datawave.security.util.ScannerHelper;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.Scanner;
@@ -33,23 +36,22 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.Sets;
+
+import datawave.data.ColumnFamilyConstants;
+import datawave.data.type.Type;
+import datawave.query.composite.CompositeMetadata;
+import datawave.query.composite.CompositeMetadataHelper;
+import datawave.security.util.AuthorizationsMinimizer;
+import datawave.security.util.ScannerHelper;
 
 @EnableCaching
 @Component("allFieldMetadataHelper")
@@ -158,7 +160,8 @@ public class AllFieldMetadataHelper {
      * @throws InstantiationException
      * @throws ExecutionException
      */
-    @Cacheable(value = "isIndexed", key = "{#root.target.auths,#root.target.metadataTableName,#colf,#key}", cacheManager = "cacheManager", sync = true)
+    @Cacheable(value = "isIndexed", key = "{#root.target.auths,#root.target.metadataTableName,#colf,#key}", cacheManager = "metadataHelperCacheManager",
+                    sync = true)
     // using cache with higher maximumSize
     public Boolean isIndexed(Text colf, Entry<String,Entry<String,Set<String>>> key) throws TableNotFoundException, InstantiationException, ExecutionException {
         log.debug("cache fault for isIndexed(" + this.auths + "," + this.metadataTableName + "," + colf + "," + key + ")");

@@ -6,14 +6,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.iterators.Combiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.google.protobuf.InvalidProtocolBufferException;
+
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 
 /**
  * Combines edge metadata from different values.

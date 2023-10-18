@@ -1,16 +1,18 @@
 package datawave.iterators;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
-import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
-import org.apache.accumulo.core.data.Value;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.accumulo.core.data.Value;
+import org.junit.jupiter.api.Test;
+
+import com.google.protobuf.InvalidProtocolBufferException;
+
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
+import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 
 public class EdgeMetadataCombinerTest {
     

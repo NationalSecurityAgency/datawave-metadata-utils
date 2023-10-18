@@ -1,9 +1,10 @@
 package datawave.iterators.filter;
 
-import datawave.util.StringUtils;
-import org.apache.accumulo.core.iterators.WrappingIterator;
 import org.apache.accumulo.core.data.Key;
+import org.apache.accumulo.core.iterators.WrappingIterator;
 import org.apache.hadoop.io.Text;
+
+import datawave.util.StringUtils;
 
 /**
  * Removes the optional attributes, "attribute2" and "attribute3" fields, from the edge entries in the metadata table. Should be used only at scan time in

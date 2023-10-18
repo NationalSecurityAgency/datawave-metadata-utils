@@ -1,15 +1,16 @@
 package datawave.util;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+
 import io.protostuff.Input;
 import io.protostuff.Output;
 import io.protostuff.ProtostuffException;
 import io.protostuff.Schema;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 
 /**
  * This schema can be used by the protostuff api to serialize/deserialize a String Multimap
