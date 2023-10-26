@@ -43,6 +43,7 @@ import org.apache.accumulo.core.iterators.user.SummingCombiner;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.commons.lang.time.DateUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.slf4j.Logger;
@@ -71,6 +72,7 @@ import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.model.Direction;
+import datawave.query.model.FieldIndexHole;
 import datawave.query.model.FieldMapping;
 import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
@@ -1413,6 +1415,24 @@ public class MetadataHelper {
         }
         
         return date;
+    }
+    
+    /**
+     * Return the field index holes calculated between all "i" and "f" entries.
+     * 
+     * @return the field index holes
+     */
+    public Map<Pair<String,String>,FieldIndexHole> getFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+        return allFieldMetadataHelper.getFieldIndexHoles();
+    }
+    
+    /**
+     * Return the field index holes calculated between all "ri" and "f" entries.
+     * 
+     * @return the field index holes
+     */
+    public Map<Pair<String,String>,FieldIndexHole> getReversedFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+        return allFieldMetadataHelper.getReversedFieldIndexHoles();
     }
     
     /**
