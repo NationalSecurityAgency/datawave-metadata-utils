@@ -45,12 +45,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
-import com.tdunning.math.stats.Sort;
 
 import datawave.data.ColumnFamilyConstants;
 import datawave.data.type.Type;
@@ -1059,29 +1059,31 @@ public class AllFieldMetadataHelper {
     }
     
     /**
-     * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all indexed entries.
+     * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all indexed entries. The map consists of
+     * field names to datatypes to field index holes.
      * 
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<Pair<String,String>,FieldIndexHole> getFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_I);
     }
     
     /**
-     * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all reversed indexed entries.
+     * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all reversed indexed entries. The map
+     * consists of field names to datatypes to field index holes.
      * 
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getReversedFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<Pair<String,String>,FieldIndexHole> getReversedFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI);
     }
     
     /**
      * Supplies field index hole for {@link #getFieldIndexHoles()} and {@link #getReversedFieldIndexHoles()}.
      */
-    private Map<Pair<String,String>,FieldIndexHole> getFieldIndexHoles(Text indexColumnFamily) throws TableNotFoundException {
+    private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text indexColumnFamily) throws TableNotFoundException {
         log.debug("cache fault for getFieldIndexHoles(" + this.auths + "," + this.metadataTableName + ")");
         
         Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
@@ -1093,10 +1095,10 @@ public class AllFieldMetadataHelper {
         // For all keys in the DatawaveMetadata table.
         bs.setRange(new Range());
         
-        // We must first scan over all fieldName-datatype combinations and extract the date ranges in which we've seen them. Each date range represents a span
-        // of time when we saw an event for each day in that date range, from the start to end (inclusive).
-        Map<Pair<String,String>,SortedSet<Pair<Date,Date>>> frequencyMap = new HashMap<>();
-        Map<Pair<String,String>,SortedSet<Pair<Date,Date>>> indexMap = new HashMap<>();
+        // We must first scan over the fieldName-datatype combinations and extract the date ranges in which we've seen them. Each date range represents a span
+        // of time when we saw an event for each day in that date range, from the start (inclusive) to end (inclusive).
+        Map<String,SortedSet<Pair<Date,Date>>> frequencyMap = new HashMap<>();
+        Map<String,SortedSet<Pair<Date,Date>>> indexMap = new HashMap<>();
         Calendar calendar = Calendar.getInstance();
         
         String prevFieldName = null;
@@ -1104,8 +1106,12 @@ public class AllFieldMetadataHelper {
         Date prevDate = null;
         Date startDate = null;
         Text prevColumnFamily = null;
-        // Points to the target map object that we add date ranges to. This changes when we see a different column family compared to the previous row.
-        Map<Pair<String,String>,SortedSet<Pair<Date,Date>>> dateMap = frequencyMap;
+        
+        // Points to the target map object that we add date ranges to. This changes when we see a different column family compared to the previous row. We must
+        // initially start adding entries to the frequency map.
+        Map<String,SortedSet<Pair<Date,Date>>> dateMap = frequencyMap;
+        
+        Map<String,Multimap<String,Pair<Date,Date>>> fieldIndexHoles = new HashMap<>();
         
         // Scan each row and extract the date ranges.
         for (Entry<Key,Value> entry : bs) {
@@ -1129,85 +1135,130 @@ public class AllFieldMetadataHelper {
                 continue;
             }
             
-            // If the column family is different, record the last date range, and begin collecting date ranges for the next batch of related rows.
+            // If the column family is different, determine record the last date range, and begin collecting date ranges for the next batch of related rows.
             if (!prevColumnFamily.equals(columnFamily)) {
-                // We've encountered a new fieldName-datatype combination. Add the latest date range seen for the previous fieldName-datatype combination.
+                // Add the latest date range seen for the previous fieldName-datatype combination.
                 Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
-                SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(Pair.of(prevFieldName, prevDatatype), (k) -> new TreeSet<>());
+                SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(prevDatatype, (k) -> new TreeSet<>());
                 dates.add(dateRange);
                 
+                // The column family is "f". We have collected the date ranges for all datatypes for the previous field name. Get the field index holes for the
+                // previously collected data.
+                if (columnFamily.equals(ColumnFamilyConstants.COLF_F)) {
+                    Multimap<String,Pair<Date,Date>> datatypeHoles = getFieldIndexHoles(frequencyMap, indexMap);
+                    fieldIndexHoles.put(prevFieldName, datatypeHoles);
+                    // Clear the date range maps.
+                    frequencyMap.clear();
+                    indexMap.clear();
+                    // Set the target date map to the frequency map.
+                    dateMap = frequencyMap;
+                } else {
+                    // The current column family is the target index. Add the latest date range seen for the previous datatype.
+                    dateMap = indexMap;
+                }
                 // Update our tracking variables.
                 prevFieldName = fieldName;
                 prevDatatype = datatype;
                 startDate = date;
-                prevDate = date;
-                
-                // Change which map dateMap points to based on the column family.
-                if (key.getColumnFamily().equals(ColumnFamilyConstants.COLF_F)) {
-                    dateMap = frequencyMap;
-                } else {
-                    dateMap = indexMap;
-                }
             } else {
-                // We're on the same fieldName-datatype combination as the previous entry. Compare the dates and determine if we need to start a new date range.
-                if (fieldName.equals(prevFieldName) && datatype.equals(prevDatatype)) {
-                    calendar.setTime(prevDate);
-                    calendar.add(Calendar.DATE, 1);
-                    // If the current date is one day after the previous date, it falls within the current date range. Update our tracking variables and
-                    // continue.
-                    if (!calendar.getTime().equals(date)) {
-                        // The current date should not be included in the current date range. Add the current date range, and start a new one.
-                        Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
-                        SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(Pair.of(prevFieldName, prevDatatype), (k) -> new TreeSet<>());
-                        dates.add(dateRange);
-                        
-                        // Update our tracking variables.
-                        startDate = date;
-                    }
-                } else {
-                    // We've encountered a new fieldName-datatype combination. Add the latest date range seen for the previous fieldName-datatype combination.
+                if (!fieldName.equals(prevFieldName)) {
+                    // Add the latest date range seen for the previous fieldName.
                     Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
-                    SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(Pair.of(prevFieldName, prevDatatype), (k) -> new TreeSet<>());
+                    SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(prevDatatype, (k) -> new TreeSet<>());
                     dates.add(dateRange);
                     
+                    // We have encountered a new field name and the previous fieldName-datatype combination did not have any corresponding index row entries.
+                    // Add
+                    // the field index holes for the previous field name.
+                    Multimap<String,Pair<Date,Date>> datatypeHoles = getFieldIndexHoles(frequencyMap, indexMap);
+                    fieldIndexHoles.put(prevFieldName, datatypeHoles);
+                    // Clear the date range maps.
+                    frequencyMap.clear();
+                    indexMap.clear();
                     // Update our tracking variables.
                     prevFieldName = fieldName;
                     prevDatatype = datatype;
                     startDate = date;
+                } else if (datatype.equals(prevDatatype)) {
+                    // We are on the same fieldName-datatype combination as the previous row. Determine if we can add a date-range.
+                    calendar.setTime(prevDate);
+                    calendar.add(Calendar.DATE, 1);
+                    // If the current date is not one day after the previous date, it is not a continuous part of the previously tracked date range. Save the
+                    // previous date range and begin a new one.
+                    if (!calendar.getTime().equals(date)) {
+                        // The current date should not be included in the current date range. Add the current date range, and start a new one.
+                        Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
+                        SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(datatype, (k) -> new TreeSet<>());
+                        dates.add(dateRange);
+                        
+                        // Update the date tracking variables.
+                        startDate = date;
+                    }
+                } else {
+                    // We've encountered a new datatype. Add the latest date range seen for the previous datatype.
+                    Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
+                    SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(prevDatatype, (k) -> new TreeSet<>());
+                    dates.add(dateRange);
+                    
+                    // Update our tracking variables.
+                    prevDatatype = datatype;
+                    startDate = date;
                 }
-                prevDate = date;
             }
+            // Update the previous date and column family.
+            prevDate = date;
             prevColumnFamily = columnFamily;
         }
         
         // After there are no more rows, ensure that we record the last date range for the last fieldName-datatype combination that we saw.
         Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
-        SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(Pair.of(prevFieldName, prevDatatype), (k) -> new TreeSet<>());
+        SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(prevDatatype, (k) -> new TreeSet<>());
         dates.add(dateRange);
         
+        // Get the field index holes for the previous field name.
+        Multimap<String,Pair<Date,Date>> datatypeHoles = getFieldIndexHoles(frequencyMap, indexMap);
+        fieldIndexHoles.put(prevFieldName, datatypeHoles);
+        
+        // Create immutable versions of the field index holes, and do not retain any empty collections.
+        ImmutableMap.Builder<String,Map<String,FieldIndexHole>> fieldMapBuilder = new ImmutableMap.Builder<>();
+        for (String fieldName : fieldIndexHoles.keySet()) {
+            Multimap<String,Pair<Date,Date>> datatypeMap = fieldIndexHoles.get(fieldName);
+            if (!datatypeMap.isEmpty()) {
+                ImmutableMap.Builder<String,FieldIndexHole> datatypeMapBuilder = new ImmutableMap.Builder<>();
+                for (String datatype : datatypeMap.keySet()) {
+                    FieldIndexHole fieldIndexHole = new FieldIndexHole(fieldName, datatype, datatypeMap.get(datatype));
+                    datatypeMapBuilder.put(datatype, fieldIndexHole);
+                }
+                fieldMapBuilder.put(fieldName, datatypeMapBuilder.build());
+            }
+        }
+        
+        // Return the finalized field index holes.
+        return fieldMapBuilder.build();
+    }
+    
+    private Multimap<String,Pair<Date,Date>> getFieldIndexHoles(Map<String,SortedSet<Pair<Date,Date>>> frequencyMap,
+                    Map<String,SortedSet<Pair<Date,Date>>> indexMap) {
         // New tracking variables.
-        Pair<String,String> prevFieldNameAndDataType = null;
+        String prevDataType = null;
         Pair<Date,Date> prevFrequencyDateRange = null;
         Date holeStartDate = null;
-        Map<Pair<String,String>,FieldIndexHole> fieldIndexHoles = new HashMap<>();
+        Multimap<String,Pair<Date,Date>> fieldIndexHoles = HashMultimap.create();
+        Calendar calendar = Calendar.getInstance();
         
-        // Now that we have the date ranges for the frequency and index rows, compare the date ranges for each fieldName-datatype combination to identify any
-        // and all field index holes. Evaluate the date ranges for each fieldName-datatype.
-        for (Pair<String,String> fieldNameAndDatatype : frequencyMap.keySet()) {
-            
-            // If hole start date is not null, we have a hole left over from the previous fieldName-datatype combination. The index hole spans from the hole
+        // Compare the date ranges for each datatype to identify any and all field index holes. Evaluate the date ranges for each datatype.
+        for (String datatype : frequencyMap.keySet()) {
+            // If holeStartDate is not null, we have a hole left over from the previous datatype combination. The index hole spans from the hole
             // start date to the end of the last frequency date range.
             if (holeStartDate != null) {
-                FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(prevFieldNameAndDataType, (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-                indexHole.addDateRange(Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
+                fieldIndexHoles.put(prevDataType, Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
                 holeStartDate = null;
             }
             
             // At least one corresponding index row was seen. Compare the date ranges to identify any index holes.
-            if (indexMap.containsKey(fieldNameAndDatatype)) {
-                SortedSet<Pair<Date,Date>> frequencyDates = frequencyMap.get(fieldNameAndDatatype);
-                
-                Iterator<Pair<Date,Date>> indexDatesIterator = indexMap.get(fieldNameAndDatatype).iterator();
+            if (indexMap.containsKey(datatype)) {
+                SortedSet<Pair<Date,Date>> frequencyDates = frequencyMap.get(datatype);
+                Iterator<Pair<Date,Date>> indexDatesIterator = indexMap.get(datatype).iterator();
                 Pair<Date,Date> prevIndexDateRange = null;
                 boolean comparePrevIndexDateRange = false;
                 // Evaluate each date range we saw for frequency rows for the current fieldName-datatype.
@@ -1225,9 +1276,7 @@ public class AllFieldMetadataHelper {
                         // If holeStartDate is not null, we have an index hole left over from the previous frequency date range. The index hole spans from the
                         // hole start date to the end of the last frequency date range.
                         if (holeStartDate != null) {
-                            FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype,
-                                            (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-                            indexHole.addDateRange(Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
+                            fieldIndexHoles.put(datatype, Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
                             holeStartDate = null;
                         }
                         
@@ -1244,13 +1293,11 @@ public class AllFieldMetadataHelper {
                         } else {
                             // The index start date is after the frequency start date. Check if we have a hole that partially covers the frequency date range,
                             // or all of it.
-                            FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype,
-                                            (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
                             if (indexStartDate.before(frequencyEndDate)) {
                                 // There is an index hole starting on the frequency start date, and ending the day before the index start date.
                                 calendar.setTime(indexStartDate);
                                 calendar.add(Calendar.DATE, -1);
-                                indexHole.addDateRange(Pair.of(frequencyStartDate, calendar.getTime()));
+                                fieldIndexHoles.put(datatype, Pair.of(frequencyStartDate, calendar.getTime()));
                                 
                                 if (indexEndDate.before(frequencyEndDate)) {
                                     // There is an index hole starting the day after the index end date. We must evaluate the next index date range to determine
@@ -1262,7 +1309,7 @@ public class AllFieldMetadataHelper {
                             } else {
                                 // The entire frequency date range is an index hole. Add it as such, and continue to the next frequency date range. We want to
                                 // compare the current index date range to the next frequency date range as well.
-                                indexHole.addDateRange(frequencyDateRange);
+                                fieldIndexHoles.put(datatype, frequencyDateRange);
                                 continue;
                             }
                         }
@@ -1290,19 +1337,16 @@ public class AllFieldMetadataHelper {
                                 holeStartDate = calendar.getTime();
                             }
                         } else if (indexStartDate.before(frequencyEndDate)) {
-                            FieldIndexHole indexHole;
                             calendar.setTime(indexStartDate);
                             calendar.add(Calendar.DATE, -1);
                             if (holeStartDate != null) {
                                 // If holeStartDate is not null, we've previously identified the start of an index hole that is not the start of the frequency
                                 // date range. There is an index hole from holeStartDate to the day before the index start date.
-                                indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype, (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-                                indexHole.addDateRange(Pair.of(holeStartDate, calendar.getTime()));
+                                fieldIndexHoles.put(datatype, Pair.of(holeStartDate, calendar.getTime()));
                                 holeStartDate = null;
                             } else {
                                 // There is an index hole from the frequency start date to the day before the index start date.
-                                indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype, (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-                                indexHole.addDateRange(Pair.of(frequencyStartDate, calendar.getTime()));
+                                fieldIndexHoles.put(datatype, Pair.of(frequencyStartDate, calendar.getTime()));
                             }
                             
                             // It's possible for the current index date range to end before the current frequency date range. If so, this indicates a new index
@@ -1317,17 +1361,15 @@ public class AllFieldMetadataHelper {
                         } else {
                             // The start of the current index date range occurs after the current frequency date range. There is a hole in the current frequency
                             // date range.
-                            FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype,
-                                            (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
                             if (holeStartDate == null) {
                                 // The entire current frequency date range is an index hole. Add it as such and break out to continue to the next frequency
                                 // date range.
-                                indexHole.addDateRange(frequencyDateRange);
+                                fieldIndexHoles.put(datatype, frequencyDateRange);
                                 break;
                             } else {
                                 // There is an index hole from the recorded hole start date to the end of the frequency date range. Add it as such and break
                                 // out to continue to the next frequency date range.
-                                indexHole.addDateRange(Pair.of(holeStartDate, frequencyEndDate));
+                                fieldIndexHoles.put(datatype, Pair.of(holeStartDate, frequencyEndDate));
                                 holeStartDate = null;
                                 // The current index date range is entirely after the current frequency date range. As such, we need to compare the current
                                 // index date range to the next frequency date range.
@@ -1343,18 +1385,16 @@ public class AllFieldMetadataHelper {
                 
             } else {
                 // No corresponding index rows were seen for any of the frequency rows. Each date range represents an index hole.
-                FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(fieldNameAndDatatype, (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-                indexHole.addDateRanges(frequencyMap.get(fieldNameAndDatatype));
+                fieldIndexHoles.putAll(datatype, frequencyMap.get(datatype));
             }
-            // Update the prev fieldName-datatype.
-            prevFieldNameAndDataType = fieldNameAndDatatype;
+            // Update the prev datatype.
+            prevDataType = datatype;
         }
         
         // If we have a non-null hole start date after processing all the date ranges, we have an index hole that ends at the last frequency date range seen
         // for the last fieldName-datatype combination.
         if (holeStartDate != null) {
-            FieldIndexHole indexHole = fieldIndexHoles.computeIfAbsent(prevFieldNameAndDataType, (k) -> new FieldIndexHole(k.getLeft(), k.getRight()));
-            indexHole.addDateRange(Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
+            fieldIndexHoles.put(prevDataType, Pair.of(holeStartDate, prevFrequencyDateRange.getRight()));
         }
         
         return fieldIndexHoles;

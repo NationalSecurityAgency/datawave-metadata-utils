@@ -1,13 +1,16 @@
 package datawave.query.model;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Objects;
 import java.util.SortedSet;
 import java.util.StringJoiner;
-import java.util.TreeSet;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+
+import com.google.common.collect.ImmutableSortedSet;
 
 /**
  * This class represents a set of calculated field index holes for a given fieldName and datatype. A field index hole is effectively a date where a frequency
@@ -17,11 +20,15 @@ public class FieldIndexHole {
     
     private final String fieldName;
     private final String datatype;
-    private final SortedSet<Pair<Date,Date>> dateRanges = new TreeSet<>();
+    private final SortedSet<Pair<Date,Date>> dateRanges;
     
-    public FieldIndexHole(String fieldName, String dataType) {
+    public FieldIndexHole(String fieldName, String dataType, Collection<Pair<Date,Date>> holes) {
         this.fieldName = fieldName;
         this.datatype = dataType;
+        // Ensure the date range set is immutable.
+        ImmutableSortedSet.Builder<Pair<Date,Date>> builder = new ImmutableSortedSet.Builder<>(Comparator.naturalOrder());
+        holes.forEach(p -> builder.add(new ImmutablePair<>(p.getLeft(), p.getRight())));
+        dateRanges = builder.build();
     }
     
     /**
@@ -50,26 +57,6 @@ public class FieldIndexHole {
      */
     public SortedSet<Pair<Date,Date>> getDateRanges() {
         return dateRanges;
-    }
-    
-    /**
-     * Add a collection of field index hole date ranges to this {@link FieldIndexHole}.
-     * 
-     * @param dateRanges
-     *            the date ranges
-     */
-    public void addDateRanges(Collection<Pair<Date,Date>> dateRanges) {
-        this.dateRanges.addAll(dateRanges);
-    }
-    
-    /**
-     * Add a field index hole date range to this {@link FieldIndexHole}.
-     * 
-     * @param dateRange
-     *            the date range
-     */
-    public void addDateRange(Pair<Date,Date> dateRange) {
-        this.dateRanges.add(dateRange);
     }
     
     @Override
