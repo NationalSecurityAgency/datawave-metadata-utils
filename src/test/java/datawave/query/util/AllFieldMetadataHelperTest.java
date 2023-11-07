@@ -11,6 +11,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -55,7 +56,7 @@ class AllFieldMetadataHelperTest {
     
     @BeforeAll
     static void beforeAll() throws URISyntaxException {
-        File dir = new File(ClassLoader.getSystemClassLoader().getResource(".").toURI());
+        File dir = new File(Objects.requireNonNull(ClassLoader.getSystemClassLoader().getResource(".")).toURI());
         File targetDir = dir.getParentFile();
         System.setProperty("hadoop.home.dir", targetDir.getAbsolutePath());
     }
@@ -101,7 +102,6 @@ class AllFieldMetadataHelperTest {
     /**
      * Tests for {@link AllFieldMetadataHelper#getFieldIndexHoles()}.
      */
-    @SuppressWarnings("unchecked")
     @Nested
     public class FieldIndexHoleTests {
         

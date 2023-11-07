@@ -1135,7 +1135,11 @@ public class AllFieldMetadataHelper {
                 continue;
             }
             
-            // If the column family is different, determine record the last date range, and begin collecting date ranges for the next batch of related rows.
+            // The column family is different. We have two possible scenarios:
+            // - The previous column family was 'f'. The current row is an index row for to the current field.
+            // - The previous column family was the target index column family. The current row is an 'f' row for a new field.
+            //
+            // In both cases, record the last date range, and begin collecting date ranges for the next batch of related rows.
             if (!prevColumnFamily.equals(columnFamily)) {
                 // Add the latest date range seen for the previous fieldName-datatype combination.
                 Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
@@ -1161,15 +1165,18 @@ public class AllFieldMetadataHelper {
                 prevDatatype = datatype;
                 startDate = date;
             } else {
+                // The column family is the same. We have three possible scenarios:
+                // - A row with a field that is different to the previous field.
+                // - A row with the same field and datatype.
+                // - A row with the same field, but a different datatype.
+                //
+                // We have encountered a new field name and the previous fieldName-datatype combination did not have any corresponding index row entries.
                 if (!fieldName.equals(prevFieldName)) {
                     // Add the latest date range seen for the previous fieldName.
                     Pair<Date,Date> dateRange = Pair.of(startDate, prevDate);
                     SortedSet<Pair<Date,Date>> dates = dateMap.computeIfAbsent(prevDatatype, (k) -> new TreeSet<>());
                     dates.add(dateRange);
-                    
-                    // We have encountered a new field name and the previous fieldName-datatype combination did not have any corresponding index row entries.
-                    // Add
-                    // the field index holes for the previous field name.
+                    // Add the field index holes for the previous field name.
                     Multimap<String,Pair<Date,Date>> datatypeHoles = getFieldIndexHoles(frequencyMap, indexMap);
                     fieldIndexHoles.put(prevFieldName, datatypeHoles);
                     // Clear the date range maps.
