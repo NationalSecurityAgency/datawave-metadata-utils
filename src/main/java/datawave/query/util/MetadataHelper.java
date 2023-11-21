@@ -71,6 +71,7 @@ import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.model.Direction;
+import datawave.query.model.FieldIndexHole;
 import datawave.query.model.FieldMapping;
 import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
@@ -1413,6 +1414,24 @@ public class MetadataHelper {
         }
         
         return date;
+    }
+    
+    /**
+     * Return the field index holes calculated between all "i" and "f" entries. The map consists of field names to datatypes to field index holes.
+     *
+     * @return the field index holes
+     */
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+        return allFieldMetadataHelper.getFieldIndexHoles();
+    }
+    
+    /**
+     * Return the field index holes calculated between all "ri" and "f" entries. The map consists of field names to datatypes to field index holes.
+     *
+     * @return the field index holes
+     */
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
+        return allFieldMetadataHelper.getReversedFieldIndexHoles();
     }
     
     /**
