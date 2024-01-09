@@ -1419,19 +1419,23 @@ public class MetadataHelper {
     /**
      * Return the field index holes calculated between all "i" and "f" entries. The map consists of field names to datatypes to field index holes.
      *
+     * @param minThreshold
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
-        return allFieldMetadataHelper.getFieldIndexHoles();
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+        return allFieldMetadataHelper.getFieldIndexHoles(minThreshold);
     }
     
     /**
      * Return the field index holes calculated between all "ri" and "f" entries. The map consists of field names to datatypes to field index holes.
      *
+     * @param minThreshold
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles() throws TableNotFoundException, CharacterCodingException {
-        return allFieldMetadataHelper.getReversedFieldIndexHoles();
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+        return allFieldMetadataHelper.getReversedFieldIndexHoles(minThreshold);
     }
     
     /**
