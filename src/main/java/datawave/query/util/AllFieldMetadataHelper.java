@@ -1061,11 +1061,12 @@ public class AllFieldMetadataHelper {
      * field names to datatypes to field index holes.
      *
      * @param minThreshold
-     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, this should be a value in the
+     *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_I, minThreshold);
     }
     
@@ -1074,22 +1075,23 @@ public class AllFieldMetadataHelper {
      * consists of field names to datatypes to field index holes.
      *
      * @param minThreshold
-     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, this should be a value in the
+     *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getReversedFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI, minThreshold);
     }
     
-    private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, int minThreshold) throws TableNotFoundException, IOException {
+    private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, double minThreshold) throws TableNotFoundException, IOException {
         log.debug("cache fault for getFieldIndexHoles(" + this.auths + "," + this.metadataTableName + ")");
         
         // Ensure the minThreshold is a percentage in the range 0%-100%.
-        if (minThreshold > 100) {
-            minThreshold = 100;
-        } else if (minThreshold < 0) {
-            minThreshold = 0;
+        if (minThreshold > 1.0d) {
+            minThreshold = 1.0d;
+        } else if (minThreshold < 0.0d) {
+            minThreshold = 0.0d;
         }
         
         Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
@@ -1111,7 +1113,7 @@ public class AllFieldMetadataHelper {
     private static class FieldIndexHoleFinder {
         
         private final Scanner scanner;
-        private final long minThreshold;
+        private final double minThreshold;
         
         // Contains datatypes to dates and counts for entries seen in "f" rows for the current field name.
         private final Map<String,SortedMap<Date,Long>> frequencyMap = new HashMap<>();
@@ -1126,14 +1128,9 @@ public class AllFieldMetadataHelper {
         // Map of field names to maps of datatypes to date ranges encompassing field index holes.
         Map<String,Multimap<String,Pair<Date,Date>>> fieldIndexHoles = new HashMap<>();
         
-        FieldIndexHoleFinder(Scanner scanner, int minThreshold) {
+        FieldIndexHoleFinder(Scanner scanner, double minThreshold) {
             this.scanner = scanner;
-            // Ensure the minThreshold is a percentage that falls within the range 0-100.
-            if (minThreshold > 100) {
-                this.minThreshold = 100;
-            } else {
-                this.minThreshold = Math.max(minThreshold, 0);
-            }
+            this.minThreshold = minThreshold;
         }
         
         /**
@@ -1336,7 +1333,8 @@ public class AllFieldMetadataHelper {
             if (indexCount >= frequencyCount) {
                 return true;
             }
-            long percentage = Math.floorDiv(indexCount, frequencyCount);
+            
+            double percentage = indexCount.doubleValue() / frequencyCount;
             return percentage >= minThreshold;
         }
         

@@ -1423,7 +1423,7 @@ public class MetadataHelper {
      *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getFieldIndexHoles(minThreshold);
     }
     
@@ -1434,7 +1434,7 @@ public class MetadataHelper {
      *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(int minThreshold) throws TableNotFoundException, IOException {
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getReversedFieldIndexHoles(minThreshold);
     }
     
