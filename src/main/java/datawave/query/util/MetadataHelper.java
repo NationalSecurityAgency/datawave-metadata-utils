@@ -1418,24 +1418,36 @@ public class MetadataHelper {
     
     /**
      * Return the field index holes calculated between all "i" and "f" entries. The map consists of field names to datatypes to field index holes.
-     *
+     * 
+     * @param fields
+     *            the fields to fetch field index holes for, an empty set will result in all fields being fetched
+     * @param datatypes
+     *            the datatypes to fetch field index holes for, an empty set will result in all datatypes being fetched
      * @param minThreshold
-     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, expected to be a value between
+     *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
-        return allFieldMetadataHelper.getFieldIndexHoles(minThreshold);
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+                    throws TableNotFoundException, IOException {
+        return allFieldMetadataHelper.getFieldIndexHoles(fields, datatypes, minThreshold);
     }
     
     /**
      * Return the field index holes calculated between all "ri" and "f" entries. The map consists of field names to datatypes to field index holes.
-     *
+     * 
+     * @param fields
+     *            the fields to fetch field index holes for, an empty set will result in all fields being fetched
+     * @param datatypes
+     *            the datatypes to fetch field index holes for, an empty set will result in all datatypes being fetched
      * @param minThreshold
-     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date
+     *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, expected to be a value between
+     *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
-        return allFieldMetadataHelper.getReversedFieldIndexHoles(minThreshold);
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+                    throws TableNotFoundException, IOException {
+        return allFieldMetadataHelper.getReversedFieldIndexHoles(fields, datatypes, minThreshold);
     }
     
     /**

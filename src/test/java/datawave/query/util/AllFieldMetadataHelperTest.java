@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,7 +51,6 @@ class AllFieldMetadataHelperTest {
     private static final String TABLE_METADATA = "metadata";
     private static final String[] AUTHS = {"FOO"};
     private static final String NULL_BYTE = "\0";
-    private static final Value NULL_VALUE = new Value(new byte[0]);
     private AccumuloClient accumuloClient;
     private AllFieldMetadataHelper helper;
     
@@ -100,16 +100,19 @@ class AllFieldMetadataHelperTest {
     }
     
     /**
-     * Tests for {@link AllFieldMetadataHelper#getFieldIndexHoles(int)} and {@link AllFieldMetadataHelper#getReversedFieldIndexHoles(int)}.
+     * Tests for {@link AllFieldMetadataHelper#getFieldIndexHoles(Set, Set, double)} and
+     * {@link AllFieldMetadataHelper#getReversedFieldIndexHoles(Set, Set, double)}.
      */
     @Nested
     public class FieldIndexHoleDateGapsTests {
         
-        private int minimumThreshold = 100;
+        private Set<String> fields = new HashSet<>();
+        private Set<String> datatypes = new HashSet<>();
+        private double minimumThreshold = 1.0d;
         
         protected final Supplier<Map<String,Map<String,FieldIndexHole>>> INDEX_FUNCTION = () -> {
             try {
-                return helper.getFieldIndexHoles(minimumThreshold);
+                return helper.getFieldIndexHoles(fields, datatypes, minimumThreshold);
             } catch (TableNotFoundException | IOException e) {
                 throw new RuntimeException(e);
             }
@@ -117,7 +120,7 @@ class AllFieldMetadataHelperTest {
         
         protected final Supplier<Map<String,Map<String,FieldIndexHole>>> REVERSED_INDEX_FUNCTION = () -> {
             try {
-                return helper.getReversedFieldIndexHoles(minimumThreshold);
+                return helper.getReversedFieldIndexHoles(fields, datatypes, minimumThreshold);
             } catch (TableNotFoundException | IOException e) {
                 throw new RuntimeException(e);
             }
@@ -125,6 +128,13 @@ class AllFieldMetadataHelperTest {
         
         protected Supplier<Map<String,Map<String,FieldIndexHole>>> getIndexHoleFunction(String cf) {
             return cf.equals("i") ? INDEX_FUNCTION : REVERSED_INDEX_FUNCTION;
+        }
+        
+        @AfterEach
+        void tearDown() {
+            fields.clear();
+            datatypes.clear();
+            givenMinimumThreshold(1.0d);
         }
         
         /**
@@ -665,6 +675,301 @@ class AllFieldMetadataHelperTest {
                                             dateRange("20200316", "20200316")));
             // @formatter:on
             Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        /**
+         * Test specifying a minimum percentage threshold other than the default of 1.0.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testMinimumThresholdPercentageBelow100(String cf) {
+            givenMinimumThreshold(0.75); // Index count must meet 75% of frequency count to not be considered field index hole.
+            
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200105", 100L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200101", "20200102", 75L); // Meets 75% threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200104", 100L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200105", "20200105", 74L); // Will not meet threshold.
+            // Index holes for NAME-csv on 20200110 and 20200113.
+            mutationCreator.addFrequencyMutations("NAME", "csv", "20200110", "20200115", 100L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200110", "20200110", 74L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200111", "20200112", 75L); // Meets 75% threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200114", "20200115", 100L);
+            // Index hole for EVENT_DATE-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "wiki", "20200120", "20200125", 100L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200120", "20200121", 98L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200122", "20200122", 74L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200123", "20200125", 75L); // Meets 75% threshold.
+            // Index holes for URI-maze on 20200221, 20200303, and 20200316.
+            mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 100L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200220", 100L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200221", "20200221", 74L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200222", "20200302", 90L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200304", "20200315", 75L); // Meets 75% threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200316", "20200316", 74L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 99L);
+            writeMutations(mutationCreator.getMutations());
+            
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:off
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(
+                            createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
+                            createFieldIndexHole("NAME", "csv", dateRange("20200110", "20200110"), dateRange("20200113", "20200113")),
+                            createFieldIndexHole("EVENT_DATE", "wiki", dateRange("20200122", "20200122")),
+                            createFieldIndexHole("URI", "maze", dateRange("20200221", "20200221"), dateRange("20200303", "20200303"),
+                                            dateRange("20200316", "20200316")));
+            // @formatter:on
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        /**
+         * Test specifying one field to filter on.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testOneFieldSpecified(String cf) {
+            // Retrieve field index holes for field NAME.
+            givenFields("NAME");
+            
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for NAME-csv on 20200110 and 20200113.
+            mutationCreator.addFrequencyMutations("NAME", "csv", "20200110", "20200115", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200110", "20200110", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200111", "20200112", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200114", "20200115", 5L);
+            // Index hole for EVENT_DATE-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "wiki", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200123", "20200125", 5L);
+            // Index holes for URI-maze on 20200221, 20200303, and 20200316.
+            mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200220", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200221", "20200221", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200222", "20200302", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200304", "20200315", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200316", "20200316", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
+            writeMutations(mutationCreator.getMutations());
+            
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:off
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(
+                            createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
+                            createFieldIndexHole("NAME", "csv", dateRange("20200110", "20200110"), dateRange("20200113", "20200113")));
+            // @formatter:on
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        /**
+         * Test specifying multiple fields to filter on.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testMultipleFieldsSpecified(String cf) {
+            // Retrieve field index holes for fields URI and EVENT_DATE.
+            givenFields("URI", "EVENT_DATE");
+            
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200103", "20200103", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for ALPHA-csv on 20200110 and 20200113.
+            mutationCreator.addFrequencyMutations("ALPHA", "csv", "20200110", "20200115", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200110", "20200110", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200111", "20200112", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200113", "20200113", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200114", "20200115", 5L);
+            // Index hole for EVENT_DATE-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "wiki", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200123", "20200125", 5L);
+            // Index holes for URI-maze on 20200221, 20200303, and 20200316.
+            mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200220", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200221", "20200221", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200222", "20200302", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200303", "20200303", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200304", "20200315", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200316", "20200316", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
+            // Index hole for ZETA-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("ZETA", "wiki", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "wiki", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "wiki", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ZETA", "wiki", "20200123", "20200125", 5L);
+            writeMutations(mutationCreator.getMutations());
+            
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:off
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(
+                            createFieldIndexHole("EVENT_DATE", "wiki", dateRange("20200122", "20200122")),
+                            createFieldIndexHole("URI", "maze", dateRange("20200221", "20200221"), dateRange("20200303", "20200303"),
+                                            dateRange("20200316", "20200316")));
+            // @formatter:on
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        /**
+         * Test specifying datatypes.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testDatatypesSpecified(String cf) {
+            // Retrieve field index holes for datatypes wiki and csv.
+            givenDatatypes("wiki", "csv");
+            
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200103", "20200103", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "maze", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200103", "20200103", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for ALPHA-csv on 20200110 and 20200113.
+            mutationCreator.addFrequencyMutations("ALPHA", "csv", "20200110", "20200115", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200110", "20200110", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200111", "20200112", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200113", "20200113", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200114", "20200115", 5L);
+            // Index hole for EVENT_DATE-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "wiki", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200123", "20200125", 5L);
+            // Index hole for EVENT_DATE-maze on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "maze", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200123", "20200125", 5L);
+            // Index holes for URI-maze on 20200221, 20200303, and 20200316.
+            mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200220", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200221", "20200221", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200222", "20200302", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200303", "20200303", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200304", "20200315", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200316", "20200316", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
+            // Index hole for ZETA-csv on 20200122.
+            mutationCreator.addFrequencyMutations("ZETA", "csv", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200123", "20200125", 5L);
+            // Index hole for ZETA-imdb on 20200122.
+            mutationCreator.addFrequencyMutations("ZETA", "imdb", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200123", "20200125", 5L);
+            writeMutations(mutationCreator.getMutations());
+            
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:off
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(
+                            createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
+                            createFieldIndexHole("ALPHA", "csv", dateRange("20200110", "20200110"), dateRange("20200113", "20200113")),
+                            createFieldIndexHole("EVENT_DATE", "wiki", dateRange("20200122", "20200122")),
+                            createFieldIndexHole("ZETA", "csv", dateRange("20200122", "20200122")));
+            // @formatter:on
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        /**
+         * Test specifying fields and datatypes.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testFieldsAndDatatypesSpecified(String cf) {
+            // Retrieve field index holes for fields NAME and ZETA.
+            givenFields("NAME", "ZETA");
+            // Retrieve field index holes for datatypes wiki and csv.
+            givenDatatypes("wiki", "csv");
+            
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200103", "20200103", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for NAME-wiki on 20200103 and 20200105.
+            mutationCreator.addFrequencyMutations("NAME", "maze", "20200101", "20200105", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200101", "20200102", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200103", "20200103", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200104", "20200104", 5L);
+            mutationCreator.addIndexMutations(cf, "NAME", "maze", "20200105", "20200105", 1L); // Will not meet threshold.
+            // Index holes for ALPHA-csv on 20200110 and 20200113.
+            mutationCreator.addFrequencyMutations("ALPHA", "csv", "20200110", "20200115", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200110", "20200110", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200111", "20200112", 5L);
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200113", "20200113", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ALPHA", "csv", "20200114", "20200115", 5L);
+            // Index hole for EVENT_DATE-wiki on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "wiki", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "wiki", "20200123", "20200125", 5L);
+            // Index hole for EVENT_DATE-maze on 20200122.
+            mutationCreator.addFrequencyMutations("EVENT_DATE", "maze", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "EVENT_DATE", "maze", "20200123", "20200125", 5L);
+            // Index holes for URI-maze on 20200221, 20200303, and 20200316.
+            mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200220", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200221", "20200221", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200222", "20200302", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200303", "20200303", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200304", "20200315", 5L);
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200316", "20200316", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
+            // Index hole for ZETA-csv on 20200122.
+            mutationCreator.addFrequencyMutations("ZETA", "csv", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200123", "20200125", 5L);
+            // Index hole for ZETA-imdb on 20200122.
+            mutationCreator.addFrequencyMutations("ZETA", "imdb", "20200120", "20200125", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200120", "20200121", 5L);
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200122", "20200122", 1L); // Will not meet threshold.
+            mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200123", "20200125", 5L);
+            writeMutations(mutationCreator.getMutations());
+            
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:off
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(
+                            createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
+                            createFieldIndexHole("ZETA", "csv", dateRange("20200122", "20200122")));
+            // @formatter:on
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+        
+        private void givenFields(String... fields) {
+            this.fields = Sets.newHashSet(fields);
+        }
+        
+        private void givenDatatypes(String... datatypes) {
+            this.datatypes = Sets.newHashSet(datatypes);
+        }
+        
+        private void givenMinimumThreshold(double minimumThreshold) {
+            this.minimumThreshold = minimumThreshold;
         }
         
         protected Map<String,Map<String,FieldIndexHole>> createFieldIndexHoleMap(FieldIndexHole... holes) {

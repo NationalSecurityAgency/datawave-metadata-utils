@@ -17,7 +17,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.accumulo.core.client.AccumuloClient;
@@ -1059,32 +1061,43 @@ public class AllFieldMetadataHelper {
     /**
      * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all indexed entries. The map consists of
      * field names to datatypes to field index holes.
-     *
+     * 
+     * @param fields
+     *            the fields to fetch field index holes for, an empty set will result in all fields being fetched
+     * @param datatypes
+     *            the datatypes to fetch field index holes for, an empty set will result in all datatypes being fetched
      * @param minThreshold
      *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, this should be a value in the
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
-        return getFieldIndexHoles(ColumnFamilyConstants.COLF_I, minThreshold);
+    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+                    throws TableNotFoundException, IOException {
+        return getFieldIndexHoles(ColumnFamilyConstants.COLF_I, fields, datatypes, minThreshold);
     }
     
     /**
      * Fetches results from {@link #metadataTableName} and calculates the set of field index holes that exists for all reversed indexed entries. The map
      * consists of field names to datatypes to field index holes.
-     *
+     * 
+     * @param fields
+     *            the fields to fetch field index holes for, an empty set will result in all fields being fetched
+     * @param datatypes
+     *            the datatypes to fetch field index holes for, an empty set will result in all datatypes being fetched
      * @param minThreshold
      *            the minimum percentage threshold required for an index row to be considered NOT a hole on a particular date, this should be a value in the
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
     @Cacheable(value = "getReversedFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(double minThreshold) throws TableNotFoundException, IOException {
-        return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI, minThreshold);
+    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+                    throws TableNotFoundException, IOException {
+        return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI, fields, datatypes, minThreshold);
     }
     
-    private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, double minThreshold) throws TableNotFoundException, IOException {
+    private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
+                    throws TableNotFoundException, IOException {
         log.debug("cache fault for getFieldIndexHoles(" + this.auths + "," + this.metadataTableName + ")");
         
         // Ensure the minThreshold is a percentage in the range 0%-100%.
@@ -1100,10 +1113,22 @@ public class AllFieldMetadataHelper {
         bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         bs.fetchColumnFamily(targetColumnFamily);
         
-        // Scan over all keys in the Datawave metadata table.
-        bs.setRange(new Range());
+        // Determine which range to use.
+        Range range;
+        if (fields.isEmpty()) {
+            // If no fields are specified, scan over all entries in the table.
+            range = new Range();
+        } else if (fields.size() == 1) {
+            // If just one field is specified, limit the range to where the row is the field.
+            range = new Range(new Text(fields.iterator().next()));
+        } else {
+            // If more than one field is specified, sort the fields and limit the range from the lowest to highest field (lexicographically).
+            SortedSet<String> sortedFields = new TreeSet<>(fields);
+            range = new Range(new Text(sortedFields.first()), new Text(sortedFields.last()));
+        }
+        bs.setRange(range);
         
-        FieldIndexHoleFinder finder = new FieldIndexHoleFinder(bs, minThreshold);
+        FieldIndexHoleFinder finder = new FieldIndexHoleFinder(bs, minThreshold, fields, datatypes);
         return finder.findHoles();
     }
     
@@ -1114,6 +1139,10 @@ public class AllFieldMetadataHelper {
         
         private final Scanner scanner;
         private final double minThreshold;
+        private final Set<String> fields;
+        private final Set<String> datatypes;
+        private final boolean filterFields;
+        private final boolean filterDatatypes;
         
         // Contains datatypes to dates and counts for entries seen in "f" rows for the current field name.
         private final Map<String,SortedMap<Date,Long>> frequencyMap = new HashMap<>();
@@ -1128,9 +1157,17 @@ public class AllFieldMetadataHelper {
         // Map of field names to maps of datatypes to date ranges encompassing field index holes.
         Map<String,Multimap<String,Pair<Date,Date>>> fieldIndexHoles = new HashMap<>();
         
-        FieldIndexHoleFinder(Scanner scanner, double minThreshold) {
+        FieldIndexHoleFinder(Scanner scanner, double minThreshold, Set<String> fields, Set<String> datatypes) {
             this.scanner = scanner;
             this.minThreshold = minThreshold;
+            this.fields = Collections.unmodifiableSet(fields);
+            this.datatypes = Collections.unmodifiableSet(datatypes);
+            // Actively filter out entries based on the field if we have more than one field specified. If we have an empty set, we are searching for field
+            // index holes for all fields. If we have just one field, the range for the scanner will already be limited to just the field.
+            this.filterFields = fields.size() > 1;
+            // Actively filter out entries based on the datatypes if we have any datatypes specified. If we have an empty set, we are searching for field index
+            // holes for all datatypes.
+            this.filterDatatypes = !datatypes.isEmpty();
         }
         
         /**
@@ -1158,6 +1195,12 @@ public class AllFieldMetadataHelper {
                 String cq = key.getColumnQualifier().toString();
                 int offset = cq.indexOf(NULL_BYTE);
                 currDatatype = cq.substring(0, offset);
+                
+                // Check if the current field and datatype are part of the fields and datatypes we want to retrieve field index holes for.
+                if (!isPartOfTarget(currFieldName, currDatatype)) {
+                    continue;
+                }
+                
                 currDate = DateHelper.parse(cq.substring((offset + 1)));
                 
                 ByteArrayInputStream byteStream = new ByteArrayInputStream(entry.getValue().get());
@@ -1227,6 +1270,13 @@ public class AllFieldMetadataHelper {
             
             // Return the field index holes as an immutable structure.
             return getImmutableFieldIndexHoles();
+        }
+        
+        /**
+         * Return whether the given field and datatype represent a pairing that should be evaluated for field index holes.
+         */
+        private boolean isPartOfTarget(String field, String datatype) {
+            return (!filterFields || fields.contains(field)) && (!filterDatatypes || datatypes.contains(datatype));
         }
         
         /**
