@@ -1100,6 +1100,22 @@ public class AllFieldMetadataHelper {
                     throws TableNotFoundException, IOException {
         log.debug("cache fault for getFieldIndexHoles(" + this.auths + "," + this.metadataTableName + ")");
         
+        // Handle null fields if given.
+        if (fields == null) {
+            fields = Collections.emptySet();
+        } else {
+            // Ensure null is not present as an entry.
+            fields.remove(null);
+        }
+        
+        // Handle null datatypes if given.
+        if (datatypes == null) {
+            datatypes = Collections.emptySet();
+        } else {
+            // Ensure null is not present as an entry.
+            datatypes.remove(null);
+        }
+        
         // Ensure the minThreshold is a percentage in the range 0%-100%.
         if (minThreshold > 1.0d) {
             minThreshold = 1.0d;
