@@ -104,7 +104,7 @@ class AllFieldMetadataHelperTest {
      * {@link AllFieldMetadataHelper#getReversedFieldIndexHoles(Set, Set, double)}.
      */
     @Nested
-    public class FieldIndexHoleDateGapsTests {
+    public class FieldIndexHoleTests {
         
         private Set<String> fields = new HashSet<>();
         private Set<String> datatypes = new HashSet<>();
