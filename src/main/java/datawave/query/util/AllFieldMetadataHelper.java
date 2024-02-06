@@ -1071,7 +1071,6 @@ public class AllFieldMetadataHelper {
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
-    @Cacheable(value = "getFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
     public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_I, fields, datatypes, minThreshold);
@@ -1090,7 +1089,6 @@ public class AllFieldMetadataHelper {
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
-    @Cacheable(value = "getReversedFieldIndexHoles", key = "{#root.target.auths,#root.target.metadataTableName}", cacheManager = "metadataHelperCacheManager")
     public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI, fields, datatypes, minThreshold);
@@ -1098,8 +1096,6 @@ public class AllFieldMetadataHelper {
     
     private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
-        log.debug("cache fault for getFieldIndexHoles(" + this.auths + "," + this.metadataTableName + ")");
-        
         // Handle null fields if given.
         if (fields == null) {
             fields = Collections.emptySet();
