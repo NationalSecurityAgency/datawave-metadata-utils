@@ -482,7 +482,7 @@ public class TypeMetadata implements Serializable {
                     fieldNames.add(entrySplits[0]);
                 }
             }
-        }        
+        }
     }
     
     @Override
