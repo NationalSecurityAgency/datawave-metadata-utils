@@ -59,7 +59,7 @@ public class TypeMetadataTest {
     }
     
     @Test
-    public void testReadNewSerializedFormatMultipleFieldsAndTypes() throws Exception {
+    public void testReadNewSerializedFormatMultipleFieldsAndTypes() {
         String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[0:2,1:0];FIELD2:[0:1,1:2]";
         
         TypeMetadata fromString = new TypeMetadata(newFormat);
@@ -76,7 +76,7 @@ public class TypeMetadataTest {
     }
     
     @Test
-    public void testReadNewSerializedFormatSingleFieldAndType() throws Exception {
+    public void testReadNewSerializedFormatSingleFieldAndType() {
         String newFormat = "dts:[0:ingest1];types:[0:DateType];FIELD1:[0:0]";
         
         TypeMetadata fromString = new TypeMetadata(newFormat);

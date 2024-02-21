@@ -46,7 +46,7 @@ public class TypeMetadata implements Serializable {
         typeMetadata = Maps.newHashMap();
     }
     
-    public TypeMetadata(String in) throws Exception {
+    public TypeMetadata(String in) {
         typeMetadata = Maps.newHashMap();
         this.fromString(in);
     }
@@ -421,7 +421,7 @@ public class TypeMetadata implements Serializable {
         return sb.toString();
     }
     
-    private void fromString(String data) throws Exception {
+    private void fromString(String data) {
         fieldNames = Sets.newHashSet();
         String[] entries = parse(data, ';');
         
@@ -482,10 +482,7 @@ public class TypeMetadata implements Serializable {
                     fieldNames.add(entrySplits[0]);
                 }
             }
-        } else {
-            throw new Exception("Unable to parse string using mini-map format");
-        }
-        
+        }        
     }
     
     @Override
