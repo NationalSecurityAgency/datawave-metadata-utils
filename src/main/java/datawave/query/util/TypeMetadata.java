@@ -1,5 +1,14 @@
 package datawave.query.util;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -15,15 +24,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -46,18 +46,9 @@ public class TypeMetadata implements Serializable {
         typeMetadata = Maps.newHashMap();
     }
     
-    public TypeMetadata(String in) {
+    public TypeMetadata(String in) throws Exception {
         typeMetadata = Maps.newHashMap();
         this.fromString(in);
-    }
-    
-    public TypeMetadata(String in, boolean newFormat) throws Exception {
-        typeMetadata = Maps.newHashMap();
-        if (newFormat) {
-            this.fromNewString(in);
-        } else {
-            this.fromString(in);
-        }
     }
     
     public TypeMetadata(TypeMetadata in) {
@@ -255,7 +246,7 @@ public class TypeMetadata implements Serializable {
         return this.keySet().isEmpty();
     }
     
-    public String toString() {
+    public String toOldString() {
         StringBuilder sb = new StringBuilder();
         
         Set<String> fieldNames = Sets.newHashSet();
@@ -293,7 +284,7 @@ public class TypeMetadata implements Serializable {
         return sb.toString();
     }
     
-    private void fromString(String data) {
+    private void fromOldString(String data) {
         // was:
         // field1:a,b;field2:d,e;field3:y,z
         
@@ -369,7 +360,7 @@ public class TypeMetadata implements Serializable {
         return typeMap;
     }
     
-    public String toNewString() {
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         
         // create and append ingestTypes mini-map
@@ -430,7 +421,7 @@ public class TypeMetadata implements Serializable {
         return sb.toString();
     }
     
-    private void fromNewString(String data) throws Exception {
+    private void fromString(String data) throws Exception {
         fieldNames = Sets.newHashSet();
         String[] entries = parse(data, ';');
         

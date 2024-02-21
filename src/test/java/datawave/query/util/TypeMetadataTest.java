@@ -1,16 +1,15 @@
 package datawave.query.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import com.google.common.collect.Sets;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.Collections;
 import java.util.Set;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.google.common.collect.Sets;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TypeMetadataTest {
     
@@ -63,7 +62,7 @@ public class TypeMetadataTest {
     public void testReadNewSerializedFormatMultipleFieldsAndTypes() throws Exception {
         String newFormat = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[0:2,1:0];FIELD2:[0:1,1:2]";
         
-        TypeMetadata fromString = new TypeMetadata(newFormat, true);
+        TypeMetadata fromString = new TypeMetadata(newFormat);
         
         Set<String> types1 = fromString.getDataTypesForField("FIELD1");
         assertEquals(2, types1.size());
@@ -80,7 +79,7 @@ public class TypeMetadataTest {
     public void testReadNewSerializedFormatSingleFieldAndType() throws Exception {
         String newFormat = "dts:[0:ingest1];types:[0:DateType];FIELD1:[0:0]";
         
-        TypeMetadata fromString = new TypeMetadata(newFormat, true);
+        TypeMetadata fromString = new TypeMetadata(newFormat);
         
         Set<String> types1 = fromString.getDataTypesForField("FIELD1");
         assertEquals(1, types1.size());
@@ -101,13 +100,14 @@ public class TypeMetadataTest {
         typeMetadata.put("FIELD2", "ingest1", "IntegerType");
         typeMetadata.put("FIELD2", "ingest2", "LcType");
         
-        String newString = typeMetadata.toNewString();
+        String newString = typeMetadata.toString();
         
         String expectedString = "dts:[0:ingest1,1:ingest2];types:[0:DateType,1:IntegerType,2:LcType];FIELD1:[0:2,1:0];FIELD2:[0:1,1:2]";
         
         assertEquals(expectedString, newString);
     }
     
+    @Test
     public void testReduceEmptyTypeMetadata() {
         TypeMetadata reduced = typeMetadata.reduce(Collections.emptySet());
         assertTrue(reduced.typeMetadata.isEmpty());
