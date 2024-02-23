@@ -1,5 +1,14 @@
 package datawave.query.util;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -15,15 +24,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -437,6 +437,7 @@ public class TypeMetadata implements Serializable {
     
     private void readObject(ObjectInputStream in) throws Exception {
         this.ingestTypes = Sets.newTreeSet();
+        this.fieldNames = Sets.newTreeSet();
         this.typeMetadata = Maps.newHashMap();
         this.fromString((String) in.readObject());
     }
