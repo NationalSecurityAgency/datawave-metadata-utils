@@ -1,14 +1,5 @@
 package datawave.query.util;
 
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -22,8 +13,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -237,7 +238,7 @@ public class TypeMetadata implements Serializable {
         }
         
         TypeMetadata typeMetadata = new TypeMetadata();
-        typeMetadata.ingestTypes = datatypeFilter;
+        typeMetadata.ingestTypes.addAll(datatypeFilter);
         typeMetadata.typeMetadata.putAll(localMap);
         return typeMetadata;
     }
@@ -350,7 +351,7 @@ public class TypeMetadata implements Serializable {
         String types = typeEntry.split(":\\[")[1];
         String typeEntries = types.substring(0, types.length() - 1);
         
-        Map<String,Integer> typeMap = new HashMap<>();
+        Map<String,Integer> typeMap = new TreeMap<>();
         
         for (String entry : typeEntries.split(",")) {
             String[] entryParts = entry.split(":");
@@ -429,6 +430,7 @@ public class TypeMetadata implements Serializable {
             for (String entry : entries) {
                 if (entry.startsWith(INGESTTYPE_PREFIX)) {
                     ingestTypesMiniMap = parseTypes(entry);
+                    ingestTypes.addAll(ingestTypesMiniMap.keySet());
                 } else if (entry.startsWith(DATATYPES_PREFIX)) {
                     dataTypesMiniMap = parseTypes(entry);
                 } else {
@@ -474,7 +476,6 @@ public class TypeMetadata implements Serializable {
                                         .split(dataType), String.class);
                         // @formatter:on
                         
-                        this.ingestTypes.add(ingestType);
                         for (String r : rhs) {
                             mm.put(entrySplits[0], r);
                         }
@@ -513,7 +514,7 @@ public class TypeMetadata implements Serializable {
     }
     
     private void readObject(ObjectInputStream in) throws Exception {
-        this.ingestTypes = Sets.newHashSet();
+        this.ingestTypes = Sets.newTreeSet();
         this.typeMetadata = Maps.newHashMap();
         this.fromString((String) in.readObject());
     }
