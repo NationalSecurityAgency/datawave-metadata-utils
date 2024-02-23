@@ -14,7 +14,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -24,6 +23,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class TypeMetadata implements Serializable {
@@ -48,8 +48,8 @@ public class TypeMetadata implements Serializable {
         this.dataTypesMiniMap = dataTypesMiniMap;
     }
 
-    private Map<String, Integer> ingestTypesMiniMap = new HashMap<>();
-    private Map<String, Integer> dataTypesMiniMap = new HashMap<>();
+    private Map<String, Integer> ingestTypesMiniMap = new ConcurrentHashMap<>();
+    private Map<String, Integer> dataTypesMiniMap = new ConcurrentHashMap<>();
 
     // <ingestType, <fieldName, DataType(s)>>
     protected Map<String, Multimap<String, String>> typeMetadata;
@@ -64,12 +64,12 @@ public class TypeMetadata implements Serializable {
     }
 
     public TypeMetadata(String in) {
-        this.typeMetadata = Maps.newHashMap();
+        this.typeMetadata = Maps.newConcurrentMap();
         this.fromString(in);
     }
 
     public TypeMetadata(TypeMetadata in) {
-        this.typeMetadata = Maps.newHashMap();
+        this.typeMetadata = Maps.newConcurrentMap();
         // make sure we do a deep copy to avoid access issues later
         for (Map.Entry<String, Multimap<String, String>> entry : in.typeMetadata.entrySet()) {
             this.typeMetadata.put(entry.getKey(), HashMultimap.create(entry.getValue()));
@@ -444,9 +444,6 @@ public class TypeMetadata implements Serializable {
                 if (entry.startsWith(INGESTTYPE_PREFIX)) {
                     setIngestTypesMiniMap(parseTypes(entry));
                     ingestTypes.addAll(getIngestTypesMiniMap().keySet());
-                    for (String ingestType : getIngestTypesMiniMap().keySet()) {
-                        this.typeMetadata.putIfAbsent(ingestType, emptyMap);
-                    }
                 } else if (entry.startsWith(DATATYPES_PREFIX)) {
                     setDataTypesMiniMap(parseTypes(entry));
                 } else {
