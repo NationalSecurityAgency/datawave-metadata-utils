@@ -59,16 +59,16 @@ public class TypeMetadata implements Serializable {
     private static final String DATATYPES_PREFIX = "types";
     
     public TypeMetadata() {
-        this.typeMetadata = Maps.newConcurrentMap();
+        typeMetadata = Maps.newHashMap();
     }
     
     public TypeMetadata(String in) {
-        this.typeMetadata = Maps.newConcurrentMap();
+        typeMetadata = Maps.newHashMap();
         this.fromString(in);
     }
     
     public TypeMetadata(TypeMetadata in) {
-        this.typeMetadata = Maps.newConcurrentMap();
+        typeMetadata = Maps.newHashMap();
         // make sure we do a deep copy to avoid access issues later
         for (Map.Entry<String,Multimap<String,String>> entry : in.typeMetadata.entrySet()) {
             this.typeMetadata.put(entry.getKey(), HashMultimap.create(entry.getValue()));
@@ -88,7 +88,7 @@ public class TypeMetadata implements Serializable {
      */
     public TypeMetadata reduce(Set<String> fields) {
         TypeMetadata reduced = new TypeMetadata();
-        for (Entry<String,Multimap<String,String>> entry : this.typeMetadata.entrySet()) {
+        for (Entry<String,Multimap<String,String>> entry : typeMetadata.entrySet()) {
             final String ingestType = entry.getKey();
             for (Entry<String,String> element : entry.getValue().entries()) {
                 final String field = element.getKey();
@@ -262,84 +262,6 @@ public class TypeMetadata implements Serializable {
     
     public boolean isEmpty() {
         return this.keySet().isEmpty();
-    }
-    
-    public String toOldString() {
-        StringBuilder sb = new StringBuilder();
-        
-        Set<String> fieldNames = Sets.newHashSet();
-        for (String ingestType : typeMetadata.keySet()) {
-            fieldNames.addAll(typeMetadata.get(ingestType).keySet());
-        }
-        
-        for (String fieldName : fieldNames) {
-            if (sb.length() > 0) {
-                sb.append(';');
-            }
-            
-            sb.append(fieldName).append(':');
-            sb.append('[');
-            boolean firstField = true;
-            for (String ingestType : typeMetadata.keySet()) {
-                if (!typeMetadata.get(ingestType).containsKey(fieldName))
-                    continue;
-                if (!firstField)
-                    sb.append(';');
-                firstField = false;
-                sb.append(ingestType);
-                sb.append(':');
-                boolean first = true;
-                for (String type : typeMetadata.get(ingestType).get(fieldName)) {
-                    if (!first)
-                        sb.append(',');
-                    sb.append(type);
-                    first = false;
-                }
-            }
-            sb.append(']');
-        }
-        
-        return sb.toString();
-    }
-    
-    private void fromOldString(String data) {
-        // was:
-        // field1:a,b;field2:d,e;field3:y,z
-        
-        // post-fix: String should look like this:
-        // field1:[type1:a,b;type2:b];field2:[type1:a,b;type2:a,c]
-        fieldNames = Sets.newHashSet();
-        String[] entries = parse(data, ';');
-        for (String entry : entries) {
-            String[] entrySplits = parse(entry, ':');
-            if (2 != entrySplits.length) {
-                // Do nothing
-            } else {
-                // entrySplits[1] looks like this:
-                // [type1:a,b;type2:b] - split it on the ';'
-                // get rid of the leading and trailing brackets:
-                entrySplits[1] = entrySplits[1].substring(1, entrySplits[1].length() - 1);
-                String[] values = parse(entrySplits[1], ';');
-                
-                for (String value : values) {
-                    
-                    String[] vs = Iterables.toArray(Splitter.on(':').omitEmptyStrings().trimResults().split(value), String.class);
-                    
-                    Multimap<String,String> mm = typeMetadata.get(vs[0]);
-                    if (null == mm) {
-                        mm = HashMultimap.create();
-                        typeMetadata.put(vs[0], mm);
-                    }
-                    
-                    String[] rhs = Iterables.toArray(Splitter.on(',').omitEmptyStrings().trimResults().split(vs[1]), String.class);
-                    this.ingestTypes.add(vs[0]);
-                    for (String r : rhs) {
-                        mm.put(entrySplits[0], r);
-                    }
-                }
-                fieldNames.add(entrySplits[0]);
-            }
-        }
     }
     
     private static String[] parse(String in, char c) {
