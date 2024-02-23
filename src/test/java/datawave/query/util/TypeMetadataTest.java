@@ -1,14 +1,15 @@
 package datawave.query.util;
 
-import com.google.common.collect.Sets;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
 import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+import com.google.common.collect.Sets;
 
 public class TypeMetadataTest {
     
@@ -109,11 +110,11 @@ public class TypeMetadataTest {
         Set<String> normalizers1 = fromString.getNormalizerNamesForField("CITY");
         assertEquals(1, normalizers1.size());
         assertTrue(normalizers1.contains("datawave.data.type.LcNoDiacriticsType"));
-
+        
         Set<String> types2 = fromString.getDataTypesForField("CITY_STATE");
         assertEquals(1, types2.size());
         assertTrue(types2.contains("generic"));
-
+        
         Set<String> normalizers2 = fromString.getNormalizerNamesForField("CITY_STATE");
         assertEquals(1, normalizers2.size());
         assertTrue(normalizers2.contains("datawave.data.type.LcNoDiacriticsType"));
