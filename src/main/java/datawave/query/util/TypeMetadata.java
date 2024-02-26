@@ -1,5 +1,15 @@
 package datawave.query.util;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -15,15 +25,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -384,29 +385,31 @@ public class TypeMetadata implements Serializable {
                     String[] values = parse(entrySplits[1], ',');
                     
                     for (String aValue : values) {
-                        // @formatter:off
+                        if (!aValue.isEmpty()) { // ignore last entry for trailing comma
+                            // @formatter:off
                         String[] vs = Iterables
                                 .toArray(Splitter.on(':')
                                         .omitEmptyStrings()
                                         .trimResults()
                                         .split(aValue), String.class);
 
-                        String ingestType = getIngestTypesMiniMap()
+                        String ingestType = ImmutableMap.copyOf(getIngestTypesMiniMap())
                                 .entrySet()
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[0])))
                                 .map(Entry::getKey)
                                 .findFirst().get();
 
-                        String dataType = getDataTypesMiniMap()
+                        String dataType = ImmutableMap.copyOf(getDataTypesMiniMap())
                                 .entrySet()
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[1])))
                                 .map(Entry::getKey)
                                 .findFirst().get();
                         // @formatter:on
-                        
-                        this.addTypeMetadata(entrySplits[0], ingestType, dataType);
+                            
+                            this.addTypeMetadata(entrySplits[0], ingestType, dataType);
+                        }
                     }
                     fieldNames.add(entrySplits[0]);
                 }
