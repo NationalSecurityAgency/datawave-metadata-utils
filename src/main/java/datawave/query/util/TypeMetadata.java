@@ -1,14 +1,5 @@
 package datawave.query.util;
 
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -24,6 +15,15 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -47,8 +47,8 @@ public class TypeMetadata implements Serializable {
         this.dataTypesMiniMap = dataTypesMiniMap;
     }
     
-    private Map<String,Integer> ingestTypesMiniMap = new TreeMap<>();
-    private Map<String,Integer> dataTypesMiniMap = new TreeMap<>();
+    private Map<String,Integer> ingestTypesMiniMap;
+    private Map<String,Integer> dataTypesMiniMap;
     
     // <ingestType, <fieldName, DataType(s)>>
     protected Map<String,Multimap<String,String>> typeMetadata;
@@ -60,17 +60,23 @@ public class TypeMetadata implements Serializable {
     
     public TypeMetadata() {
         typeMetadata = Maps.newHashMap();
+        ingestTypesMiniMap = new TreeMap<>();
+        dataTypesMiniMap = new TreeMap<>();
     }
     
     public TypeMetadata(String in) {
         typeMetadata = Maps.newHashMap();
+        ingestTypesMiniMap = new TreeMap<>();
+        dataTypesMiniMap = new TreeMap<>();
         this.fromString(in);
     }
     
     public TypeMetadata(TypeMetadata in) {
         typeMetadata = Maps.newHashMap();
+        ingestTypesMiniMap = new TreeMap<>();
+        dataTypesMiniMap = new TreeMap<>();
         // make sure we do a deep copy to avoid access issues later
-        for (Map.Entry<String,Multimap<String,String>> entry : in.typeMetadata.entrySet()) {
+        for (Entry<String,Multimap<String,String>> entry : in.typeMetadata.entrySet()) {
             this.typeMetadata.put(entry.getKey(), HashMultimap.create(entry.getValue()));
         }
         this.ingestTypes.addAll(in.ingestTypes);
@@ -389,18 +395,18 @@ public class TypeMetadata implements Serializable {
                                 .entrySet()
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[0])))
-                                .map(Map.Entry::getKey)
+                                .map(Entry::getKey)
                                 .findFirst().get();
 
                         String dataType = getDataTypesMiniMap()
                                 .entrySet()
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[1])))
-                                .map(Map.Entry::getKey)
+                                .map(Entry::getKey)
                                 .findFirst().get();
                         // @formatter:on
                         
-                        this.put(entrySplits[0], ingestType, dataType);
+                        this.addTypeMetadata(entrySplits[0], ingestType, dataType);
                     }
                     fieldNames.add(entrySplits[0]);
                 }
