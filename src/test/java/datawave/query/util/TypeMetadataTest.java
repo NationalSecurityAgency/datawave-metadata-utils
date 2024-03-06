@@ -35,6 +35,33 @@ public class TypeMetadataTest {
     }
     
     @Test
+    public void testMultipleDataTypes() {
+        TypeMetadata typeMetadata = new TypeMetadata();
+        typeMetadata.put("FIELD1", "ingestA", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD1", "ingestB", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD1", "ingestC", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD2", "ingestA", "NumberType");
+        typeMetadata.put("FIELD2", "ingestB", "NumberType");
+        typeMetadata.put("FIELD2", "ingestC", "NumberType");
+        typeMetadata.put("FIELD2", "ingestA", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD2", "ingestB", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD2", "ingestC", "LcNoDiacriticsType");
+        
+        assertEquals("dts:[0:ingestA,1:ingestB,2:ingestC];types:[0:LcNoDiacriticsType,1:NumberType];FIELD1:[0:0,1:0,2:0];FIELD2:[0:0,0:1,1:0,1:1,2:0,2:1]",
+                        typeMetadata.toString());
+    }
+    
+    @Test
+    public void testMultipleIngestTypes() {
+        TypeMetadata typeMetadata = new TypeMetadata();
+        typeMetadata.put("FIELD1", "ingestA", "LcNoDiacriticsType");
+        typeMetadata.put("FIELD1", "ingestA", "NumberType");
+        typeMetadata.put("FIELD1", "ingestB", "DateType");
+        
+        assertEquals("dts:[0:ingestA,1:ingestB];types:[0:DateType,1:LcNoDiacriticsType,2:NumberType];FIELD1:[0:1,0:2,1:0]", typeMetadata.toString());
+    }
+    
+    @Test
     public void testGetDataTypes() {
         TypeMetadata typeMetadata = new TypeMetadata();
         typeMetadata.put("FIELD1", "datatypeA", "LcType");

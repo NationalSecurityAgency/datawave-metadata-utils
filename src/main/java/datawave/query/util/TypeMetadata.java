@@ -1,15 +1,5 @@
 package datawave.query.util;
 
-import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -25,6 +15,16 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 public class TypeMetadata implements Serializable {
     
@@ -356,9 +356,12 @@ public class TypeMetadata implements Serializable {
                 if (!typeMetadata.get(ingestType).containsKey(fieldName)) {
                     continue;
                 }
-                for (String dataType : typeMetadata.get(ingestType).get(fieldName)) {
+                Iterator<String> dataTypeIter = typeMetadata.get(ingestType).get(fieldName).iterator();
+                while (dataTypeIter.hasNext()) {
+                    String dataType = dataTypeIter.next();
                     sb.append(getIngestTypesMiniMap().get(ingestType)).append(':');
                     sb.append(getDataTypesMiniMap().get(dataType));
+                    sb.append(dataTypeIter.hasNext() ? "," : "");
                 }
                 sb.append(iIter.hasNext() ? "," : "");
             }
