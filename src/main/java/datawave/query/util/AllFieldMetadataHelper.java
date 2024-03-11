@@ -30,6 +30,7 @@ import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.Range;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.iterators.user.RegExFilter;
+import org.apache.accumulo.core.iterators.user.SummingCombiner;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.io.Text;
@@ -56,7 +57,9 @@ import datawave.data.ColumnFamilyConstants;
 import datawave.data.type.Type;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.composite.CompositeMetadataHelper;
+import datawave.query.model.DateFrequencyMap;
 import datawave.query.model.FieldIndexHole;
+import datawave.query.model.Frequency;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
 import datawave.util.time.DateHelper;
@@ -692,26 +695,35 @@ public class AllFieldMetadataHelper {
         scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
         scanner.setRange(Range.exact(fieldName));
         
+        // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date> (non-aggregated entries).
+        // Filter out any non-aggregated entries that does not have the date in the column qualifier.
         IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-        RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
+        // Allow any entries that do not contain the null byte delimiter, or contain it with the target date directly afterwards.
+        RegExFilter.setRegexs(cqRegex, null, null, "^((?!\u0000).)*$|^(.*\u0000" + date + ")$", null, false);
         scanner.addScanIterator(cqRegex);
         
-        final Text holder = new Text();
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
-        for (Entry<Key,Value> countEntry : scanner) {
-            ByteArrayInputStream bais = new ByteArrayInputStream(countEntry.getValue().get());
-            DataInputStream inputStream = new DataInputStream(bais);
+        for (Entry<Key,Value> entry : scanner) {
+            Text colq = entry.getKey().getColumnQualifier();
+            int nullBytePos = colq.find(NULL_BYTE);
             
-            Long sum = WritableUtils.readVLong(inputStream);
-            
-            countEntry.getKey().getColumnQualifier(holder);
-            int offset = holder.find(NULL_BYTE);
-            
-            Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + countEntry.getKey());
-            
-            String datatype = Text.decode(holder.getBytes(), 0, offset);
-            
-            datatypeToCounts.put(datatype, sum);
+            // If the null byte is not present in the colq, this is an aggregated entry. The colq consists solely of the datatype, and the value is a
+            // DateFrequencyMap.
+            if (nullBytePos == -1) {
+                String datatype = Text.decode(colq.getBytes());
+                DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                // If a count is present for the target date, merge in the sum.
+                if (map.contains(date)) {
+                    long count = map.get(date).getValue();
+                    datatypeToCounts.merge(datatype, count, Long::sum);
+                }
+            } else {
+                // If the null byte is present, this is an entry that hasn't been compacted yet. The colq consists of the datatype and date, and the value is a
+                // long.
+                String datatype = Text.decode(colq.getBytes(), 0, nullBytePos);
+                Long count = SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                datatypeToCounts.merge(datatype, count, Long::sum);
+            }
         }
         
         return datatypeToCounts;
@@ -1187,16 +1199,18 @@ public class AllFieldMetadataHelper {
          * 
          * @return the field index holes
          * @throws IOException
+         *             if an exception occurs when decoding a {@link Value}
          */
-        Map<String,Map<String,FieldIndexHole>> findHoles() throws IOException {
+        private Map<String,Map<String,FieldIndexHole>> findHoles() throws IOException {
             String prevFieldName = null;
             Text prevColumnFamily = null;
             
             String currFieldName;
             String currDatatype;
             Text currColumnFamily;
-            Date currDate;
-            Long currCount;
+            Date currDate = null;
+            Value currentValue;
+            boolean isCurrentAggregated;
             
             for (Map.Entry<Key,Value> entry : scanner) {
                 // Parse the current row.
@@ -1206,24 +1220,31 @@ public class AllFieldMetadataHelper {
                 
                 String cq = key.getColumnQualifier().toString();
                 int offset = cq.indexOf(NULL_BYTE);
-                currDatatype = cq.substring(0, offset);
+                isCurrentAggregated = offset == -1;
+                // If the current entry is an aggregated entry, the colq consists solely of the datatype.
+                if (isCurrentAggregated) {
+                    currDatatype = cq;
+                } else {
+                    // Otherwise, the colq consists of the datatype and a date.
+                    currDatatype = cq.substring(0, offset);
+                    currDate = DateHelper.parse(cq.substring((offset + 1)));
+                }
                 
                 // Check if the current field and datatype are part of the fields and datatypes we want to retrieve field index holes for.
                 if (!isPartOfTarget(currFieldName, currDatatype)) {
                     continue;
                 }
                 
-                currDate = DateHelper.parse(cq.substring((offset + 1)));
-                
-                ByteArrayInputStream byteStream = new ByteArrayInputStream(entry.getValue().get());
-                DataInputStream inputStream = new DataInputStream(byteStream);
-                currCount = WritableUtils.readVLong(inputStream);
+                currentValue = entry.getValue();
                 
                 // If this is the very first entry we've looked at, update our tracking variables, add the current entry to the target map, and continue to the
-                // next
-                // entry.
+                // next entry.
                 if (prevFieldName == null) {
-                    addToTargetMap(currDatatype, currDate, currCount);
+                    if (isCurrentAggregated) {
+                        addToTargetMap(currDatatype, currentValue);
+                    } else {
+                        addToTargetMap(currDatatype, currDate, currentValue);
+                    }
                     
                     prevFieldName = currFieldName;
                     prevColumnFamily = currColumnFamily;
@@ -1237,8 +1258,7 @@ public class AllFieldMetadataHelper {
                 // In both cases, record the last entry, and begin collecting date ranges for the next batch of related rows.
                 if (!prevColumnFamily.equals(currColumnFamily)) {
                     // The column family is "f". We have collected the date ranges for all datatypes for the previous field name. Get the field index holes for
-                    // the
-                    // previously collected data.
+                    // the previously collected data.
                     if (currColumnFamily.equals(ColumnFamilyConstants.COLF_F)) {
                         // Find and add all field index holes for the current frequency and index entries.
                         findFieldIndexHoles(prevFieldName);
@@ -1250,9 +1270,6 @@ public class AllFieldMetadataHelper {
                         // The current column family is the target index column family. Set the target map to the index map.
                         this.targetMap = indexMap;
                     }
-                    
-                    // Add the current entry to the target entry map.
-                    addToTargetMap(currDatatype, currDate, currCount);
                 } else {
                     // The column family is the same. We have two possible scenarios:
                     // - A row with a field that is different to the previous field.
@@ -1264,12 +1281,14 @@ public class AllFieldMetadataHelper {
                         findFieldIndexHoles(prevFieldName);
                         // Clear the entry maps.
                         clearEntryMaps();
-                        // Add the current entry to the target entry map.
-                        addToTargetMap(currDatatype, currDate, currCount);
-                    } else {
-                        // The current row has the same field. Add the current entry to the target map.
-                        addToTargetMap(currDatatype, currDate, currCount);
                     }
+                }
+                
+                // Add the current entry to the target entry map.
+                if (isCurrentAggregated) {
+                    addToTargetMap(currDatatype, currentValue);
+                } else {
+                    addToTargetMap(currDatatype, currDate, currentValue);
                 }
                 
                 // Set the values for our prev entry to the current entry.
@@ -1294,9 +1313,19 @@ public class AllFieldMetadataHelper {
         /**
          * Add the current date and count to the current target map for the current datatype.
          */
-        private void addToTargetMap(String datatype, Date date, Long count) {
+        private void addToTargetMap(String datatype, Date date, Value value) {
+            Long count = SummingCombiner.VAR_LEN_ENCODER.decode(value.get());
             SortedMap<Date,Long> datesToCounts = targetMap.computeIfAbsent(datatype, (k) -> new TreeMap<>());
-            datesToCounts.put(date, count);
+            datesToCounts.merge(date, count, Long::sum);
+        }
+        
+        private void addToTargetMap(String datatype, Value value) throws IOException {
+            DateFrequencyMap map = new DateFrequencyMap(value.get());
+            SortedMap<Date,Long> datesToCounts = targetMap.computeIfAbsent(datatype, (k) -> new TreeMap<>());
+            for (Entry<String,Frequency> entry : map.entrySet()) {
+                Date date = DateHelper.parse(entry.getKey());
+                datesToCounts.merge(date, entry.getValue().getValue(), Long::sum);
+            }
         }
         
         /**

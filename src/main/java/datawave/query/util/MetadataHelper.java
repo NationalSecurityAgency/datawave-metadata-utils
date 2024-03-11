@@ -1,6 +1,7 @@
 package datawave.query.util;
 
 import java.io.ByteArrayInputStream;
+import java.io.Console;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
@@ -43,6 +44,7 @@ import org.apache.accumulo.core.iterators.user.SummingCombiner;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.hadoop.fs.shell.Concat;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.slf4j.Logger;
@@ -70,9 +72,11 @@ import datawave.iterators.EdgeMetadataCombiner;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
+import datawave.query.model.DateFrequencyMap;
 import datawave.query.model.Direction;
 import datawave.query.model.FieldIndexHole;
 import datawave.query.model.FieldMapping;
+import datawave.query.model.Frequency;
 import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
 import datawave.security.util.AuthorizationsMinimizer;
@@ -1099,34 +1103,42 @@ public class MetadataHelper {
     }
     
     /**
-     * Sum all of the frequency counts for a field between a start and end date (inclusive)
+     * Return the sum of all frequency counts for a field between a start and end date (inclusive).
      *
      * @param fieldName
+     *            the field name
      * @param begin
+     *            the start date
      * @param end
-     * @return
+     *            the end date
+     * @return the sum
      * @throws TableNotFoundException
+     *             if the metadata table could not be found
      */
     public long getCardinalityForField(String fieldName, Date begin, Date end) throws TableNotFoundException {
         return getCardinalityForField(fieldName, null, begin, end);
     }
     
     /**
-     * Sum all of the frequency counts for a field in a datatype between a start and end date (inclusive)
+     * Return the sum of all frequency counts for a field in a datatype between a start and end date (inclusive).
      *
      * @param fieldName
+     *            the field name
      * @param datatype
+     *            the datatype
      * @param begin
+     *            the start date
      * @param end
-     * @return
+     *            the end date
+     * @return the sum
      * @throws TableNotFoundException
+     *             if the metadata table could not be found
      */
     public long getCardinalityForField(String fieldName, String datatype, Date begin, Date end) throws TableNotFoundException {
         log.trace("getCardinalityForField from table: " + metadataTableName);
         Text row = new Text(fieldName.toUpperCase());
         
-        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
-        // colfam
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f' column family.
         Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
         
         Key startKey = new Key(row);
@@ -1138,10 +1150,13 @@ public class MetadataHelper {
         for (Entry<Key,Value> entry : bs) {
             Text colq = entry.getKey().getColumnQualifier();
             
+            // Check for the presence of a null byte in the colq. If present, we have a non-aggregated entry with a Long value. If not present, we have an
+            // aggregated entry with a DateFrequencyMap value.
             int index = colq.find(NULL_BYTE);
+            
+            // If a null byte is present in the colq, this is a non-aggregated entry.
             if (index != -1) {
-                // If we were given a non-null datatype
-                // Ensure that we process records only on that type
+                // If a datatype was specified, sum the count only if the current datatype matches.
                 if (null != datatype) {
                     try {
                         String type = Text.decode(colq.getBytes(), 0, index);
@@ -1154,14 +1169,12 @@ public class MetadataHelper {
                     }
                 }
                 
-                // Parse the date to ensure that we want this record
-                String dateStr = "null";
-                Date date;
+                // Parse the date to ensure that we want this record.
+                String dateStr = null;
                 try {
                     dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
-                    date = DateHelper.parse(dateStr);
-                    // Add the provided count if we fall within begin and end,
-                    // inclusive
+                    Date date = DateHelper.parse(dateStr);
+                    // Add the provided count if we fall within begin and end, inclusively.
                     if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
                         count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
                     }
@@ -1172,11 +1185,26 @@ public class MetadataHelper {
                 } catch (DateTimeParseException e) {
                     log.warn("Could not convert date string: " + dateStr);
                 }
+            } else {
+                // If a datatype was specified, sum the counts only if the current datatype matches.
+                if (datatype != null) {
+                    String type = colq.toString();
+                    if (!type.equals(datatype)) {
+                        continue;
+                    }
+                }
+                try {
+                    DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                    // Fetch all entries within the target date range and sum the counts.
+                    long sum = map.subMap(DateHelper.format(begin), DateHelper.format(end)).values().stream().mapToLong(Frequency::getValue).sum();
+                    count += sum;
+                } catch (IOException e) {
+                    log.debug("Could not convert the value to a " + DateFrequencyMap.class.getSimpleName());
+                }
             }
         }
         
         bs.close();
-        
         return count;
     }
     
@@ -1311,11 +1339,14 @@ public class MetadataHelper {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
+            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date> (non-aggregated
+            // entries).
+            // Filter out any non-aggregated entries that does not have the date in the column qualifier.
             IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-            RegExFilter.setRegexs(cqRegex, null, null, ".*\u0000" + date, null, false);
+            // Allow any entries that do not contain the null byte delimiter, or contain it with the target date directly afterwards.
+            RegExFilter.setRegexs(cqRegex, null, null, "^((?!\u0000).)*$|^(.*\u0000" + date + ")$", null, false);
             scanner.addScanIterator(cqRegex);
             
-            final Text holder = new Text();
             for (Entry<Key,Value> entry : scanner) {
                 // if this is the real connector, and wrapped connector is not null, it means
                 // that we didn't get a hit in the cache. So, we will update the cache with the
@@ -1324,19 +1355,27 @@ public class MetadataHelper {
                     writer = updateCache(entry, writer, wrappedClient);
                 }
                 
-                ByteArrayInputStream bais = new ByteArrayInputStream(entry.getValue().get());
-                DataInputStream inputStream = new DataInputStream(bais);
+                Text colq = entry.getKey().getColumnQualifier();
+                int nullBytePos = colq.find(NULL_BYTE);
                 
-                Long sum = WritableUtils.readVLong(inputStream);
-                
-                entry.getKey().getColumnQualifier(holder);
-                int offset = holder.find(NULL_BYTE);
-                
-                Preconditions.checkArgument(-1 != offset, "Could not find nullbyte separator in column qualifier for: " + entry.getKey());
-                
-                String datatype = Text.decode(holder.getBytes(), 0, offset);
-                
-                datatypeToCounts.put(datatype, sum);
+                // If the null byte is not present in the colq, this is an aggregated entry. The colq consists solely of the datatype, and the value is a
+                // DateFrequencyMap.
+                if (nullBytePos == -1) {
+                    String datatype = Text.decode(colq.getBytes());
+                    DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                    // If a count is present for the target date, merge in the sum.
+                    if (map.contains(date)) {
+                        long count = map.get(date).getValue();
+                        datatypeToCounts.merge(datatype, count, Long::sum);
+                    }
+                } else {
+                    // If the null byte is present, this is an entry that hasn't been compacted yet. The colq consists of the datatype and date, and the value
+                    // is a
+                    // long.
+                    String datatype = Text.decode(colq.getBytes(), 0, nullBytePos);
+                    Long count = SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                    datatypeToCounts.merge(datatype, count, Long::sum);
+                }
             }
         } finally {
             if (writer != null) {
@@ -1368,8 +1407,11 @@ public class MetadataHelper {
         return date;
     }
     
-    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataType, AccumuloClient client, WrappedAccumuloClient wrappedClient) {
-        String dateString = null;
+    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataTypeFilter, AccumuloClient client,
+                    WrappedAccumuloClient wrappedClient) {
+        String prevDatatype = null;
+        boolean prevEntryAggregated = false;
+        String earliestDate = null;
         BatchWriter writer = null;
         
         try {
@@ -1377,37 +1419,74 @@ public class MetadataHelper {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
-            // if a type was specified, add a regex filter for it
-            if (dataType != null) {
+            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date>
+            // (non-aggregated entries). Filter out any non-aggregated entries that does not have the date in the column qualifier.
+            if (dataTypeFilter != null) {
                 IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-                RegExFilter.setRegexs(cqRegex, null, null, dataType + "\u0000.*", null, false);
+                // Allow any entries that match the datatype exactly, or contain it with a null byte afterwards..
+                RegExFilter.setRegexs(cqRegex, null, null, "^" + dataTypeFilter + "$|^(" + dataTypeFilter + "\u0000.*" + ")$", null, false);
                 scanner.addScanIterator(cqRegex);
             }
             
             try {
-                final Text holder = new Text();
                 for (Entry<Key,Value> entry : scanner) {
-                    // if this is the real connector, and wrapped connector is not null, it means
-                    // that we didn't get a hit in the cache. So, we will update the cache with the
-                    // entries from the real table
+                    // if this is the real connector, and wrapped connector is not null, it means that we didn't get a hit in the cache. So, we will update the
+                    // cache with the entries from the real table.
                     if (wrappedClient != null && client == wrappedClient.getReal()) {
                         writer = updateCache(entry, writer, wrappedClient);
                     }
                     
-                    entry.getKey().getColumnQualifier(holder);
-                    int startPos = holder.find(NULL_BYTE) + 1;
+                    String colq = entry.getKey().getColumnQualifier().toString();
+                    int nullBytePos = colq.indexOf(NULL_BYTE);
                     
-                    if (0 == startPos) {
-                        log.trace("Could not find nullbyte separator in column qualifier for: " + entry.getKey());
-                    } else if ((holder.getLength() - startPos) <= 0) {
-                        log.trace("Could not find date to parse in column qualifier for: " + entry.getKey());
-                    } else {
-                        try {
-                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
-                            break;
-                        } catch (CharacterCodingException e) {
-                            log.trace("Unable to decode date string for: " + entry.getKey().getColumnQualifier());
+                    // If the null byte is not present in the colq, this is an aggregated entry. The colq consists solely of the datatype, and the value is a
+                    // DateFrequencyMap.
+                    if (nullBytePos == -1) {
+                        // If a datatype filter was not specified, track/update the current datatype.
+                        if (dataTypeFilter == null) {
+                            if (prevDatatype == null || !prevDatatype.equals(colq)) {
+                                prevDatatype = colq;
+                            }
                         }
+                        try {
+                            // The value is a DateFrequencyMap. Fetch the earliest date from it.
+                            DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                            String earliestKey = map.earliestDate();
+                            // If the earliest date has not been set yet, or the previous earliest date value is later than the current date, update it.
+                            if (earliestDate == null || earliestKey.compareTo(earliestDate) < 0) {
+                                earliestDate = earliestKey;
+                            }
+                        } catch (IOException e) {
+                            log.trace("Could not parse DateFrequencyMap from value for " + entry.getKey());
+                        }
+                        // Mark that we saw an aggregated entry last.
+                        prevEntryAggregated = true;
+                    } else {
+                        // If a datatype filter was specified, we only need to check the date of the first non-aggregated entry we see.
+                        if (dataTypeFilter != null) {
+                            String date = colq.substring((nullBytePos + 1));
+                            // If the earliest date has not been set yet, or the previous earliest date from an aggregated entry is later than the current date,
+                            // we have found the earliest date.
+                            if (earliestDate == null || date.compareTo(earliestDate) < 0) {
+                                earliestDate = date;
+                            }
+                            break;
+                        } else {
+                            // If a datatype filter was specified, we need to check for a possible earlier date if either the previous entry was an aggregated
+                            // entry, or if the current datatype differs from the previous datatype.
+                            String datatype = colq.substring(0, nullBytePos);
+                            if (prevEntryAggregated || prevDatatype == null || !prevDatatype.equals(datatype)) {
+                                String date = colq.substring((nullBytePos + 1));
+                                // If the earliest date has not been set yet, or the previous earliest date value is later than the current date, update it.
+                                if (earliestDate == null || date.compareTo(earliestDate) < 0) {
+                                    earliestDate = date;
+                                }
+                            }
+                            // Update the last datatype seen.
+                            prevDatatype = datatype;
+                        }
+                        // Mark that we saw a non-aggregated entry last.
+                        prevEntryAggregated = false;
                     }
                 }
             } finally {
@@ -1425,11 +1504,11 @@ public class MetadataHelper {
             }
         }
         
+        // Parse and return the date.
         Date date = null;
-        if (dateString != null) {
-            date = DateHelper.parse(dateString);
+        if (earliestDate != null) {
+            date = DateHelper.parse(earliestDate);
         }
-        
         return date;
     }
     
@@ -1649,5 +1728,4 @@ public class MetadataHelper {
     public String getMetadataTableName() {
         return metadataTableName;
     }
-    
 }
