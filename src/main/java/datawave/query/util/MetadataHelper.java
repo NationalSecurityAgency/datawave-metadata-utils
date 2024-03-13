@@ -1652,14 +1652,4 @@ public class MetadataHelper {
         return metadataTableName;
     }
     
-    public static boolean isAggregatedFrequencyKey(Key key) {
-        Text colf = key.getColumnFamily();
-        // Check if the key contains an 'f', 'i', or 'ri' column family.
-        if (colf.equals(ColumnFamilyConstants.COLF_F) || colf.equals(ColumnFamilyConstants.COLF_I) || (colf.equals(ColumnFamilyConstants.COLF_RI))) {
-            // If the column family contains the \0 separator, it has the format datatype\0yyyyMMdd and is not an aggregated value. Otherwise, it consists
-            // solely of the datatype, and has an aggregated value.
-            return key.getColumnQualifier().toString().indexOf('\0') == -1;
-        }
-        return false;
-    }
 }
