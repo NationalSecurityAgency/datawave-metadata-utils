@@ -83,7 +83,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (options.containsKey(COMBINE_VISIBILITIES)) {
             combineVisibilities = Boolean.parseBoolean(options.get(COMBINE_VISIBILITIES));
             if (log.isTraceEnabled()) {
-                log.trace("combine visibilities: " + combineVisibilities);
+                System.out.println("combine visibilities: " + combineVisibilities);
             }
         }
     
@@ -101,15 +101,14 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     @Override
     public void seek(Range range, Collection<ByteSequence> columnFamilies, boolean inclusive) throws IOException {
-        log.trace("seeking");
+        System.out.println("seeking");
         
         source.seek(range, columnFamilies, inclusive);
-        
         // Get the next top key.
         next();
     
         if (log.isTraceEnabled()) {
-            log.trace("top key after seek: " + topKey);
+            System.out.println("top key after seek: " + topKey);
         }
     }
     
@@ -130,13 +129,17 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     @Override
     public void next() throws IOException {
+        System.out.println("Fetching next");
         if (!popCache()) {
+            System.out.println("No entries in cache");
             if (source.hasTop()) {
+                System.out.println("Source has top, updating cache");
                 updateCache();
+            } else {
+                System.out.println("Source does not have top");
             }
             popCache();
         }
-        super.next();
     }
     
     private boolean popCache() {
@@ -153,7 +156,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     }
     
     private void resetCurrent() {
-        log.trace("Resetting current vars");
+        System.out.println("Resetting current vars");
         currentRow = null;
         currentColumnFamily = null;
         currentDatatype = null;
@@ -165,21 +168,21 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         visibilityToMaxTimestamp.clear();
     }
     
-    private void updateCache() {
-        log.trace("Updating cache");
+    private void updateCache() throws IOException {
+        System.out.println("Updating cache");
         
         resetCurrent();
         
         while (true) {
             if (!source.hasTop()) {
-                log.trace("Source does not have top");
+                System.out.println("Source does not have top");
                 wrapUpCurrent();
                 return;
             }
     
             Key key = source.getTopKey();
             if (log.isTraceEnabled()) {
-                log.trace("updateCache examining key " + key);
+                System.out.println("updateCache examining key " + key);
             }
     
             if (differsFromPrev(key)) {
@@ -188,6 +191,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
             }
             
             aggregateCurrent();
+            source.next();
         }
     }
     
@@ -196,12 +200,12 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (currentRow == null) {
             currentRow = key.getRow();
             if (log.isTraceEnabled()) {
-                log.trace("Set current row to " + currentRow);
+                System.out.println("Set current row to " + currentRow);
             }
             // Check if we're on a new field.
         } else if (!currentRow.equals(key.getRow())) {
             if (log.isTraceEnabled()) {
-                log.trace("Next row " + key.getRow() + " differs from prev " + currentRow);
+                System.out.println("Next row " + key.getRow() + " differs from prev " + currentRow);
             }
             return true;
         }
@@ -210,12 +214,12 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (currentColumnFamily == null) {
             currentColumnFamily = key.getColumnFamily();
             if (log.isTraceEnabled()) {
-                log.trace("Set current column family to " + currentColumnFamily);
+                System.out.println("Set current column family to " + currentColumnFamily);
             }
             // Check if we're on a new column family.
         } else if (!currentColumnFamily.equals(key.getColumnFamily())) {
             if (log.isTraceEnabled()) {
-                log.trace("Next column family " + key.getColumnFamily() + " differs from prev " + currentColumnFamily);
+                System.out.println("Next column family " + key.getColumnFamily() + " differs from prev " + currentColumnFamily);
             }
             return true;
         }
@@ -232,7 +236,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
             datatype = columnQualifier.substring(0, separatorPos);
             currentDate = columnQualifier.substring((separatorPos + 1));
             if (log.isTraceEnabled()) {
-                log.trace("Set current date to " + currentDate);
+                System.out.println("Set current date to " + currentDate);
             }
         }
         
@@ -240,12 +244,12 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (currentDatatype == null) {
             currentDatatype = datatype;
             if (log.isTraceEnabled()) {
-                log.trace("Set current datatype to " + currentDatatype);
+                System.out.println("Set current datatype to " + currentDatatype);
             }
             // Check if we're on a new datatype.
         } else if (!currentDatatype.equals(datatype)) {
             if (log.isTraceEnabled()) {
-                log.trace("Next datatype " + datatype + " differs from prev " + currentDatatype);
+                System.out.println("Next datatype " + datatype + " differs from prev " + currentDatatype);
             }
             return true;
         }
@@ -290,7 +294,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     private void wrapUpCurrent() {
         if (log.isTraceEnabled()) {
-            log.trace("Wrapping up for row: " + currentRow + ", cf: " + currentColumnFamily + ", cq: " + currentDatatype);
+            System.out.println("Wrapping up for row: " + currentRow + ", cf: " + currentColumnFamily + ", cq: " + currentDatatype);
         }
     
         cache.putAll(buildTopEntries());
@@ -299,9 +303,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     private Map<Key, Value> buildTopEntries() {
         if (log.isTraceEnabled()) {
-            log.trace("buildTopKeys, currentRow: " + currentRow);
-            log.trace("buildTopKeys, currentColumnFamily: " + currentColumnFamily);
-            log.trace("buildTopKeys, currentDatatype: " + currentDatatype);
+            System.out.println("buildTopKeys, currentRow: " + currentRow);
+            System.out.println("buildTopKeys, currentColumnFamily: " + currentColumnFamily);
+            System.out.println("buildTopKeys, currentDatatype: " + currentDatatype);
         }
     
         Text columnQualifier = new Text(currentDatatype);

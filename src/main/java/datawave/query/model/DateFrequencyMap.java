@@ -40,6 +40,10 @@ public class DateFrequencyMap implements Writable {
         dateToFrequencies.put(date, new Frequency(value));
     }
     
+    public void put(String date, long value) {
+        dateToFrequencies.put(date, new Frequency(value));
+    }
+    
     public void increment(String date, long value) {
         dateToFrequencies.computeIfAbsent(date, (k) -> new Frequency()).incrementBy(value);
     }
