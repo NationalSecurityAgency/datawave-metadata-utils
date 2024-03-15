@@ -36,7 +36,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     private boolean combineVisibilities;
     
     private final TreeMap<Key,Value> cache;
-    private final Map<ColumnVisibility,DateFrequencyMap> visibilityToDateFrequencies;
+    private final Map<ColumnVisibility, DateFrequencyMap> visibilityToDateFrequencies;
     private final Map<ColumnVisibility, Long> visibilityToMaxTimestamp;
     
     private Key topKey;

@@ -36,12 +36,12 @@ public class DateFrequencyMap implements Writable {
         dataIn.close();
     }
     
-    public void setFrequency(String date, long value) {
-        dateToFrequencies.put(date, new Frequency(value));
+    public void put(String date, long value) {
+        put(date, new Frequency(value));
     }
     
-    public void put(String date, long value) {
-        dateToFrequencies.put(date, new Frequency(value));
+    public void put(String date, Frequency value) {
+        dateToFrequencies.put(date, value);
     }
     
     public void increment(String date, long value) {
@@ -54,15 +54,11 @@ public class DateFrequencyMap implements Writable {
         }
     }
     
-    public Frequency getFrequency(String date) {
+    public Frequency get(String date) {
         return dateToFrequencies.get(date);
     }
     
-    public boolean containsKey(String date) {
-        return dateToFrequencies.containsKey(date);
-    }
-    
-    public SortedMap<String,Frequency> getFrequencies(Collection<String> dates) {
+    public SortedMap<String,Frequency> get(Collection<String> dates) {
         SortedMap<String,Frequency> map = new TreeMap<>();
         for (String date : dates) {
             if (this.dateToFrequencies.containsKey(date)) {
@@ -70,6 +66,14 @@ public class DateFrequencyMap implements Writable {
             }
         }
         return map;
+    }
+    
+    public boolean containsKey(String date) {
+        return dateToFrequencies.containsKey(date);
+    }
+    
+    public void clear() {
+        this.dateToFrequencies.clear();
     }
     
     @Override

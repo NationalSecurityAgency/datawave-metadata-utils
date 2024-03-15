@@ -21,6 +21,7 @@ import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,8 @@ public class FrequencyMetadataAggregatorTest {
     
     private AccumuloClient accumuloClient;
     private Boolean combineColumnVisibilities;
-    private final List<Map.Entry<Key, Value>> expected = new ArrayList<>();
+    private final List<Map.Entry<Key, DateFrequencyMap>> expected = new ArrayList<>();
+    private final List<Mutation> mutations = new ArrayList<>();
     
     @BeforeAll
     static void beforeAll() throws URISyntaxException {
@@ -73,181 +75,263 @@ public class FrequencyMetadataAggregatorTest {
         expected.clear();
     }
     
+    /**
+     * Verify that aggregation of entries for the columns "f", "i", and "ri" in their non-aggregated format (e.g. when they're initially ingested) are
+     * aggregated correctly.
+     */
     @Test
-    void testSimpleAggregationOfNonAggregatedEntries() throws TableNotFoundException, IOException {
-        Mutations mutations = new Mutations();
-    
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000004L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000003L);
-    
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200101", 3L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200101", 3L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200101", 3L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200101", 3L, "FOO", 1500000003L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200102", 1L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200102", 1L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200102", 1L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200102", 1L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200103", 2L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200103", 2L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200103", 2L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_I, "csv", "20200103", 2L, "FOO", 1500000003L);
-    
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200102", 3L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200102", 3L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200102", 3L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200102", 3L, "FOO", 1500000015L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200103", 1L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200103", 1L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200103", 1L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200103", 1L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200104", 2L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200104", 2L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200104", 2L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_RI, "csv", "20200104", 2L, "FOO", 1500000003L);
-        writeMutations(mutations);
+    void testAggregatingNonAggregatedEntries() throws TableNotFoundException, IOException {
+        // "f" rows.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200103", 3L);
         
-        Scanner scanner = createScanner();
-    
-        System.out.println("Creating scanner");
-    
-        for (Map.Entry<Key,Value> entry : scanner) {
-            System.out.println("Key: " + entry.getKey());
-            DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
-            System.out.println("Value: " + map);
-        }
+        // "i" rows.
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_I, "csv", "FOO", 1500000003L, "20200103", 3L);
+        
+        // "ri" rows.
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000004L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000004L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000005L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000003L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1500000004L, "20200103", 3L);
+        
+        expect("NAME", COLF_F, "csv", "FOO", 1500000004L, createMap("20200101", 4L, "20200102", 10L, "20200103", 12L));
+        expect("NAME", COLF_I, "csv", "FOO", 1500000004L, createMap("20200101", 3L, "20200102", 8L, "20200103", 9L));
+        expect("NAME", COLF_RI, "csv", "FOO", 1500000005L, createMap("20200101", 5L, "20200102", 12L, "20200103", 15L));
+        
+        assertResults();
     }
     
     /**
-     * Test that when entries for the same field, column family, datatype, and date are aggregated, that the aggregated entries are still separated by their
-     * column visibility.
+     * Verify that when entries for the same field, column family, datatype, and date are aggregated, that the aggregated entries are still separated by their
+     * column visibility by default.
      */
     @Test
-    public void testSeparationByColumnVisibilitiesWithNonAggregatedEntries() throws TableNotFoundException, IOException {
-        Mutations mutations = new Mutations();
-        
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000004L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000003L);
-        
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000003L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000003L);
+    public void testDifferingColumnVisibilitiesNotCombined() throws TableNotFoundException, IOException {
+        // Column visibility "FOO".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200103", 3L);
     
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000015L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000003L);
-        writeMutations(mutations);
+        // Column visibility "BAR".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200101", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200103", 2L);
     
-        System.out.println("Writing mutations");
-        
-        Scanner scanner = createScanner();
-        
-        System.out.println("Creating scanner");
-        
-        for (Map.Entry<Key,Value> entry : scanner) {
-            System.out.println("Key: " + entry.getKey());
-            DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
-            System.out.println("Value: " + map);
-        }
+        // Column visibility "COB".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000015L, "20200102", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000003L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000003L, "20200104", 4L);
+    
+        expect("NAME", COLF_F, "csv", "BAR", 1500000003L, createMap("20200101", 12L, "20200102", 4L, "20200103", 8L));
+        expect("NAME", COLF_F, "csv", "COB", 1500000015L, createMap("20200102", 12L, "20200103", 4L, "20200104", 16L));
+        expect("NAME", COLF_F, "csv", "FOO", 1500000004L, createMap("20200101", 4L, "20200102", 10L, "20200103", 12L));
+     
+        assertResults();
     }
     
+    /**
+     * Verify that when the iterator option {@link FrequencyMetadataAggregator#COMBINE_VISIBILITIES} is set to true, entries with same field, column family,
+     * datatype, and date are aggregated and their column visibilities are combined.
+     */
     @Test
-    public void testCombiningColumnVisibilitiesWithNonAggregatedEntries() throws TableNotFoundException, IOException {
-        Mutations mutations = new Mutations();
-        
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 1L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 2L, "FOO", 1500000004L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 3L, "FOO", 1500000003L);
-        
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200101", 3L, "BAR", 1500000003L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 1L, "BAR", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 2L, "BAR", 1500000003L);
-        
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200102", 3L, "COB", 1500000015L); // Latest timestamp
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200103", 1L, "COB", 1500000003L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000000L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000001L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000002L);
-        mutations.addNonAggregatedRow("NAME", COLF_F, "csv", "20200104", 2L, "COB", 1500000003L);
-        writeMutations(mutations);
-        
+    public void testCombiningColumnVisibilities() throws TableNotFoundException, IOException {
+        // Column visibility "FOO".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200103", 3L);
+    
+        // Column visibility "BAR".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200101", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000000L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000001L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000002L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "BAR", 1500000003L, "20200103", 2L);
+    
+        // Column visibility "COB".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000015L, "20200102", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000003L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000000L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000001L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000002L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "COB", 1500000003L, "20200104", 4L);
+    
+        // Enable to option to combine visibilities.
         givenCombineColumnVisibilitiesIsTrue();
         
-        System.out.println("Writing mutations");
+        expect("NAME", COLF_F, "csv", "BAR&COB&FOO", 1500000015L, createMap("20200101", 16L, "20200102", 26L, "20200103", 24L, "20200104", 16L));
+    
+        assertResults();
+    }
+    
+    /**
+     * Verify that aggregating non-aggregated entries into a previously-aggregated row works correctly.
+     */
+    @Test
+    void testAggregationOfMixedAggregatedAndNonAggregatedEntries() throws TableNotFoundException, IOException {
+        // Aggregated entry.
+        givenAggregatedRow("NAME", COLF_F, "csv", "FOO", 1499999999L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
         
+        // Non-aggregated entry.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200103", 3L);
+    
+        expect("NAME", COLF_F, "csv", "FOO", 1500000004L, createMap("20191225", 40L, "20200101", 19L, "20200102", 30L, "20200103", 12L));
+    
+        assertResults();
+    }
+    
+    /**
+     * Verify that entries not requiring any aggregation are not modified.
+     */
+    @Test
+    void testNoAggregationNeeded() throws TableNotFoundException, IOException {
+        givenAggregatedRow("NAME", COLF_F, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        givenAggregatedRow("NAME", COLF_I, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        givenAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        givenAggregatedRow("NAME", COLF_F, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        givenAggregatedRow("NAME", COLF_I, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        givenAggregatedRow("NAME", COLF_RI, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        givenAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+        givenAggregatedRow("NAME", COLF_I, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+        givenAggregatedRow("NAME", COLF_RI, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+        givenAggregatedRow("GENDER", COLF_F, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        givenAggregatedRow("GENDER", COLF_I, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        givenAggregatedRow("GENDER", COLF_RI, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        givenAggregatedRow("GENDER", COLF_F, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        givenAggregatedRow("GENDER", COLF_I, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        givenAggregatedRow("GENDER", COLF_RI, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+    
+        expect("GENDER", COLF_F, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("GENDER", COLF_F, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("GENDER", COLF_I, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("GENDER", COLF_I, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("GENDER", COLF_RI, "attr", "BAR", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("GENDER", COLF_RI, "attr", "FOO", 1499999995L, createMap("20191220", 20L, "20191225", 10L, "20191230", 11L));
+        expect("NAME", COLF_F, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        expect("NAME", COLF_F, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        expect("NAME", COLF_F, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+        expect("NAME", COLF_I, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        expect("NAME", COLF_I, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        expect("NAME", COLF_I, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+        expect("NAME", COLF_RI, "csv", "FOO", 1499999995L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
+        expect("NAME", COLF_RI, "text", "FOO", 1499999995L, createMap("20200101", 20L, "20200102", 10L));
+        expect("NAME", COLF_RI, "wiki", "FOO", 1499999995L, createMap("20191225", 20L, "20200101", 10L));
+    
+        assertResults();
+    }
+    
+    private void assertResults() throws TableNotFoundException, IOException {
+        writeMutations();
         Scanner scanner = createScanner();
-        
-        System.out.println("Creating scanner");
-        
+        List<Map.Entry<Key,DateFrequencyMap>> actual = new ArrayList<>();
         for (Map.Entry<Key,Value> entry : scanner) {
-            System.out.println("Key: " + entry.getKey());
-            DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
-            System.out.println("Value: " + map);
+            actual.add(new AbstractMap.SimpleEntry<>(entry.getKey(), new DateFrequencyMap(entry.getValue().get())));
+        }
+        Assertions.assertEquals(expected, actual);
+    }
+    
+    private void writeMutations() {
+        BatchWriterConfig config = new BatchWriterConfig();
+        config.setMaxMemory(0);
+        try (BatchWriter writer = accumuloClient.createBatchWriter(TABLE_METADATA, config)) {
+            writer.addMutations(mutations);
+            writer.flush();
+        } catch (TableNotFoundException | MutationsRejectedException e) {
+            throw new RuntimeException(e);
         }
     }
     
@@ -268,54 +352,37 @@ public class FrequencyMetadataAggregatorTest {
         return scanner;
     }
     
-    private void writeMutations(Mutations mutations) {
-        BatchWriterConfig config = new BatchWriterConfig();
-        config.setMaxMemory(0);
-        try (BatchWriter writer = accumuloClient.createBatchWriter(TABLE_METADATA, config)) {
-            writer.addMutations(mutations.mutations);
-            writer.flush();
-        } catch (TableNotFoundException | MutationsRejectedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
     private void givenCombineColumnVisibilitiesIsTrue() {
         this.combineColumnVisibilities = true;
     }
     
-    private void expect(String row, String colf, String colq, String colv, long timestamp, DateFrequencyMap map) {
-        expect(new Key(row, colf, colq, colv, timestamp), new Value(WritableUtils.toByteArray(map)));
+    private void givenNonAggregatedRow(String row, Text colf, String datatype, String colv, long timestamp, String date, long count) {
+        givenMutation(row, colf, datatype + NULL_BYTE + date, colv, timestamp, new Value(LongCombiner.VAR_LEN_ENCODER.encode(count)));
     }
     
-    private void expect(Key key, Value value) {
-        expected.add(new AbstractMap.SimpleEntry<>(key, value));
+    private void givenAggregatedRow(String row, Text colf, String datatype, String colv, long timestamp, DateFrequencyMap map) {
+        givenMutation(row, colf, datatype, colv, timestamp, new Value(WritableUtils.toByteArray(map)));
     }
     
-    private static class Mutations {
-        
-        private final List<Mutation> mutations = new ArrayList<>();
+    private void givenMutation(String row, Text colf, String colq, String colv, long timestamp, Value value) {
+        Mutation mutation = new Mutation(row);
+        mutation.put(colf, new Text(colq), new ColumnVisibility(colv), timestamp, value);
+        this.mutations.add(mutation);
+    }
     
-        private void addNonAggregatedRow(String row, Text colf, String datatype, String date, long count, String colv, long timestamp) {
-            Value value = new Value(LongCombiner.VAR_LEN_ENCODER.encode(count));
-            String colq = datatype + NULL_BYTE + date;
-            addMutation(row, colf, colq, colv, timestamp, value);
-        }
-        
-        private void addAggregatedRow(String row, Text colf, String datatype, String date, long count, String colv, long timestamp) {
-            DateFrequencyMap map = new DateFrequencyMap();
-            map.increment(date, count);
-            addAggregatedRow(row, colf, datatype, colv, timestamp, map);
-        }
+    private void expect(String row, Text colf, String colq, String colv, long timestamp, DateFrequencyMap map) {
+        expected.add(new AbstractMap.SimpleEntry<>(new Key(new Text(row), colf, new Text(colq), new ColumnVisibility(colv), timestamp), map));
+    }
     
-        private void addAggregatedRow(String row, Text colf, String datatype, String colv, long timestamp, DateFrequencyMap map) {
-            Value value = new Value(WritableUtils.toByteArray(map));
-            addMutation(row, colf, datatype, colv, timestamp, value);
+    private DateFrequencyMap createMap(Object... entries) {
+        DateFrequencyMap map = new DateFrequencyMap();
+        int lastEntry = entries.length - 1;
+        for (int i = 0; i < lastEntry; i++) {
+            String date = (String) entries[i];
+            i++;
+            long count = (Long) entries[i];
+            map.put(date, count);
         }
-        
-        private void addMutation(String row, Text colf, String colq, String colv, long timestamp, Value value) {
-            Mutation mutation = new Mutation(row);
-            mutation.put(colf, new Text(colq), new ColumnVisibility(colv), timestamp, value);
-            mutations.add(mutation);
-        }
+        return map;
     }
 }
