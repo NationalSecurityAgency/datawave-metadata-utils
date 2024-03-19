@@ -1,6 +1,5 @@
 package datawave.query.model;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
@@ -9,11 +8,11 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
 
 public class DateFrequencyMap implements Writable {
     
@@ -21,11 +20,6 @@ public class DateFrequencyMap implements Writable {
     
     public DateFrequencyMap() {
         this.dateToFrequencies = new TreeMap<>();
-    }
-    
-    public DateFrequencyMap(SortedMap<String,Frequency> dateToFrequencies) {
-        Preconditions.checkNotNull(dateToFrequencies, "date-frequency map must not be null");
-        this.dateToFrequencies = dateToFrequencies;
     }
     
     public DateFrequencyMap(byte[] bytes) throws IOException {
@@ -36,42 +30,68 @@ public class DateFrequencyMap implements Writable {
         dataIn.close();
     }
     
-    public void put(String date, long value) {
-        put(date, new Frequency(value));
+    /**
+     * Associates the given frequency with the given date in this {@link DateFrequencyMap}. If the map previously contained a mapping for the given date, the
+     * old frequency is replaced by the new frequency.
+     * @param date the date
+     * @param frequency the frequency
+     */
+    public void put(String date, long frequency) {
+        put(date, new Frequency(frequency));
     }
     
-    public void put(String date, Frequency value) {
-        dateToFrequencies.put(date, value);
+    /**
+     * Associates the given frequency with the given date in this {@link DateFrequencyMap}. If the map previously contained a mapping for the given date, the
+     * old frequency is replaced by the new frequency.
+     * @param date the date
+     * @param frequency the frequency
+     */
+    public void put(String date, Frequency frequency) {
+        dateToFrequencies.put(date, frequency);
     }
     
-    public void increment(String date, long value) {
-        dateToFrequencies.computeIfAbsent(date, (k) -> new Frequency()).incrementBy(value);
+    /**
+     * Increments the frequency associated with the given date by the given addend. If a mapping does not previously exist for the date, a new mapping will be
+     * added with the given addend as the frequency.
+     * @param date the date
+     * @param addend the addend
+     */
+    public void increment(String date, long addend) {
+        dateToFrequencies.computeIfAbsent(date, (k) -> new Frequency()).add(addend);
     }
     
+    /**
+     * Increment all frequencies in this {@link DateFrequencyMap} by the frequencies in the given map. If the given map contains mappings for dates not present
+     * in this map, those mappings will be added to this map.
+     * @param map the map
+     */
     public void incrementAll(DateFrequencyMap map) {
         for (Map.Entry<String,Frequency> entry : map.dateToFrequencies.entrySet()) {
             increment(entry.getKey(), entry.getValue().getValue());
         }
     }
     
+    /**
+     * Return the frequency associated with the given date, or null if no such mapping exists.
+     * @param date the date
+     * @return the count
+     */
     public Frequency get(String date) {
         return dateToFrequencies.get(date);
     }
     
-    public SortedMap<String,Frequency> get(Collection<String> dates) {
-        SortedMap<String,Frequency> map = new TreeMap<>();
-        for (String date : dates) {
-            if (this.dateToFrequencies.containsKey(date)) {
-                map.put(date, this.dateToFrequencies.get(date));
-            }
-        }
-        return map;
-    }
-    
-    public boolean containsKey(String date) {
+    /**
+     * Return whether this map contains a mapping for the given date.
+     * @param date the date
+     * @return true if a mapping exists for the given date, or false otherwise
+     */
+    public boolean contains(String date) {
         return dateToFrequencies.containsKey(date);
     }
     
+    /**
+     * Clear all mappings in this {@link DateFrequencyMap}.
+     */
     public void clear() {
         this.dateToFrequencies.clear();
     }

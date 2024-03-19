@@ -8,24 +8,34 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Objects;
 
+/**
+ * Represents a frequency count.
+ */
 public class Frequency implements WritableComparable<Frequency> {
     
+    // The value.
     private long value;
     
-    public Frequency() {
-        this(0L);
-    }
+    public Frequency() {}
     
     public Frequency(long value) {
         this.value = value;
     }
     
+    /**
+     * Return the value of this {@link Frequency}.
+     * @return the frequency
+     */
     public long getValue() {
         return value;
     }
     
-    public void incrementBy(long increment) {
-        this.value += increment;
+    /**
+     * Increment the value of this {@link Frequency} by the given addend.
+     * @param addend the addend to add
+     */
+    public void add(long addend) {
+        this.value += addend;
     }
     
     @Override

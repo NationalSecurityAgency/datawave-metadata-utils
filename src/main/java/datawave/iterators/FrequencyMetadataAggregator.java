@@ -24,6 +24,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+/**
+ * Aggregates entries in the metadata table for the "f", "i", and "ri" columns. When initially ingested, entries for these columns have a column qualifier with
+ * the format {@code <datatype>\0<yyyyMMdd>}, and a value containing a possibly partial frequency count for the date in the column qualifier. Entries with the
+ * same row, column family, datatype, and column family will be aggregated into a single entry where the column qualifier consists of the datatype and the value
+ * consists of an encoded {@link DateFrequencyMap} with the dates and counts seen. Additionally, this aggregator will handle the case where we have a previously
+ * aggregated entry and freshly ingested rows that need to be aggregated together.
+ * <br>
+ * <br>
+ * This iterator supports the following options:
+ * <ul>
+ *     <li>{@value COMBINE_VISIBILITIES}: Defaults to false. If true, entries will be aggregated by row, column family, and datatype only, and the column
+ *     visibility will be a combination of all column visibilities seen for the row/column family/datatype combo. This option is meant to be used when scanning
+ *     only, and not for compaction.</li>
+ * </ul>
+ */
 public class FrequencyMetadataAggregator extends WrappingIterator implements OptionDescriber {
     
     public static final String COMBINE_VISIBILITIES = "FrequencyMetadataAggregator.COMBINE_VISIBILITIES";
@@ -32,15 +47,14 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     private static final String NULL_BYTE = "\0";
     private static final MarkingFunctions markingFunctions = MarkingFunctions.Factory.createMarkingFunctions();
     
-    protected SortedKeyValueIterator<Key,Value> source;
+    private SortedKeyValueIterator<Key,Value> source;
     private boolean combineVisibilities;
+    private Key topKey;
+    private Value topValue;
     
     private final TreeMap<Key,Value> cache;
     private final Map<ColumnVisibility, DateFrequencyMap> visibilityToDateFrequencies;
     private final Map<ColumnVisibility, Long> visibilityToMaxTimestamp;
-    
-    private Key topKey;
-    private Value topValue;
     
     private Text currentRow;
     private Text currentColumnFamily;
@@ -71,8 +85,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     @Override
     public IteratorOptions describeOptions() {
         Map<String,String> options = new HashMap<>();
-        options.put(COMBINE_VISIBILITIES, "Boolean value denoting whether to combine entries with different visibilities. Defaults to false. Do not override "
-                        + "for compaction use.");
+        options.put(COMBINE_VISIBILITIES, "Boolean value denoting whether to combine entries with different visibilities. Defaults to false.");
         
         return new IteratorOptions(getClass().getSimpleName(), "An iterator used to collapse frequency columns in the metadata table", options, null);
     }
@@ -83,7 +96,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (options.containsKey(COMBINE_VISIBILITIES)) {
             combineVisibilities = Boolean.parseBoolean(options.get(COMBINE_VISIBILITIES));
             if (log.isTraceEnabled()) {
-                System.out.println("combine visibilities: " + combineVisibilities);
+                log.trace("combine visibilities: " + combineVisibilities);
             }
         }
     
@@ -101,14 +114,15 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     @Override
     public void seek(Range range, Collection<ByteSequence> columnFamilies, boolean inclusive) throws IOException {
-        System.out.println("seeking");
+        log.trace("seeking");
         
         source.seek(range, columnFamilies, inclusive);
-        // Get the next top key.
+        
+        // Establish the first top key.
         next();
     
         if (log.isTraceEnabled()) {
-            System.out.println("top key after seek: " + topKey);
+            log.trace("first top key after seek: " + topKey);
         }
     }
     
@@ -129,19 +143,22 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     @Override
     public void next() throws IOException {
-        System.out.println("Fetching next");
+        log.trace("Fetching next");
         if (!popCache()) {
-            System.out.println("No entries in cache");
+            log.trace("No entries in cache");
             if (source.hasTop()) {
-                System.out.println("Source has top, updating cache");
+                log.trace("Source has top, updating cache");
                 updateCache();
             } else {
-                System.out.println("Source does not have top");
+                log.trace("Source does not have top");
             }
             popCache();
         }
     }
     
+    /**
+     * Set {@link #topKey} and {@link #topValue} to the next available entry in the cache. Returns true if the cache was not empty, or false otherwise.
+     */
     private boolean popCache() {
         topKey = null;
         topValue = null;
@@ -155,8 +172,10 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         return false;
     }
     
+    /**
+     * Reset all current tracking variables.
+     */
     private void resetCurrent() {
-        System.out.println("Resetting current vars");
         currentRow = null;
         currentColumnFamily = null;
         currentDatatype = null;
@@ -168,44 +187,57 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         visibilityToMaxTimestamp.clear();
     }
     
+    /**
+     * Iterate over the source entries, aggregate all entries for the next row/column family/datatype combination, and add them to the cache.
+     */
     private void updateCache() throws IOException {
-        System.out.println("Updating cache");
+        log.trace("Updating cache");
         
         resetCurrent();
         
         while (true) {
+            // If the source does not have any more entries, wrap up the last batch of entries.
             if (!source.hasTop()) {
-                System.out.println("Source does not have top");
+                log.trace("Source does not have top");
                 wrapUpCurrent();
                 return;
             }
     
             Key key = source.getTopKey();
             if (log.isTraceEnabled()) {
-                System.out.println("updateCache examining key " + key);
+                log.trace("updateCache examining key " + key);
             }
     
+            // If the current entry has a different row, column family, or datatype from the previous entry, wrap up and return the current
+            // batch of entries.
             if (differsFromPrev(key)) {
                 wrapUpCurrent();
                 return;
             }
             
+            // Aggregate the current entry.
             aggregateCurrent();
+            
+            // Advance to the next entry from the source.
             source.next();
         }
     }
     
+    /**
+     * Return true if the current entry is not the first entry seen in the current call to {@link #updateCache()} and has a different row, column family, or
+     * datatype from the previous entry, or false otherwise.
+     */
     private boolean differsFromPrev(Key key) {
         // Update the current row if null.
         if (currentRow == null) {
             currentRow = key.getRow();
             if (log.isTraceEnabled()) {
-                System.out.println("Set current row to " + currentRow);
+                log.trace("Set current row to " + currentRow);
             }
             // Check if we're on a new field.
         } else if (!currentRow.equals(key.getRow())) {
             if (log.isTraceEnabled()) {
-                System.out.println("Next row " + key.getRow() + " differs from prev " + currentRow);
+                log.trace("Next row " + key.getRow() + " differs from prev " + currentRow);
             }
             return true;
         }
@@ -214,12 +246,12 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (currentColumnFamily == null) {
             currentColumnFamily = key.getColumnFamily();
             if (log.isTraceEnabled()) {
-                System.out.println("Set current column family to " + currentColumnFamily);
+                log.trace("Set current column family to " + currentColumnFamily);
             }
             // Check if we're on a new column family.
         } else if (!currentColumnFamily.equals(key.getColumnFamily())) {
             if (log.isTraceEnabled()) {
-                System.out.println("Next column family " + key.getColumnFamily() + " differs from prev " + currentColumnFamily);
+                log.trace("Next column family " + key.getColumnFamily() + " differs from prev " + currentColumnFamily);
             }
             return true;
         }
@@ -236,7 +268,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
             datatype = columnQualifier.substring(0, separatorPos);
             currentDate = columnQualifier.substring((separatorPos + 1));
             if (log.isTraceEnabled()) {
-                System.out.println("Set current date to " + currentDate);
+                log.trace("Set current date to " + currentDate);
             }
         }
         
@@ -244,12 +276,12 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         if (currentDatatype == null) {
             currentDatatype = datatype;
             if (log.isTraceEnabled()) {
-                System.out.println("Set current datatype to " + currentDatatype);
+                log.trace("Set current datatype to " + currentDatatype);
             }
             // Check if we're on a new datatype.
         } else if (!currentDatatype.equals(datatype)) {
             if (log.isTraceEnabled()) {
-                System.out.println("Next datatype " + datatype + " differs from prev " + currentDatatype);
+                log.trace("Next datatype " + datatype + " differs from prev " + currentDatatype);
             }
             return true;
         }
@@ -260,6 +292,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         return false;
     }
     
+    /**
+     * Aggregate the current entry.
+     */
     private void aggregateCurrent() {
         Value value = source.getTopValue();
         // Fetch the date-frequency map for the current column visibility, creating one if not present.
@@ -292,20 +327,26 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         }
     }
     
+    /**
+     * Create the entries to be returned by {@link #next()} and add them to the cache.
+     */
     private void wrapUpCurrent() {
         if (log.isTraceEnabled()) {
-            System.out.println("Wrapping up for row: " + currentRow + ", cf: " + currentColumnFamily + ", cq: " + currentDatatype);
+            log.trace("Wrapping up for row: " + currentRow + ", cf: " + currentColumnFamily + ", cq: " + currentDatatype);
         }
     
         cache.putAll(buildTopEntries());
         resetCurrent();
     }
     
+    /**
+     * Build and return a sorted map of the key-value entries that should be made available to be returned by {@link #next()}.
+     */
     private Map<Key, Value> buildTopEntries() {
         if (log.isTraceEnabled()) {
-            System.out.println("buildTopKeys, currentRow: " + currentRow);
-            System.out.println("buildTopKeys, currentColumnFamily: " + currentColumnFamily);
-            System.out.println("buildTopKeys, currentDatatype: " + currentDatatype);
+            log.trace("buildTopKeys, currentRow: " + currentRow);
+            log.trace("buildTopKeys, currentColumnFamily: " + currentColumnFamily);
+            log.trace("buildTopKeys, currentDatatype: " + currentDatatype);
         }
     
         Text columnQualifier = new Text(currentDatatype);
@@ -335,6 +376,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         }
     }
     
+    /**
+     * Return a {@link ColumnVisibility} that is the combination of all visibilities present in {@link #visibilityToDateFrequencies}.
+     */
     private ColumnVisibility combineAllVisibilities() {
         Set<ColumnVisibility> visibilities = visibilityToDateFrequencies.keySet();
         try {
@@ -345,6 +389,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         }
     }
     
+    /**
+     * Return the latest timestamp present in {@link #visibilityToMaxTimestamp}.
+     */
     private long getLatestTimestamp() {
         long max = 0L;
         for (long timestamp : visibilityToMaxTimestamp.values()) {
@@ -353,6 +400,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         return max;
     }
     
+    /**
+     * Return a {@link DateFrequencyMap} that contains all date counts present in {@link #visibilityToDateFrequencies}.
+     */
     private DateFrequencyMap combineAllDateFrequencies() {
         DateFrequencyMap combined = new DateFrequencyMap();
         for (DateFrequencyMap map : visibilityToDateFrequencies.values()) {

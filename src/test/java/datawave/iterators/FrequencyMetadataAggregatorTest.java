@@ -80,7 +80,7 @@ public class FrequencyMetadataAggregatorTest {
      * aggregated correctly.
      */
     @Test
-    void testAggregatingNonAggregatedEntries() throws TableNotFoundException, IOException {
+    void testDifferingColumnFamilies() throws TableNotFoundException, IOException {
         // "f" rows.
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -134,11 +134,66 @@ public class FrequencyMetadataAggregatorTest {
     }
     
     /**
+     * Verify that entries with the same name, column family, and column visibility are separated by their datatype.
+     */
+    @Test
+    void testDifferingDatatypes() throws TableNotFoundException, IOException {
+        // Datatype "csv".
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200101", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200102", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000004L, "20200102", 2L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000002L, "20200103", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000003L, "20200103", 3L);
+        
+        // Datatype "wiki".
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000000L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000001L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000002L, "20200101", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000003L, "20200101", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000000L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000001L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000002L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000003L, "20200102", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000000L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000001L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000002L, "20200103", 2L);
+        givenNonAggregatedRow("NAME", COLF_F, "wiki", "FOO", 1500000003L, "20200103", 2L);
+        
+        // Datatype "text".
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000000L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000001L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000002L, "20200102", 3L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000015L, "20200102", 3L); // Latest timestamp.
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000000L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000001L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000002L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000003L, "20200103", 1L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000000L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000001L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000002L, "20200104", 4L);
+        givenNonAggregatedRow("NAME", COLF_F, "text", "FOO", 1500000003L, "20200104", 4L);
+        
+        expect("NAME", COLF_F, "csv", "FOO", 1500000004L, createMap("20200101", 4L, "20200102", 10L, "20200103", 12L));
+        expect("NAME", COLF_F, "text", "FOO", 1500000015L, createMap("20200102", 12L, "20200103", 4L, "20200104", 16L));
+        expect("NAME", COLF_F, "wiki", "FOO", 1500000003L, createMap("20200101", 12L, "20200102", 4L, "20200103", 8L));
+        
+        assertResults();
+    }
+    
+    /**
      * Verify that when entries for the same field, column family, datatype, and date are aggregated, that the aggregated entries are still separated by their
      * column visibility by default.
      */
     @Test
-    public void testDifferingColumnVisibilitiesNotCombined() throws TableNotFoundException, IOException {
+    public void testDifferingColumnVisibilities() throws TableNotFoundException, IOException {
         // Column visibility "FOO".
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -250,7 +305,7 @@ public class FrequencyMetadataAggregatorTest {
      * Verify that aggregating non-aggregated entries into a previously-aggregated row works correctly.
      */
     @Test
-    void testAggregationOfMixedAggregatedAndNonAggregatedEntries() throws TableNotFoundException, IOException {
+    void testAggregatedAndNonAggregatedEntries() throws TableNotFoundException, IOException {
         // Aggregated entry.
         givenAggregatedRow("NAME", COLF_F, "csv", "FOO", 1499999999L, createMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
         
