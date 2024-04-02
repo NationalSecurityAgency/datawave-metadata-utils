@@ -105,7 +105,7 @@ public class QueryModel implements Serializable {
         
         Collection<String> newMappings = remapParameter(projectFieldsList, model);
         
-        return org.apache.commons.lang.StringUtils.join(newMappings, PARAM_VALUE_SEP);
+        return org.apache.commons.lang3.StringUtils.join(newMappings, PARAM_VALUE_SEP);
         
     }
     
