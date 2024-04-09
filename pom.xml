@@ -4,7 +4,7 @@
     <parent>
         <groupId>gov.nsa.datawave.microservice</groupId>
         <artifactId>datawave-microservice-parent</artifactId>
-        <version>3.0.3</version>
+        <version>3.0.4-SNAPSHOT</version>
         <relativePath>../../../microservices/microservice-parent/pom.xml</relativePath>
     </parent>
     <artifactId>metadata-utils</artifactId>
@@ -29,7 +29,7 @@
         <version.easymock>4.0.2</version.easymock>
         <version.kryo>2.20</version.kryo>
         <version.powermock>2.0.2</version.powermock>
-        <version.type-utils>2.0.0</version.type-utils>
+        <version.type-utils>2.0.2-SNAPSHOT</version.type-utils>
     </properties>
     <dependencyManagement>
         <dependencies>
