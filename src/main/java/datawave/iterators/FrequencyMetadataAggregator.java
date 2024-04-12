@@ -41,7 +41,7 @@ import datawave.query.model.DateFrequencyMap;
  */
 public class FrequencyMetadataAggregator extends WrappingIterator implements OptionDescriber {
     
-    public static final String COMBINE_VISIBILITIES = "FrequencyMetadataAggregator.COMBINE_VISIBILITIES";
+    public static final String COMBINE_VISIBILITIES = "COMBINE_VISIBILITIES";
     
     private static final Logger log = Logger.getLogger(FrequencyMetadataAggregator.class);
     private static final String NULL_BYTE = "\0";
