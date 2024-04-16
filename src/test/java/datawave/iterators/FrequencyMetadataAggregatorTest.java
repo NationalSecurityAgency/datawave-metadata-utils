@@ -1,7 +1,10 @@
 package datawave.iterators;
 
+import static datawave.data.ColumnFamilyConstants.COLF_DESC;
+import static datawave.data.ColumnFamilyConstants.COLF_E;
 import static datawave.data.ColumnFamilyConstants.COLF_F;
 import static datawave.data.ColumnFamilyConstants.COLF_I;
+import static datawave.data.ColumnFamilyConstants.COLF_N;
 import static datawave.data.ColumnFamilyConstants.COLF_RI;
 import static datawave.query.util.TestUtils.createDateFrequencyMap;
 
@@ -50,7 +53,7 @@ public class FrequencyMetadataAggregatorTest {
     
     private AccumuloClient accumuloClient;
     private Boolean combineColumnVisibilities;
-    private final List<Map.Entry<Key,DateFrequencyMap>> expected = new ArrayList<>();
+    private final List<Map.Entry<Key,Value>> expected = new ArrayList<>();
     private final List<Mutation> mutations = new ArrayList<>();
     
     @BeforeAll
@@ -80,7 +83,7 @@ public class FrequencyMetadataAggregatorTest {
      * aggregated correctly.
      */
     @Test
-    void testDifferingColumnFamilies() throws TableNotFoundException, IOException {
+    void testDifferingColumnFamilies() throws TableNotFoundException {
         // "f" rows.
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -137,7 +140,7 @@ public class FrequencyMetadataAggregatorTest {
      * Verify that entries with the same name, column family, and column visibility are separated by their datatype.
      */
     @Test
-    void testDifferingDatatypes() throws TableNotFoundException, IOException {
+    void testDifferingDatatypes() throws TableNotFoundException {
         // Datatype "csv".
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -193,7 +196,7 @@ public class FrequencyMetadataAggregatorTest {
      * column visibility by default.
      */
     @Test
-    public void testDifferingColumnVisibilities() throws TableNotFoundException, IOException {
+    public void testDifferingColumnVisibilities() throws TableNotFoundException {
         // Column visibility "FOO".
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -245,11 +248,11 @@ public class FrequencyMetadataAggregatorTest {
     }
     
     /**
-     * Verify that when the iterator option {@link FrequencyMetadataAggregator#COMBINE_VISIBILITIES} is set to true, entries with same field, column family,
-     * datatype, and date are aggregated and their column visibilities are combined.
+     * Verify that when the iterator option {@link FrequencyMetadataAggregator#COMBINE_VISIBILITIES_OPTION} is set to true, entries with same field, column
+     * family, datatype, and date are aggregated and their column visibilities are combined.
      */
     @Test
-    public void testCombiningColumnVisibilities() throws TableNotFoundException, IOException {
+    public void testCombiningColumnVisibilities() throws TableNotFoundException {
         // Column visibility "FOO".
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000000L, "20200101", 1L);
         givenNonAggregatedRow("NAME", COLF_F, "csv", "FOO", 1500000001L, "20200101", 1L);
@@ -305,7 +308,7 @@ public class FrequencyMetadataAggregatorTest {
      * Verify that aggregating non-aggregated entries into a previously-aggregated row works correctly.
      */
     @Test
-    void testAggregatedAndNonAggregatedEntries() throws TableNotFoundException, IOException {
+    void testAggregatedAndNonAggregatedEntries() throws TableNotFoundException {
         // Aggregated entry.
         givenAggregatedRow("NAME", COLF_F, "csv", "FOO", 1499999999L, createDateFrequencyMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
         
@@ -333,7 +336,7 @@ public class FrequencyMetadataAggregatorTest {
      * Verify that entries not requiring any aggregation are not modified.
      */
     @Test
-    void testNoAggregationNeeded() throws TableNotFoundException, IOException {
+    void testNoAggregationNeeded() throws TableNotFoundException {
         givenAggregatedRow("NAME", COLF_F, "csv", "FOO", 1499999995L, createDateFrequencyMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
         givenAggregatedRow("NAME", COLF_I, "csv", "FOO", 1499999995L, createDateFrequencyMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
         givenAggregatedRow("NAME", COLF_RI, "csv", "FOO", 1499999995L, createDateFrequencyMap("20191225", 40L, "20200101", 15L, "20200102", 20L));
@@ -373,7 +376,7 @@ public class FrequencyMetadataAggregatorTest {
      * Test aggregation over a more diverse dataset of mixed aggregated and non-aggregated rows.
      */
     @Test
-    void testDiverseDataset() throws TableNotFoundException, IOException {
+    void testDiverseDataset() throws TableNotFoundException {
         givenAggregatedRow("AGE", COLF_F, "num", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
         givenAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
         givenAggregatedRow("AGE", COLF_I, "num", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
@@ -408,12 +411,71 @@ public class FrequencyMetadataAggregatorTest {
         assertResults();
     }
     
-    private void assertResults() throws TableNotFoundException, IOException {
+    /**
+     * Verify that scanning over a table with columns that are not to be aggregated result in them being unchanged.
+     */
+    @Test
+    void testMixedColumns() throws TableNotFoundException {
+        givenAggregatedRow("AGE", COLF_F, "num", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "num", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("GENDER", COLF_F, "text", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_F, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_I, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        givenNonAggregatedRow("AGE", COLF_F, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "var", "BAR", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new datatype.
+        givenNonAggregatedRow("GENDER", COLF_F, "text", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new colvis.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_I, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        
+        // Non frequency rows that should not be affected by aggregation.
+        givenMutation("AGE", COLF_E, "num", "BAR", 1400000005L, new Value());
+        givenMutation("AGE", COLF_DESC, "num", "BAR", 1400000005L, new Value("age_num description"));
+        givenMutation("AGE", COLF_E, "lifetime", "BAR", 1400000005L, new Value());
+        givenMutation("AGE", COLF_DESC, "lifetime", "BAR", 1400000005L, new Value("age_lifetime description"));
+        givenMutation("AGE", COLF_DESC, "var", "BAR", 1400000005L, new Value("age_var description"));
+        givenMutation("JOB", COLF_E, "attr", "BAR", 1400000005L, new Value());
+        givenMutation("JOB", COLF_DESC, "attr", "BAR", 1400000005L, new Value("job_attr description"));
+        givenMutation("GENDER", COLF_DESC, "text", "BAR", 1400000005L, new Value("gender_text description"));
+        givenMutation("JOB", new Text("m"), "attr", "BAR", 1400000005L, new Value());
+        
+        expect("AGE", COLF_DESC, "lifetime", "BAR", 1400000005L, new Value("age_lifetime description"));
+        expect("AGE", COLF_DESC, "num", "BAR", 1400000005L, new Value("age_num description"));
+        expect("AGE", COLF_DESC, "var", "BAR", 1400000005L, new Value("age_var description"));
+        expect("AGE", COLF_E, "lifetime", "BAR", 1400000005L, new Value());
+        expect("AGE", COLF_E, "num", "BAR", 1400000005L, new Value());
+        expect("AGE", COLF_F, "lifetime", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "num", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "var", "BAR", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("AGE", COLF_I, "lifetime", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_I, "num", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("GENDER", COLF_DESC, "text", "BAR", 1400000005L, new Value("gender_text description"));
+        expect("GENDER", COLF_F, "text", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("GENDER", COLF_F, "text", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", COLF_DESC, "attr", "BAR", 1400000005L, new Value("job_attr description"));
+        expect("JOB", COLF_E, "attr", "BAR", 1400000005L, new Value());
+        expect("JOB", COLF_F, "attr", "FOO", 1500000004L, createDateFrequencyMap("20200101", 3L));
+        expect("JOB", COLF_I, "attr", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", new Text("m"), "attr", "BAR", 1400000005L, new Value());
+        expect("NAME", COLF_F, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("NAME", COLF_I, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        assertResults();
+    }
+    
+    private void assertResults() throws TableNotFoundException {
         TestUtils.writeMutations(accumuloClient, TABLE_METADATA, mutations);
         Scanner scanner = createScanner();
-        List<Map.Entry<Key,DateFrequencyMap>> actual = new ArrayList<>();
+        List<Map.Entry<Key,Value>> actual = new ArrayList<>();
         for (Map.Entry<Key,Value> entry : scanner) {
-            actual.add(new AbstractMap.SimpleEntry<>(entry.getKey(), new DateFrequencyMap(entry.getValue().get())));
+            actual.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
         }
         Assertions.assertEquals(expected, actual);
     }
@@ -422,14 +484,11 @@ public class FrequencyMetadataAggregatorTest {
         Scanner scanner = ScannerHelper.createScanner(accumuloClient, TABLE_METADATA, AUTHS_SET);
         scanner.setRange(new Range());
         
-        scanner.fetchColumnFamily(COLF_F);
-        scanner.fetchColumnFamily(COLF_I);
-        scanner.fetchColumnFamily(COLF_RI);
-        
         IteratorSetting iteratorSetting = new IteratorSetting(10, FrequencyMetadataAggregator.class);
         if (combineColumnVisibilities != null) {
-            iteratorSetting.addOption(FrequencyMetadataAggregator.COMBINE_VISIBILITIES, String.valueOf(combineColumnVisibilities));
+            iteratorSetting.addOption(FrequencyMetadataAggregator.COMBINE_VISIBILITIES_OPTION, String.valueOf(combineColumnVisibilities));
         }
+        iteratorSetting.addOption(FrequencyMetadataAggregator.COLUMNS_OPTION, "f,i,ri");
         scanner.addScanIterator(iteratorSetting);
         
         return scanner;
@@ -454,6 +513,10 @@ public class FrequencyMetadataAggregatorTest {
     }
     
     private void expect(String row, Text colf, String colq, String colv, long timestamp, DateFrequencyMap map) {
-        expected.add(new AbstractMap.SimpleEntry<>(new Key(new Text(row), colf, new Text(colq), new ColumnVisibility(colv), timestamp), map));
+        expect(row, colf, colq, colv, timestamp, new Value(WritableUtils.toByteArray(map)));
+    }
+    
+    private void expect(String row, Text colf, String colq, String colv, long timestamp, Value value) {
+        expected.add(new AbstractMap.SimpleEntry<>(new Key(new Text(row), colf, new Text(colq), new ColumnVisibility(colv), timestamp), value));
     }
 }
