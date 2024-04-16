@@ -244,6 +244,9 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
             if (!workKey.isDeleted()) {
                 // Aggregate the current entry.
                 aggregateCurrent();
+            } else {
+                // Add the deleted entry to the cache so that it is available for scanning, but do not include it as part of the aggregation.
+                cache.put(super.getTopKey(), super.getTopValue());
             }
             
             // Advance to the next entry from the source.
