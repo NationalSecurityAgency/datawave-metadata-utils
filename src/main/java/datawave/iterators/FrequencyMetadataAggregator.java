@@ -11,9 +11,11 @@ import java.util.TreeMap;
 
 import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.accumulo.core.data.Key;
+import org.apache.accumulo.core.data.PartialKey;
 import org.apache.accumulo.core.data.Range;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.iterators.IteratorEnvironment;
+import org.apache.accumulo.core.iterators.IteratorUtil;
 import org.apache.accumulo.core.iterators.LongCombiner;
 import org.apache.accumulo.core.iterators.OptionDescriber;
 import org.apache.accumulo.core.iterators.SortedKeyValueIterator;
@@ -131,8 +133,23 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     @Override
     public void seek(Range range, Collection<ByteSequence> columnFamilies, boolean inclusive) throws IOException {
-        super.seek(range, columnFamilies, inclusive);
+        // Do not seek to the middle of a value that should be combined.
+        Range seekRange = IteratorUtil.maximizeStartKeyTimeStamp(range);
+        
+        super.seek(seekRange, columnFamilies, inclusive);
         findTop();
+        
+        if (range.getStartKey() != null) {
+            while (hasTop() && getTopKey().equals(range.getStartKey(), PartialKey.ROW_COLFAM_COLQUAL_COLVIS)
+                            && getTopKey().getTimestamp() > range.getStartKey().getTimestamp()) {
+                // Value has a more recent timestamp, pass it up.
+                next();
+            }
+        }
+        
+        while (hasTop() && range.beforeStartKey(getTopKey())) {
+            next();
+        }
     }
     
     @Override
