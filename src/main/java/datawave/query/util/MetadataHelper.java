@@ -1434,6 +1434,8 @@ public class MetadataHelper {
      * Get the counts for a field and date pair across all ingest types.
      * <p>
      * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
      *
      * @param identifier
      *            a pair of field and date
@@ -1459,16 +1461,35 @@ public class MetadataHelper {
         return datatypeToCounts;
     }
     
+    /**
+     * Get the counts for a field and date pair across all ingest typos
+     * <p>
+     * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
+     *
+     * @param fieldName
+     *            the field name
+     * @param date
+     *            the date
+     * @param client
+     *            the AccumuloClient
+     * @param wrappedClient
+     *            the 'real' client, used to update a cache
+     * @return a map of counts by datatype
+     * @throws TableNotFoundException
+     *             if no table exists
+     * @throws IOException
+     *             if there is an IO problem
+     */
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, AccumuloClient client, WrappedAccumuloClient wrappedClient)
                     throws TableNotFoundException, IOException {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         
         BatchWriter writer = null;
         
-        // TODO -- scanner can go try-with-resources
-        try {
-            // we have to use the real connector since the f column is not cached
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        // we have to use the real connector since the f column is not cached
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1562,9 +1583,7 @@ public class MetadataHelper {
         String dateString = null;
         BatchWriter writer = null;
         
-        // TODO -- this is a mess
-        try {
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1575,34 +1594,30 @@ public class MetadataHelper {
                 scanner.addScanIterator(cqRegex);
             }
             
-            try {
-                final Text holder = new Text();
-                for (Entry<Key,Value> entry : scanner) {
-                    // if this is the real connector, and wrapped connector is not null, it means
-                    // that we didn't get a hit in the cache. So, we will update the cache with the
-                    // entries from the real table
-                    if (wrappedClient != null && client == wrappedClient.getReal()) {
-                        writer = updateCache(entry, writer, wrappedClient);
-                    }
-                    
-                    entry.getKey().getColumnQualifier(holder);
-                    int startPos = holder.find(NULL_BYTE) + 1;
-                    
-                    if (0 == startPos) {
-                        log.trace("Could not find nullbyte separator in column qualifier for: {}", entry.getKey());
-                    } else if ((holder.getLength() - startPos) <= 0) {
-                        log.trace("Could not find date to parse in column qualifier for: {}", entry.getKey());
-                    } else {
-                        try {
-                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
-                            break;
-                        } catch (CharacterCodingException e) {
-                            log.trace("Unable to decode date string for: {}", entry.getKey().getColumnQualifier());
-                        }
+            final Text holder = new Text();
+            for (Entry<Key,Value> entry : scanner) {
+                // if this is the real connector, and wrapped connector is not null, it means
+                // that we didn't get a hit in the cache. So, we will update the cache with the
+                // entries from the real table
+                if (wrappedClient != null && client == wrappedClient.getReal()) {
+                    writer = updateCache(entry, writer, wrappedClient);
+                }
+                
+                entry.getKey().getColumnQualifier(holder);
+                int startPos = holder.find(NULL_BYTE) + 1;
+                
+                if (0 == startPos) {
+                    log.trace("Could not find nullbyte separator in column qualifier for: {}", entry.getKey());
+                } else if ((holder.getLength() - startPos) <= 0) {
+                    log.trace("Could not find date to parse in column qualifier for: {}", entry.getKey());
+                } else {
+                    try {
+                        dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
+                        break;
+                    } catch (CharacterCodingException e) {
+                        log.trace("Unable to decode date string for: {}", entry.getKey().getColumnQualifier());
                     }
                 }
-            } finally {
-                scanner.close();
             }
         } catch (TableNotFoundException e) {
             log.warn("Error creating scanner against table: {}", metadataTableName, e);
@@ -1842,6 +1857,7 @@ public class MetadataHelper {
      * @throws InvalidProtocolBufferException
      *             can't be thrown, remove
      */
+    @Deprecated(forRemoval = true, since = "4.0.0")
     public static void basicIterator(AccumuloClient client, String tableName, Collection<Authorizations> auths)
                     throws TableNotFoundException, InvalidProtocolBufferException {
         if (log.isTraceEnabled()) {
