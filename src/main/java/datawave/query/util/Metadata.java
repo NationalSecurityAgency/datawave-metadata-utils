@@ -52,9 +52,9 @@ public class Metadata implements Serializable, OptionDescriber {
      * @throws TableNotFoundException
      */
     public Metadata(MetadataHelper helper, Set<String> datatypeFilter) throws ExecutionException, TableNotFoundException {
-        this(Sets.<String> newHashSet(helper.getDatatypes(datatypeFilter)), Sets.<String> newHashSet(helper.getTermFrequencyFields(datatypeFilter)),
-                        Sets.<String> newHashSet(helper.getAllFields(datatypeFilter)), Sets.<String> newHashSet(helper.getIndexedFields(datatypeFilter)),
-                        Sets.<String> newHashSet(helper.getIndexOnlyFields(datatypeFilter)));
+        this(Sets.newHashSet(helper.getDatatypes(datatypeFilter)), Sets.newHashSet(helper.getTermFrequencyFields(datatypeFilter)),
+                        Sets.newHashSet(helper.getAllFields(datatypeFilter)), Sets.newHashSet(helper.getIndexedFields(datatypeFilter)),
+                        Sets.newHashSet(helper.getIndexOnlyFields(datatypeFilter)));
     }
     
     protected Metadata(Set<String> datatypes, Set<String> termFrequencyFields, Set<String> allFields, Set<String> indexedFields, Set<String> indexOnlyFields) {
