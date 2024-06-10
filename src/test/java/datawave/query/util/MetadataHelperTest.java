@@ -63,7 +63,7 @@ public class MetadataHelperTest {
     }
     
     @BeforeEach
-    public void setup() throws TableNotFoundException, AccumuloException, TableExistsException, AccumuloSecurityException {
+    public void setup() throws AccumuloException, TableExistsException, AccumuloSecurityException {
         accumuloClient = new InMemoryAccumuloClient("root", new InMemoryInstance(MetadataHelperTest.class.toString()));
         if (!accumuloClient.tableOperations().exists(TABLE_METADATA)) {
             accumuloClient.tableOperations().create(TABLE_METADATA);
@@ -97,14 +97,10 @@ public class MetadataHelperTest {
         this.mutations.add(mutation);
     }
     
-    private void givenMutation(String row, String columnFamily, String columnQualifier, Value value) throws TableNotFoundException {
+    private void givenMutation(String row, String columnFamily, String columnQualifier, Value value) {
         Mutation mutation = new Mutation(row);
         mutation.put(columnFamily, columnQualifier, value);
         givenMutation(mutation);
-    }
-    
-    private void givenNonAggregatedFrequencyRows(String row, String colf, String datatype, String startDate, String endDate, long count) {
-        givenNonAggregatedFrequencyRows(row, new Text(colf), datatype, startDate, endDate, count);
     }
     
     private void givenNonAggregatedFrequencyRows(String row, Text colf, String datatype, String startDate, String endDate, long count) {
@@ -113,10 +109,6 @@ public class MetadataHelperTest {
         List<String> dates = TestUtils.getDatesInRange(startDate, endDate);
         dates.forEach((date) -> mutation.put(colf, new Text(datatype + NULL_BYTE + date), value));
         givenMutation(mutation);
-    }
-    
-    private void givenAggregatedFrequencyRow(String row, String colf, String datatype, DateFrequencyMap map) {
-        givenAggregatedFrequencyRow(row, new Text(colf), datatype, map);
     }
     
     private void givenAggregatedFrequencyRow(String row, Text colf, String datatype, DateFrequencyMap map) {
