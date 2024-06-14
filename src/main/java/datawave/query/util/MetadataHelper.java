@@ -500,31 +500,32 @@ public class MetadataHelper {
                             accumuloClient.getClass().getCanonicalName(), auths, modelTableName, modelName, unevaluatedFields);
         }
         
-        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
-        scan.setRange(new Range());
-        scan.fetchColumnFamily(new Text(modelName));
-        // We need the entire Model so we can do both directions.
-        final Set<String> allFields = this.getAllFields(ingestTypeFilter);
-        
-        for (Map.Entry<Key,Value> entry : scan) {
-            try {
-                FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey(), entry.getValue());
-                if (!mapping.isFieldMapping()) {
-                    queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
-                } else if (mapping.getDirection() == Direction.FORWARD) {
-                    // Do not add a forward mapping entry
-                    // when the replacement does not exist in the database
-                    if (allFields.contains(mapping.getFieldName())) {
-                        queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
-                    } else if (log.isTraceEnabled()) {
-                        log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
-                                        mapping.getModelFieldName());
+        try (Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths)) {
+            scan.setRange(new Range());
+            scan.fetchColumnFamily(new Text(modelName));
+            // We need the entire Model so we can do both directions.
+            final Set<String> allFields = this.getAllFields(ingestTypeFilter);
+            
+            for (Entry<Key,Value> entry : scan) {
+                try {
+                    FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey(), entry.getValue());
+                    if (!mapping.isFieldMapping()) {
+                        queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
+                    } else if (mapping.getDirection() == Direction.FORWARD) {
+                        // Do not add a forward mapping entry
+                        // when the replacement does not exist in the database
+                        if (allFields.contains(mapping.getFieldName())) {
+                            queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
+                        } else if (log.isTraceEnabled()) {
+                            log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
+                                            mapping.getModelFieldName());
+                        }
+                    } else {
+                        queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
                     }
-                } else {
-                    queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
+                } catch (IllegalArgumentException iae) {
+                    log.warn("Ignoring unparseable key {}", entry.getKey());
                 }
-            } catch (IllegalArgumentException iae) {
-                log.warn("Ignoring unparseable key {}", entry.getKey());
             }
         }
         
@@ -562,31 +563,33 @@ public class MetadataHelper {
             log.trace("using client: {} with auths: {} and model table name: {}", accumuloClient.getClass().getCanonicalName(), auths, modelTableName);
         }
         
-        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
-        scan.setRange(new Range());
         Set<String> modelNames = new HashSet<>();
-        Set<Text> ignoreColfs = new HashSet<>();
-        ignoreColfs.addAll(metadataIndexColfs);
-        ignoreColfs.addAll(metadataNormalizedColfs);
-        ignoreColfs.addAll(metadataTypeColfs);
-        ignoreColfs.addAll(metadataCompositeIndexColfs);
-        ignoreColfs.addAll(metadataCardinalityColfs);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_E);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_DESC);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_EDGE);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_F);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_H);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_VI);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_TF);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_VERSION);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_EXP);
-        
-        for (Map.Entry<Key,Value> entry : scan) {
-            Text cf = entry.getKey().getColumnFamily();
-            if (!ignoreColfs.contains(entry.getKey().getColumnFamily())) {
-                if (entry.getKey().getColumnQualifier().toString().endsWith("\0forward")) {
+        try (Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths)) {
+            scan.setRange(new Range());
+            Set<Text> ignoreColfs = new HashSet<>();
+            ignoreColfs.addAll(metadataIndexColfs);
+            ignoreColfs.addAll(metadataNormalizedColfs);
+            ignoreColfs.addAll(metadataTypeColfs);
+            ignoreColfs.addAll(metadataCompositeIndexColfs);
+            ignoreColfs.addAll(metadataCardinalityColfs);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_E);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_DESC);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_EDGE);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_F);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_H);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_VI);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_TF);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_VERSION);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_EXP);
+            
+            for (Entry<Key,Value> entry : scan) {
+                Text cf = entry.getKey().getColumnFamily();
+                Text cq = entry.getKey().getColumnQualifier();
+                
+                if (!ignoreColfs.contains(cf) && cq.toString().endsWith("\0forward")) {
                     modelNames.add(cf.toString());
                 }
+                
             }
         }
         
@@ -686,25 +689,23 @@ public class MetadataHelper {
         log.debug("cache fault for getFacets({}, {})", this.auths, table);
         Multimap<String,String> fieldPivots = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        bs.fetchColumnFamily(PV);
-        
-        for (Entry<Key,Value> entry : bs) {
-            Key key = entry.getKey();
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths)) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(PV);
             
-            if (null != key.getRow()) {
-                String[] parts = StringUtils.split(key.getRow().toString(), "\0");
-                if (parts.length == 2) {
-                    fieldPivots.put(parts[0], parts[1]);
-                    fieldPivots.put(parts[1], parts[0]);
-                    fieldPivots.put(parts[0], parts[0]);
+            for (Entry<Key,Value> entry : bs) {
+                Key key = entry.getKey();
+                
+                if (null != key.getRow()) {
+                    String[] parts = StringUtils.split(key.getRow().toString(), "\0");
+                    if (parts.length == 2) {
+                        fieldPivots.put(parts[0], parts[1]);
+                        fieldPivots.put(parts[1], parts[0]);
+                        fieldPivots.put(parts[0], parts[0]);
+                    }
+                } else {
+                    log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
-            } else {
-                log.warn("Row null in ColumnFamilyConstants for key: {}", key);
             }
         }
         
@@ -731,17 +732,10 @@ public class MetadataHelper {
             log.trace("getTermCounts from table: {}", metadataTableName);
         }
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataCardinalityColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_COUNT);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -753,8 +747,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableMap(allCounts);
@@ -782,17 +774,10 @@ public class MetadataHelper {
         
         Authorizations rootAuths = accumuloClient.securityOperations().getUserAuthorizations(accumuloClient.whoami());
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths));
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataCardinalityColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths))) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_COUNT);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -804,8 +789,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableMap(allCounts);
@@ -830,17 +813,11 @@ public class MetadataHelper {
             log.trace("getAllNormalized from table: {}", metadataTableName);
         }
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataNormalizedColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_N);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -850,8 +827,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableSet(normalizedFields);
@@ -1025,21 +1000,22 @@ public class MetadataHelper {
         }
         // unlike other entries, the edges colf entries have many auths set. We'll use the fullUserAuths in the scanner instead
         // of the minimal set in this.auths
-        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths);
-        
-        scanner.setRange(new Range());
-        scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
-        
-        // First iterator strips the optional attribute2 and attribute3 off the cq, second one
-        // combines the protocol buffer data.
-        IteratorSetting stripConfig = new IteratorSetting(50, EdgeMetadataCQStrippingIterator.class);
-        IteratorSetting combineConfig = new IteratorSetting(51, EdgeMetadataCombiner.class);
-        combineConfig.addOption("columns", ColumnFamilyConstants.COLF_EDGE.toString());
-        scanner.addScanIterator(stripConfig);
-        scanner.addScanIterator(combineConfig);
-        
-        for (Map.Entry<Key,Value> entry : scanner) {
-            edges.put(entry.getKey(), entry.getValue());
+        try (Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths)) {
+            
+            scanner.setRange(new Range());
+            scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
+            
+            // First iterator strips the optional attribute2 and attribute3 off the cq, second one
+            // combines the protocol buffer data.
+            IteratorSetting stripConfig = new IteratorSetting(50, EdgeMetadataCQStrippingIterator.class);
+            IteratorSetting combineConfig = new IteratorSetting(51, EdgeMetadataCombiner.class);
+            combineConfig.addOption("columns", ColumnFamilyConstants.COLF_EDGE.toString());
+            scanner.addScanIterator(stripConfig);
+            scanner.addScanIterator(combineConfig);
+            
+            for (Entry<Key,Value> entry : scanner) {
+                edges.put(entry.getKey(), entry.getValue());
+            }
         }
         
         return Multimaps.unmodifiableSetMultimap(edges);
@@ -1270,21 +1246,24 @@ public class MetadataHelper {
         log.trace("getCardinalityForField from table: {}", metadataTableName);
         Text row = new Text(fieldName.toUpperCase());
         
-        // Get all the rows in DatawaveMetadata for the field, only in the 'f'
-        // colfam
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        
-        Key startKey = new Key(row);
-        bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-        
-        long count = 0;
-        
-        for (Entry<Key,Value> entry : bs) {
-            Text colq = entry.getKey().getColumnQualifier();
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f' colfam
+        long count;
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
             
-            int index = colq.find(NULL_BYTE);
-            if (index != -1) {
+            Key startKey = new Key(row);
+            bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            
+            count = 0;
+            
+            for (Entry<Key,Value> entry : bs) {
+                Text colq = entry.getKey().getColumnQualifier();
+                
+                int index = colq.find(NULL_BYTE);
+                if (index == -1) {
+                    continue;
+                }
+                
                 // If we were given a non-null datatype
                 // Ensure that we process records only on that type
                 if (null != datatype) {
@@ -1319,8 +1298,6 @@ public class MetadataHelper {
                 }
             }
         }
-        
-        bs.close();
         
         return count;
     }
@@ -1457,6 +1434,8 @@ public class MetadataHelper {
      * Get the counts for a field and date pair across all ingest types.
      * <p>
      * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
      *
      * @param identifier
      *            a pair of field and date
@@ -1482,15 +1461,35 @@ public class MetadataHelper {
         return datatypeToCounts;
     }
     
+    /**
+     * Get the counts for a field and date pair across all ingest typos
+     * <p>
+     * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
+     *
+     * @param fieldName
+     *            the field name
+     * @param date
+     *            the date
+     * @param client
+     *            the AccumuloClient
+     * @param wrappedClient
+     *            the 'real' client, used to update a cache
+     * @return a map of counts by datatype
+     * @throws TableNotFoundException
+     *             if no table exists
+     * @throws IOException
+     *             if there is an IO problem
+     */
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, AccumuloClient client, WrappedAccumuloClient wrappedClient)
                     throws TableNotFoundException, IOException {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         
         BatchWriter writer = null;
         
-        try {
-            // we have to use the real connector since the f column is not cached
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        // we have to use the real connector since the f column is not cached
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1584,8 +1583,7 @@ public class MetadataHelper {
         String dateString = null;
         BatchWriter writer = null;
         
-        try {
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
@@ -1596,34 +1594,30 @@ public class MetadataHelper {
                 scanner.addScanIterator(cqRegex);
             }
             
-            try {
-                final Text holder = new Text();
-                for (Entry<Key,Value> entry : scanner) {
-                    // if this is the real connector, and wrapped connector is not null, it means
-                    // that we didn't get a hit in the cache. So, we will update the cache with the
-                    // entries from the real table
-                    if (wrappedClient != null && client == wrappedClient.getReal()) {
-                        writer = updateCache(entry, writer, wrappedClient);
-                    }
-                    
-                    entry.getKey().getColumnQualifier(holder);
-                    int startPos = holder.find(NULL_BYTE) + 1;
-                    
-                    if (0 == startPos) {
-                        log.trace("Could not find nullbyte separator in column qualifier for: {}", entry.getKey());
-                    } else if ((holder.getLength() - startPos) <= 0) {
-                        log.trace("Could not find date to parse in column qualifier for: {}", entry.getKey());
-                    } else {
-                        try {
-                            dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
-                            break;
-                        } catch (CharacterCodingException e) {
-                            log.trace("Unable to decode date string for: {}", entry.getKey().getColumnQualifier());
-                        }
+            final Text holder = new Text();
+            for (Entry<Key,Value> entry : scanner) {
+                // if this is the real connector, and wrapped connector is not null, it means
+                // that we didn't get a hit in the cache. So, we will update the cache with the
+                // entries from the real table
+                if (wrappedClient != null && client == wrappedClient.getReal()) {
+                    writer = updateCache(entry, writer, wrappedClient);
+                }
+                
+                entry.getKey().getColumnQualifier(holder);
+                int startPos = holder.find(NULL_BYTE) + 1;
+                
+                if (0 == startPos) {
+                    log.trace("Could not find nullbyte separator in column qualifier for: {}", entry.getKey());
+                } else if ((holder.getLength() - startPos) <= 0) {
+                    log.trace("Could not find date to parse in column qualifier for: {}", entry.getKey());
+                } else {
+                    try {
+                        dateString = Text.decode(holder.getBytes(), startPos, holder.getLength() - startPos);
+                        break;
+                    } catch (CharacterCodingException e) {
+                        log.trace("Unable to decode date string for: {}", entry.getKey().getColumnQualifier());
                     }
                 }
-            } finally {
-                scanner.close();
             }
         } catch (TableNotFoundException e) {
             log.warn("Error creating scanner against table: {}", metadataTableName, e);
@@ -1768,35 +1762,29 @@ public class MetadataHelper {
     protected Multimap<String,String> loadAllFields() throws TableNotFoundException {
         Multimap<String,String> fields = HashMultimap.create();
         
-        // TODO -- close this scanner
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        if (log.isTraceEnabled()) {
-            log.trace("loadAllFields from table: {}", metadataTableName);
-        }
-        
-        bs.setRange(new Range());
-        
-        // We don't want to fetch all columns because that could include model
-        // field names
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_T);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_RI);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
-        
-        Iterator<Entry<Key,Value>> iterator = bs.iterator();
-        
-        while (iterator.hasNext()) {
-            Entry<Key,Value> entry = iterator.next();
-            Key k = entry.getKey();
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            if (log.isTraceEnabled()) {
+                log.trace("loadAllFields from table: {}", metadataTableName);
+            }
             
-            String fieldname = k.getRow().toString();
-            String datatype = getDatatype(k);
+            bs.setRange(new Range());
             
-            fields.put(datatype, fieldname);
+            // We don't want to fetch all columns because that could include model
+            // field names
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_T);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_RI);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
+            
+            for (Entry<Key,Value> entry : bs) {
+                Key k = entry.getKey();
+                String fieldname = k.getRow().toString();
+                String datatype = getDatatype(k);
+                fields.put(datatype, fieldname);
+            }
         }
-        
         return Multimaps.unmodifiableMultimap(fields);
     }
     
@@ -1826,13 +1814,14 @@ public class MetadataHelper {
         }
         
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        
-        bs.setRange(new Range());
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
-        
-        for (Entry<Key,Value> entry : bs) {
-            fields.put(getDatatype(entry.getKey()), entry.getKey().getRow().toString());
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
+            
+            for (Entry<Key,Value> entry : bs) {
+                fields.put(getDatatype(entry.getKey()), entry.getKey().getRow().toString());
+            }
         }
         
         return Multimaps.unmodifiableMultimap(fields);
@@ -1868,19 +1857,21 @@ public class MetadataHelper {
      * @throws InvalidProtocolBufferException
      *             can't be thrown, remove
      */
+    @Deprecated(forRemoval = true, since = "4.0.0")
     public static void basicIterator(AccumuloClient client, String tableName, Collection<Authorizations> auths)
                     throws TableNotFoundException, InvalidProtocolBufferException {
-        if (log.isTraceEnabled())
+        if (log.isTraceEnabled()) {
             log.trace("--- basicIterator --- {}", tableName);
-        Scanner scanner = client.createScanner(tableName, auths.iterator().next());
-        Range range = new Range();
-        scanner.setRange(range);
-        Iterator<Entry<Key,Value>> iter = scanner.iterator();
-        while (iter.hasNext()) {
-            Entry<Key,Value> entry = iter.next();
-            Key k = entry.getKey();
-            if (log.isTraceEnabled()) {
-                log.trace("Key: {}", k);
+        }
+        
+        try (Scanner scanner = client.createScanner(tableName, auths.iterator().next())) {
+            Range range = new Range();
+            scanner.setRange(range);
+            for (Entry<Key,Value> entry : scanner) {
+                Key k = entry.getKey();
+                if (log.isTraceEnabled()) {
+                    log.trace("Key: {}", k);
+                }
             }
         }
     }
