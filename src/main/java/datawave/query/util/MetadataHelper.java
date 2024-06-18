@@ -12,12 +12,13 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -26,6 +27,7 @@ import java.util.stream.StreamSupport;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
+import org.apache.accumulo.core.client.BatchScanner;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
 import org.apache.accumulo.core.client.IteratorSetting;
@@ -53,6 +55,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -67,6 +70,7 @@ import datawave.data.ColumnFamilyConstants;
 import datawave.data.MetadataCardinalityCounts;
 import datawave.data.type.Type;
 import datawave.iterators.EdgeMetadataCombiner;
+import datawave.iterators.MetadataFColumnSeekingFilter;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
@@ -1531,6 +1535,143 @@ public class MetadataHelper {
         }
         
         return datatypeToCounts;
+    }
+    
+    /**
+     * Get counts for each field across the date range.
+     * <p>
+     * Note: it is highly recommended to use this method instead {@link #getCountsForFieldsInDateRange(Set, Set, Date, Date)}.
+     *
+     * @param fields
+     *            the fields
+     * @param begin
+     *            the start date
+     * @param end
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Date begin, Date end) {
+        return getCountsForFieldsInDateRange(fields, Collections.emptySet(), begin, end);
+    }
+    
+    /**
+     * Get counts for each field across the date range. Optionally filter by datatypes if provided.
+     *
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param begin
+     *            the start date
+     * @param end
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Set<String> datatypes, Date begin, Date end) {
+        Date truncatedBegin = DateUtils.truncate(begin, Calendar.DATE);
+        Date truncatedEnd = DateUtils.truncate(end, Calendar.DATE);
+        String startDate = DateHelper.format(truncatedBegin);
+        String endDate = DateHelper.format(truncatedEnd);
+        return getCountsForFieldsInDateRange(fields, datatypes, startDate, endDate);
+    }
+    
+    /**
+     * Get counts for each field across the date range. Optionally filter by datatypes if provided.
+     * 
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param beginDate
+     *            the start date
+     * @param endDate
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Set<String> datatypes, String beginDate, String endDate) {
+        
+        SortedSet<String> sortedDatatypes = new TreeSet<>(datatypes);
+        Map<String,Long> fieldCounts = new HashMap<>();
+        Set<Range> ranges = createFieldCountRanges(fields, sortedDatatypes, beginDate, endDate);
+        
+        try (BatchScanner bs = ScannerHelper.createBatchScanner(accumuloClient, getMetadataTableName(), getAuths(), fields.size())) {
+            
+            bs.setRanges(ranges);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            
+            IteratorSetting setting = new IteratorSetting(50, "MetadataFrequencySeekingIterator", MetadataFColumnSeekingFilter.class);
+            setting.addOption(MetadataFColumnSeekingFilter.DATATYPES_OPT, Joiner.on(',').join(sortedDatatypes));
+            setting.addOption(MetadataFColumnSeekingFilter.START_DATE, beginDate);
+            setting.addOption(MetadataFColumnSeekingFilter.END_DATE, endDate);
+            bs.addScanIterator(setting);
+            
+            for (Entry<Key,Value> entry : bs) {
+                
+                String field = entry.getKey().getRow().toString();
+                Long count = readLongFromValue(entry.getValue());
+                
+                if (fieldCounts.containsKey(field)) {
+                    Long existingCount = fieldCounts.get(field);
+                    existingCount += count;
+                    fieldCounts.put(field, existingCount);
+                } else {
+                    fieldCounts.put(field, count);
+                }
+            }
+            
+        } catch (TableNotFoundException | IOException e) {
+            throw new RuntimeException(e);
+        }
+        return fieldCounts;
+    }
+    
+    /**
+     * Build ranges for the {@link #getCountsForFieldsInDateRange(Set, Set, String, String)} method.
+     * <p>
+     * The {@link MetadataFColumnSeekingFilter} can handle a field range, but providing datatypes enables more precise ranges.
+     *
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param beginDate
+     *            the start date
+     * @param endDate
+     *            the end date
+     * @return a set of ranges for the provided fields, bounded by date and optionally datatypes
+     */
+    private Set<Range> createFieldCountRanges(Set<String> fields, SortedSet<String> datatypes, String beginDate, String endDate) {
+        Set<Range> ranges = new HashSet<>();
+        for (String field : fields) {
+            if (datatypes.isEmpty()) {
+                // punt the hard work to the MetadataFColumnSeekingFilter
+                ranges.add(Range.exact(field, "f"));
+            } else {
+                // more precise range, the MetadataFColumnSeekingFilter will handle seeing between the first and
+                // last datatypes as necessary
+                Key start = new Key(field, "f", datatypes.first() + '\u0000' + beginDate);
+                Key end = new Key(field, "f", datatypes.last() + '\u0000' + endDate + '\u0000');
+                ranges.add(new Range(start, true, end, false));
+            }
+        }
+        return ranges;
+    }
+    
+    /**
+     * Deserialize a Value that contains a Long
+     * 
+     * @param value
+     *            an accumulo Value
+     * @return a long
+     * @throws IOException
+     *             if there is a deserialization problem
+     */
+    private Long readLongFromValue(Value value) throws IOException {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(value.get())) {
+            try (DataInputStream inputStream = new DataInputStream(bais)) {
+                return WritableUtils.readVLong(inputStream);
+            }
+        }
     }
     
     /**
