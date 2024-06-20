@@ -1594,6 +1594,10 @@ public class MetadataHelper {
         Map<String,Long> fieldCounts = new HashMap<>();
         Set<Range> ranges = createFieldCountRanges(fields, sortedDatatypes, beginDate, endDate);
         
+        if (ranges.isEmpty()) {
+            return fieldCounts;
+        }
+        
         try (BatchScanner bs = ScannerHelper.createBatchScanner(accumuloClient, getMetadataTableName(), getAuths(), fields.size())) {
             
             bs.setRanges(ranges);
