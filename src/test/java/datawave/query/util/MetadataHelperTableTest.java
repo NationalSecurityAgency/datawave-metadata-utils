@@ -812,6 +812,40 @@ public class MetadataHelperTableTest {
         assertEquals(METADATA_TABLE_NAME, helper.getMetadataTableName());
     }
     
+    @Test
+    public void testGetCountsForFieldsInDateRange_SingleFieldSingleDatatypeSingleDayRange() {
+        // presuming a query like "SHAPE == 'foo' && COLOR == 'bar'"
+        Set<String> fields = Set.of("SHAPE");
+        Set<String> datatypes = Set.of("datatype-a");
+        Map<String,Long> counts = helper.getCountsForFieldsInDateRange(fields, datatypes, "20240302", "20240302");
+        
+        assertTrue(counts.containsKey("SHAPE"));
+        assertEquals(14L, counts.get("SHAPE"));
+    }
+    
+    @Test
+    public void testGetCountsForFieldsInDateRange_MultiFieldMultiDatatypeSingleDayRange() {
+        // presuming a query like "SHAPE == 'foo' && COLOR == 'bar'"
+        Set<String> fields = Set.of("SHAPE", "DEFINITION");
+        Set<String> datatypes = Set.of("datatype-a", "datatype-b");
+        Map<String,Long> counts = helper.getCountsForFieldsInDateRange(fields, datatypes, "20240302", "20240302");
+        
+        assertTrue(counts.containsKey("SHAPE"));
+        assertTrue(counts.containsKey("DEFINITION"));
+        assertEquals(14L, counts.get("SHAPE"));
+        assertEquals(14L, counts.get("DEFINITION"));
+    }
+    
+    @Test
+    public void testGetCountsForFieldsInDateRange_SingleFieldNoDatatypesMultiDayRange() {
+        // presuming a query like "SHAPE == 'foo' && COLOR == 'bar'"
+        Set<String> fields = Set.of("SHAPE");
+        Map<String,Long> counts = helper.getCountsForFieldsInDateRange(fields, Set.of(), "20240302", "20240304");
+        
+        assertTrue(counts.containsKey("SHAPE"));
+        assertEquals(536L, counts.get("SHAPE"));
+    }
+    
     /**
      * Assert that an iterable matches expectations
      * 
