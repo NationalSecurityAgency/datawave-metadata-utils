@@ -90,8 +90,8 @@ public class MetadataFColumnSeekingFilter extends SeekingFilter implements Optio
      */
     @Override
     public FilterResult filter(Key k, Value v) {
-        if (log.isDebugEnabled()) {
-            log.debug("filter key: {}", k.toStringNoTime());
+        if (log.isTraceEnabled()) {
+            log.trace("filter key: {}", k.toStringNoTime());
         }
         String cq = k.getColumnQualifier().toString();
         int index = cq.indexOf('\u0000');
@@ -114,8 +114,8 @@ public class MetadataFColumnSeekingFilter extends SeekingFilter implements Optio
     
     @Override
     public Key getNextKeyHint(Key k, Value v) {
-        if (log.isDebugEnabled()) {
-            log.debug("get next hint for key: {}", k.toStringNoTime());
+        if (log.isTraceEnabled()) {
+            log.trace("get next hint for key: {}", k.toStringNoTime());
         }
         
         Key hint;
@@ -136,7 +136,7 @@ public class MetadataFColumnSeekingFilter extends SeekingFilter implements Optio
             }
         }
         
-        log.debug("hint: {}", hint);
+        log.trace("hint: {}", hint);
         return hint;
     }
     
@@ -149,24 +149,24 @@ public class MetadataFColumnSeekingFilter extends SeekingFilter implements Optio
         // otherwise datatypes were provided
         String nextDatatype = datatypes.higher(datatype);
         if (nextDatatype != null) {
-            log.debug("seek to next datatype");
+            log.trace("seek to next datatype");
             Text nextColumnQualifier = new Text(nextDatatype + '\u0000' + startDate);
             return new Key(key.getRow(), key.getColumnFamily(), nextColumnQualifier);
         } else {
-            log.debug("seek to next ROW_COLFAM");
+            log.trace("seek to next ROW_COLFAM");
             // out of datatypes, we're done. This partial range will trigger a "beyond source" condition
             return key.followingKey(PartialKey.ROW_COLFAM);
         }
     }
     
     private Key getDatatypeRolloverKey(Key key, String datatype) {
-        log.debug("seek to rollover datatype");
+        log.trace("seek to rollover datatype");
         Text cq = new Text(datatype + '\u0000' + '\uffff');
         return new Key(key.getRow(), key.getColumnFamily(), cq);
     }
     
     private Key getSeekToStartDateKey(Key k, String datatype) {
-        log.debug("seek to start date");
+        log.trace("seek to start date");
         Text cq = new Text(datatype + '\u0000' + startDate);
         return new Key(k.getRow(), k.getColumnFamily(), cq);
     }
