@@ -22,14 +22,21 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
+import datawave.query.model.Direction;
+import datawave.query.model.FieldMapping;
+import datawave.query.model.ModelKeyParser;
+import datawave.query.model.QueryModel;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
+import org.apache.accumulo.core.client.TableNotFoundException;
 import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.iterators.LongCombiner;
 import org.apache.accumulo.core.security.Authorizations;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -142,6 +149,25 @@ public class MetadataHelperTableTest {
             // write some 'counts'
             MetadataCardinalityCounts counts = new MetadataCardinalityCounts("DEFINITION", "define", 23L, 34L, 45L, 56L, 67L, 78L);
             write(bw, "DEFINITION", "count", "define", counts.getValue());
+        
+            // Write a model.
+            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "EVENT_DATE", "start-time", Direction.FORWARD, "", Collections.emptySet()),
+                            "TEST_MODEL"));
+            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "EVENT_DATE", "start-time", Direction.REVERSE, "", Collections.emptySet()),
+                            "TEST_MODEL"));
+            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "UUID", "unique-id", Direction.FORWARD, "", Collections.emptySet()),
+                            "TEST_MODEL"));
+            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "UUID", "unique-id", Direction.REVERSE, "", Collections.emptySet()),
+                            "TEST_MODEL"));
+            // Test using regex patterns in forward matching model mappings.
+            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "TITLE|HEADER|DESIGNATION", "title", Direction.FORWARD, "", Collections.emptySet()),
+                            "TEST_MODEL"));
+            // Make sure the model fields appear when fetching all fields.
+            write(bw, "EVENT_DATE", "i", "datatype-a", EMPTY_VALUE);
+            write(bw, "UUID", "i", "datatype-a", EMPTY_VALUE);
+            write(bw, "TITLE", "i", "datatype-a", EMPTY_VALUE);
+            write(bw, "HEADER", "i", "datatype-a", EMPTY_VALUE);
+            write(bw, "DESIGNATION", "i", "datatype-a", EMPTY_VALUE);
         }
     }
     
@@ -166,6 +192,7 @@ public class MetadataHelperTableTest {
         m.put(cf, cq, value);
         bw.addMutation(m);
     }
+    
     
     /**
      * Create a value with an encoded long
@@ -250,9 +277,9 @@ public class MetadataHelperTableTest {
         Metadata metadata = helper.getMetadata();
         
         Set<String> datatypes = Set.of("datatype-a", "datatype-b");
-        Set<String> fields = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_ONLY");
-        Set<String> indexedFields = Set.of("SHAPE", "COLOR", "DEFINITION");
-        Set<String> indexOnlyFields = Set.of("DEFINITION");
+        Set<String> fields = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_ONLY", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
+        Set<String> indexedFields = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
+        Set<String> indexOnlyFields = Set.of("DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
         Set<String> termFrequencyFields = Set.of("DEFINITION");
         
         assertEquals(datatypes, metadata.getDatatypes());
@@ -269,9 +296,9 @@ public class MetadataHelperTableTest {
         Metadata metadata = helper.getMetadata(filter);
         
         Set<String> datatypes = Set.of("datatype-a");
-        Set<String> fields = Set.of("SHAPE", "DEFINITION", "EVENT_ONLY");
-        Set<String> indexedFields = Set.of("SHAPE", "DEFINITION");
-        Set<String> indexOnlyFields = Set.of("DEFINITION");
+        Set<String> fields = Set.of("SHAPE", "DEFINITION", "EVENT_ONLY", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
+        Set<String> indexedFields = Set.of("SHAPE", "DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
+        Set<String> indexOnlyFields = Set.of("DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
         Set<String> termFrequencyFields = Set.of("DEFINITION");
         
         assertEquals(datatypes, metadata.getDatatypes());
@@ -284,12 +311,12 @@ public class MetadataHelperTableTest {
     
     @Test
     public void testGetAllFields() throws Exception {
-        Set<String> expected = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_ONLY");
+        Set<String> expected = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_ONLY", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
         assertEquals(expected, helper.getAllFields(Collections.emptySet()));
         
         // and with filter
         Set<String> filter = Collections.singleton("datatype-a");
-        expected = Set.of("SHAPE", "DEFINITION", "EVENT_ONLY");
+        expected = Set.of("SHAPE", "DEFINITION", "EVENT_ONLY", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
         assertEquals(expected, helper.getAllFields(filter));
     }
     
@@ -301,7 +328,7 @@ public class MetadataHelperTableTest {
     
     @Test
     public void testGetNonEventFields() throws Exception {
-        Set<String> expected = Set.of("DEFINITION");
+        Set<String> expected = Set.of("DEFINITION", "EVENT_DATE", "HEADER", "TITLE", "UUID", "DESIGNATION");
         assertEquals(expected, helper.getNonEventFields(Collections.emptySet()));
         
         // then restrict the filter
@@ -327,15 +354,14 @@ public class MetadataHelperTableTest {
     
     @Test
     public void testGetIndexOnlyFields() throws Exception {
-        Set<String> expected = Set.of("DEFINITION");
+        Set<String> expected = Set.of("DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION");
         assertEquals(expected, helper.getIndexOnlyFields(Collections.emptySet()));
         
         // restrict filter
         Set<String> filter = Collections.singleton("datatype-b");
+        expected = Set.of("DEFINITION");
         assertEquals(expected, helper.getIndexOnlyFields(filter));
     }
-    
-    // skipping query model methods
     
     @Test
     public void testIsReverseIndexed() throws Exception {
@@ -563,10 +589,10 @@ public class MetadataHelperTableTest {
     
     @Test
     public void testGetIndexedFields() throws Exception {
-        Set<String> indexedFields = Set.of("SHAPE", "COLOR", "DEFINITION");
+        Set<String> indexedFields = Set.of("SHAPE", "COLOR", "DEFINITION", "EVENT_DATE", "DESIGNATION", "HEADER", "TITLE", "UUID");
         assertEquals(indexedFields, helper.getIndexedFields(null));
         assertEquals(indexedFields, helper.getIndexedFields(Collections.emptySet()));
-        assertEquals(Set.of("SHAPE", "DEFINITION"), helper.getIndexedFields(Set.of("datatype-a")));
+        assertEquals(Set.of("SHAPE", "DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION"), helper.getIndexedFields(Set.of("datatype-a")));
         assertEquals(Set.of("COLOR", "DEFINITION"), helper.getIndexedFields(Set.of("datatype-b")));
         assertEquals(Collections.emptySet(), helper.getIndexedFields(Set.of("datatype-c")));
     }
@@ -785,7 +811,7 @@ public class MetadataHelperTableTest {
     public void testLoadAllFields() throws Exception {
         Multimap<String,String> fields = helper.loadAllFields();
         assertEquals(Set.of("datatype-a", "datatype-b"), fields.keySet());
-        assertEquals(Set.of("SHAPE", "DEFINITION", "EVENT_ONLY"), fields.get("datatype-a"));
+        assertEquals(Set.of("SHAPE", "DEFINITION", "EVENT_ONLY", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION"), fields.get("datatype-a"));
         assertEquals(Set.of("COLOR", "DEFINITION"), fields.get("datatype-b"));
     }
     
@@ -793,7 +819,7 @@ public class MetadataHelperTableTest {
     public void testLoadIndexOnlyFields() throws Exception {
         Multimap<String,String> fields = helper.loadIndexOnlyFields();
         assertEquals(Set.of("datatype-a", "datatype-b"), fields.keySet());
-        assertEquals(Set.of("DEFINITION"), fields.get("datatype-a"));
+        assertEquals(Set.of("DEFINITION", "EVENT_DATE", "TITLE", "UUID", "HEADER", "DESIGNATION"), fields.get("datatype-a"));
         assertEquals(Set.of("DEFINITION"), fields.get("datatype-b"));
     }
     
@@ -844,6 +870,24 @@ public class MetadataHelperTableTest {
         
         assertTrue(counts.containsKey("SHAPE"));
         assertEquals(536L, counts.get("SHAPE"));
+    }
+    
+    @Test
+    void testGetQueryModel() throws TableNotFoundException, ExecutionException {
+        QueryModel queryModel = helper.getQueryModel(METADATA_TABLE_NAME, "TEST_MODEL");
+        
+        // Assert the forward mappings.
+        Multimap<String,String> forwardMappings = queryModel.getForwardQueryMapping();
+        Assertions.assertTrue(forwardMappings.containsEntry("start-time", "EVENT_DATE"));
+        Assertions.assertTrue(forwardMappings.containsEntry("unique-id", "UUID"));
+        Assertions.assertTrue(forwardMappings.containsEntry("title", "TITLE"));
+        Assertions.assertTrue(forwardMappings.containsEntry("title", "HEADER"));
+        Assertions.assertTrue(forwardMappings.containsEntry("title", "DESIGNATION"));
+        
+        // Assert the reverse mappings.
+        Map<String,String> reverseMappings = queryModel.getReverseQueryMapping();
+        Assertions.assertEquals(reverseMappings.get("EVENT_DATE"), "start-time");
+        Assertions.assertEquals(reverseMappings.get("UUID"), "unique-id");
     }
     
     /**
