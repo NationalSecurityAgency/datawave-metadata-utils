@@ -401,14 +401,14 @@ public class TypeMetadata implements Serializable {
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[0])))
                                 .map(Entry::getKey)
-                                .findFirst().get();
+                                .findFirst().orElse("");
 
                         String dataType = ImmutableMap.copyOf(getDataTypesMiniMap())
                                 .entrySet()
                                 .stream()
                                 .filter(e -> e.getValue().equals(Integer.valueOf(vs[1])))
                                 .map(Entry::getKey)
-                                .findFirst().get();
+                                .findFirst().orElse("");
                         // @formatter:on
                             
                             this.addTypeMetadata(entrySplits[0], ingestType, dataType);
