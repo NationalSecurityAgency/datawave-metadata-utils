@@ -24,10 +24,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
-import datawave.query.model.Direction;
-import datawave.query.model.FieldMapping;
-import datawave.query.model.ModelKeyParser;
-import datawave.query.model.QueryModel;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
@@ -50,6 +46,10 @@ import datawave.data.MetadataCardinalityCounts;
 import datawave.data.type.LcType;
 import datawave.data.type.Type;
 import datawave.query.composite.CompositeMetadataHelper;
+import datawave.query.model.Direction;
+import datawave.query.model.FieldMapping;
+import datawave.query.model.ModelKeyParser;
+import datawave.query.model.QueryModel;
 
 /**
  * Integration test for the {@link MetadataHelper}.
@@ -149,7 +149,7 @@ public class MetadataHelperTableTest {
             // write some 'counts'
             MetadataCardinalityCounts counts = new MetadataCardinalityCounts("DEFINITION", "define", 23L, 34L, 45L, 56L, 67L, 78L);
             write(bw, "DEFINITION", "count", "define", counts.getValue());
-        
+            
             // Write a model.
             bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "EVENT_DATE", "start-time", Direction.FORWARD, "", Collections.emptySet()),
                             "TEST_MODEL"));
@@ -160,8 +160,8 @@ public class MetadataHelperTableTest {
             bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "UUID", "unique-id", Direction.REVERSE, "", Collections.emptySet()),
                             "TEST_MODEL"));
             // Test using regex patterns in forward matching model mappings.
-            bw.addMutation(ModelKeyParser.createMutation(new FieldMapping("", "TITLE|HEADER|DESIGNATION", "title", Direction.FORWARD, "", Collections.emptySet()),
-                            "TEST_MODEL"));
+            bw.addMutation(ModelKeyParser.createMutation(
+                            new FieldMapping("", "TITLE|HEADER|DESIGNATION", "title", Direction.FORWARD, "", Collections.emptySet()), "TEST_MODEL"));
             // Make sure the model fields appear when fetching all fields.
             write(bw, "EVENT_DATE", "i", "datatype-a", EMPTY_VALUE);
             write(bw, "UUID", "i", "datatype-a", EMPTY_VALUE);
@@ -192,7 +192,6 @@ public class MetadataHelperTableTest {
         m.put(cf, cq, value);
         bw.addMutation(m);
     }
-    
     
     /**
      * Create a value with an encoded long

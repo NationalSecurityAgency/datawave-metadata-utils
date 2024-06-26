@@ -1,9 +1,9 @@
 package datawave.query.model;
 
+import java.util.Collections;
+
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-
-import java.util.Collections;
 
 public class FieldMappingTest {
     
