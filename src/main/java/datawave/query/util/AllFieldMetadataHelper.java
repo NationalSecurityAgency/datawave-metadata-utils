@@ -1281,6 +1281,10 @@ public class AllFieldMetadataHelper {
      */
     private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
+        // create local copies to avoid side effects
+        fields = new HashSet<>(fields);
+        datatypes = new HashSet<>(datatypes);
+        
         // Handle null fields if given.
         if (fields == null) {
             fields = Collections.emptySet();
@@ -1295,6 +1299,23 @@ public class AllFieldMetadataHelper {
         } else {
             // Ensure null is not present as an entry.
             datatypes.remove(null);
+        }
+        
+        // remove fields that are not indexed at all by the specified datatypes
+        Multimap<String,String> indexedFieldMap = (targetColumnFamily == ColumnFamilyConstants.COLF_I ? loadIndexedFields() : loadReverseIndexedFields());
+        Set<String> indexedFields = new HashSet<>();
+        if (datatypes.isEmpty()) {
+            indexedFields.addAll(indexedFieldMap.values());
+        } else {
+            indexedFields = new HashSet<>();
+            for (String datatype : datatypes) {
+                indexedFields.addAll(indexedFieldMap.get(datatype));
+            }
+        }
+        if (fields.isEmpty()) {
+            fields = indexedFields;
+        } else {
+            fields.retainAll(indexedFields);
         }
         
         // Ensure the minThreshold is a percentage in the range 0%-100%.
