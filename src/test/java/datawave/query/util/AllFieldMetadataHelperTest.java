@@ -42,6 +42,7 @@ import com.google.common.collect.Sets;
 
 import datawave.accumulo.inmemory.InMemoryAccumuloClient;
 import datawave.accumulo.inmemory.InMemoryInstance;
+import datawave.data.type.LcNoDiacriticsType;
 import datawave.query.composite.CompositeMetadataHelper;
 import datawave.query.model.FieldIndexHole;
 import datawave.util.time.DateHelper;
@@ -289,6 +290,7 @@ class AllFieldMetadataHelperTest {
 
         /**
          * Test against data that has a field index hole in the middle of a frequency date range for a given fieldName-datatype combination based on date gaps.
+         * This uses a negative index marker.
          */
         @ParameterizedTest
         @ValueSource(strings = {"i", "ri"})
@@ -312,6 +314,7 @@ class AllFieldMetadataHelperTest {
         /**
          * Test against data that has a field index hole in the middle of a frequency date range for a given fieldName-datatype combination based on the
          * threshold.
+         * This uses a positive index marker.
          */
         @ParameterizedTest
         @ValueSource(strings = {"i", "ri"})
@@ -319,6 +322,52 @@ class AllFieldMetadataHelperTest {
             FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
             mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200110", 1L);
             mutationCreator.addIndexMarkerMutation(cf, "NAME", "wiki", "20200103", true);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200107", "20200110", 1L);
+            mutationCreator.addFrequencyMutations("NAME", "csv", "20200101", "20200105", 1L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 1L);
+            writeMutations(mutationCreator.getMutations());
+
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:on
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            // @formatter:off
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+
+        /**
+         * Test against data that has a field index hole in the middle of a frequency date range for a given fieldName-datatype combination based on the
+         * threshold.
+         * This uses a positive index marker derived from an older date-less format
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testFieldIndexHoleWithIndexedMarkerSansDate(String cf) {
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200110", 1L);
+            mutationCreator.addIndexMarkerMutation(cf, "NAME", "wiki", "20200103");
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200107", "20200110", 1L);
+            mutationCreator.addFrequencyMutations("NAME", "csv", "20200101", "20200105", 1L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 1L);
+            writeMutations(mutationCreator.getMutations());
+
+            Map<String,Map<String,FieldIndexHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:on
+            Map<String,Map<String,FieldIndexHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            // @formatter:off
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+
+        /**
+         * Test against data that has a field index hole in the middle of a frequency date range for a given fieldName-datatype combination based on the
+         * threshold.
+         * This uses a positive index marker derived from an older date-less format with type class
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testFieldIndexHoleWithIndexedMarkerOldTypeFormat(String cf) {
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200110", 1L);
+            mutationCreator.addIndexMarkerMutation(cf, "NAME", "wiki", "20200103", LcNoDiacriticsType.class);
             mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200107", "20200110", 1L);
             mutationCreator.addFrequencyMutations("NAME", "csv", "20200101", "20200105", 1L);
             mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 1L);
@@ -1066,6 +1115,14 @@ class AllFieldMetadataHelperTest {
             addMutation(fieldName, cf, datatype, endDate, indexed);
         }
         
+        private void addIndexMarkerMutation(String cf, String fieldName, String datatype, String endDate) {
+            addMutation(fieldName, cf, datatype, endDate);
+        }
+        
+        private void addIndexMarkerMutation(String cf, String fieldName, String datatype, String endDate, Class typeClass) {
+            addMutation(fieldName, cf, datatype, endDate, typeClass);
+        }
+        
         private List<String> getDatesInRange(String startDateStr, String endDateStr) {
             Date startDate = DateHelper.parse(startDateStr);
             Date endDate = DateHelper.parse(endDateStr);
@@ -1098,6 +1155,22 @@ class AllFieldMetadataHelperTest {
             Mutation mutation = new Mutation(row);
             mutation.put(columnFamily, datatype + NULL_BYTE + date + NULL_BYTE + indexed, new Value());
             mutations.add(mutation);
+        }
+        
+        private void addMutation(String row, String columnFamily, String datatype, String date) {
+            Mutation mutation = new Mutation(row);
+            mutation.put(columnFamily, datatype, getTimestamp(date), new Value());
+            mutations.add(mutation);
+        }
+        
+        private void addMutation(String row, String columnFamily, String datatype, String date, Class type) {
+            Mutation mutation = new Mutation(row);
+            mutation.put(columnFamily, datatype + NULL_BYTE + type.getName(), getTimestamp(date), new Value());
+            mutations.add(mutation);
+        }
+        
+        private long getTimestamp(String date) {
+            return DateHelper.parse(date).getTime();
         }
         
         private List<Mutation> getMutations() {

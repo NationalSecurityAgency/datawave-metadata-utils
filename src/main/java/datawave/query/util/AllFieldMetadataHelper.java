@@ -5,7 +5,9 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -1443,31 +1445,50 @@ public class AllFieldMetadataHelper {
                 String cq = key.getColumnQualifier().toString();
                 int offset = cq.indexOf(NULL_BYTE);
                 if (offset < 0) {
-                    // we can assume this is an entry of the older format (perhaps the value aggregation is not being applied)
-                    log.error("Found an index entry missing the date: " + key);
-                    continue;
-                }
-                currDatatype = cq.substring(0, offset);
-                
-                // Check if the current field and datatype are part of the fields and datatypes we want to retrieve field index holes for.
-                if (!isPartOfTarget(currFieldName, currDatatype)) {
-                    continue;
-                }
-                
-                String cqRemainder = cq.substring((offset + 1));
-                // check for a marker of <dt>\0<date>\0true/false vs just <dt>\0<date>
-                // where the boolean denotes that we can assume the field is indexed/no on and before this date
-                offset = cqRemainder.indexOf(NULL_BYTE);
-                if (offset >= 0) {
-                    currBoundaryValue = Boolean.valueOf(cqRemainder.substring(offset + 1));
-                    currDate = DateHelper.parse(cqRemainder.substring(0, offset));
+                    currDatatype = cq;
+                    
+                    // Check if the current field and datatype are part of the fields and datatypes we want to retrieve field index holes for.
+                    if (!isPartOfTarget(currFieldName, currDatatype)) {
+                        continue;
+                    }
+                    
+                    // we can treat this like an index marker but the ts of the entry denotes the boundary
+                    currDate = getBaseDate(key.getTimestamp());
+                    log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
+                    currBoundaryValue = true;
                     currCount = 0;
                 } else {
-                    currBoundaryValue = null;
-                    currDate = DateHelper.parse(cqRemainder);
-                    ByteArrayInputStream byteStream = new ByteArrayInputStream(entry.getValue().get());
-                    DataInputStream inputStream = new DataInputStream(byteStream);
-                    currCount = WritableUtils.readVLong(inputStream);
+                    currDatatype = cq.substring(0, offset);
+                    
+                    // Check if the current field and datatype are part of the fields and datatypes we want to retrieve field index holes for.
+                    if (!isPartOfTarget(currFieldName, currDatatype)) {
+                        continue;
+                    }
+                    
+                    String cqRemainder = cq.substring((offset + 1));
+                    // check for a marker of <dt>\0<date>\0true/false vs just <dt>\0<date>
+                    // where the boolean denotes that we can assume the field is indexed/no on and before this date
+                    offset = cqRemainder.indexOf(NULL_BYTE);
+                    if (offset >= 0) {
+                        currBoundaryValue = Boolean.valueOf(cqRemainder.substring(offset + 1));
+                        currDate = DateHelper.parse(cqRemainder.substring(0, offset));
+                        currCount = 0;
+                    } else {
+                        currBoundaryValue = null;
+                        try {
+                            currDate = DateHelper.parse(cqRemainder);
+                            ByteArrayInputStream byteStream = new ByteArrayInputStream(entry.getValue().get());
+                            DataInputStream inputStream = new DataInputStream(byteStream);
+                            currCount = WritableUtils.readVLong(inputStream);
+                        } catch (DateTimeParseException e) {
+                            // probably the really old type classname format instead of a date.
+                            // we can treat this like an index marker but the ts of the entry denotes the boundary
+                            currDate = getBaseDate(key.getTimestamp());
+                            log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
+                            currBoundaryValue = true;
+                            currCount = 0;
+                        }
+                    }
                 }
                 
                 // If this is the very first entry we've looked at, update our tracking variables
@@ -1531,6 +1552,16 @@ public class AllFieldMetadataHelper {
             
             // Return the field index holes as an immutable structure.
             return getImmutableFieldIndexHoles();
+        }
+        
+        private Date getBaseDate(long ts) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(ts);
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            return c.getTime();
         }
         
         /**
