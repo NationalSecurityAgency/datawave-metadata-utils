@@ -33,6 +33,7 @@ import org.apache.accumulo.core.data.Range;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.iterators.user.RegExFilter;
 import org.apache.accumulo.core.security.Authorizations;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
@@ -1270,9 +1271,9 @@ public class AllFieldMetadataHelper {
      * @param targetColumnFamily
      *            the target column family
      * @param fields
-     *            a set of fields
+     *            a set of fields for which to get holes (can be empty to denote all)
      * @param datatypes
-     *            a set of datatypes
+     *            a set of datatypes (can be empty to denote all)
      * @param minThreshold
      *            the minimum threshold
      * @return a map of index holes by datatype
@@ -1314,10 +1315,17 @@ public class AllFieldMetadataHelper {
                 indexedFields.addAll(indexedFieldMap.get(datatype));
             }
         }
+        
+        // if the initial fields list is empty, then we want all possible holes
         if (fields.isEmpty()) {
             fields = indexedFields;
         } else {
             fields.retainAll(indexedFields);
+            
+            // if we have removed all fields, then there are no fields for which we can generate holes
+            if (fields.isEmpty()) {
+                return new HashMap<>();
+            }
         }
         
         // Ensure the minThreshold is a percentage in the range 0%-100%.
@@ -1377,6 +1385,11 @@ public class AllFieldMetadataHelper {
         
         public long getCount() {
             return this.count;
+        }
+        
+        @Override
+        public String toString() {
+            return ToStringBuilder.reflectionToString(this);
         }
     }
     
