@@ -872,7 +872,7 @@ public class MetadataHelperTableTest {
     }
     
     @Test
-    void testGetQueryModel() throws TableNotFoundException, ExecutionException {
+    public void testGetQueryModel() throws TableNotFoundException, ExecutionException {
         QueryModel queryModel = helper.getQueryModel(METADATA_TABLE_NAME, "TEST_MODEL");
         
         // Assert the forward mappings.
