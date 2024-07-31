@@ -57,6 +57,7 @@ import com.google.common.collect.Sets;
 
 import datawave.data.ColumnFamilyConstants;
 import datawave.data.type.Type;
+import datawave.data.type.TypeFactory;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.composite.CompositeMetadataHelper;
 import datawave.query.model.FieldIndexHole;
@@ -89,6 +90,8 @@ public class AllFieldMetadataHelper {
     
     protected final TypeMetadataHelper typeMetadataHelper;
     protected final CompositeMetadataHelper compositeMetadataHelper;
+    
+    protected final TypeFactory typeFactory = new TypeFactory();
     
     /**
      * Initializes the instance with a provided update interval.
@@ -731,7 +734,7 @@ public class AllFieldMetadataHelper {
      *             if the class is not accessible
      */
     protected Type<?> getDatatypeFromClass(Class<? extends Type<?>> datatypeClass) throws InstantiationException, IllegalAccessException {
-        return datatypeClass.newInstance();
+        return typeFactory.createType(datatypeClass.getName());
     }
     
     /**
