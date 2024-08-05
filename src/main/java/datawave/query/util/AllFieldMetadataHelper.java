@@ -91,7 +91,9 @@ public class AllFieldMetadataHelper {
     protected final TypeMetadataHelper typeMetadataHelper;
     protected final CompositeMetadataHelper compositeMetadataHelper;
     
-    protected final TypeFactory typeFactory = new TypeFactory();
+    private int typeCacheSize = -1;
+    private int typeCacheExpirationInMinutes = -1;
+    protected TypeFactory typeFactory = null;
     
     /**
      * Initializes the instance with a provided update interval.
@@ -734,7 +736,7 @@ public class AllFieldMetadataHelper {
      *             if the class is not accessible
      */
     protected Type<?> getDatatypeFromClass(Class<? extends Type<?>> datatypeClass) throws InstantiationException, IllegalAccessException {
-        return typeFactory.createType(datatypeClass.getName());
+        return getTypeFactory().createType(datatypeClass.getName());
     }
     
     /**
@@ -1366,6 +1368,22 @@ public class AllFieldMetadataHelper {
         return indexHoles;
     }
     
+    public int getTypeCacheSize() {
+        return typeCacheSize;
+    }
+    
+    public void setTypeCacheSize(int typeCacheSize) {
+        this.typeCacheSize = typeCacheSize;
+    }
+    
+    public int getTypeCacheExpirationInMinutes() {
+        return typeCacheExpirationInMinutes;
+    }
+    
+    public void setTypeCacheExpirationInMinutes(int typeCacheExpirationInMinutes) {
+        this.typeCacheExpirationInMinutes = typeCacheExpirationInMinutes;
+    }
+    
     private static class FieldCount {
         private long count = 0;
         private Boolean boundaryValue;
@@ -1793,4 +1811,21 @@ public class AllFieldMetadataHelper {
         return getKey(this);
     }
     
+    /**
+     * Simple 'get or create' method for the TypeFactory
+     *
+     * @return a TypeFactory.
+     */
+    protected TypeFactory getTypeFactory() {
+        if (typeFactory == null) {
+            
+            // check for configured size and TTL
+            if (typeCacheSize != -1 && typeCacheExpirationInMinutes != -1) {
+                typeFactory = new TypeFactory(typeCacheSize, typeCacheExpirationInMinutes);
+            } else {
+                typeFactory = new TypeFactory();
+            }
+        }
+        return typeFactory;
+    }
 }
