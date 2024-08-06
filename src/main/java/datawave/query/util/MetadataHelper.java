@@ -1608,7 +1608,12 @@ public class MetadataHelper {
             return fieldCounts;
         }
         
-        try (BatchScanner bs = ScannerHelper.createBatchScanner(accumuloClient, getMetadataTableName(), getAuths(), fields.size())) {
+        AccumuloClient client = accumuloClient;
+        if (client instanceof WrappedAccumuloClient) {
+            client = ((WrappedAccumuloClient) client).getReal();
+        }
+        
+        try (BatchScanner bs = ScannerHelper.createBatchScanner(client, getMetadataTableName(), getAuths(), fields.size())) {
             
             bs.setRanges(ranges);
             bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
