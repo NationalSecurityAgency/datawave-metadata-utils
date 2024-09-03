@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import datawave.iterators.FrequencyMetadataAggregator;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -114,7 +115,7 @@ public class MetadataHelperTest {
     private void givenAggregatedFrequencyRow(String row, Text colf, String datatype, DateFrequencyMap map) {
         Mutation mutation = new Mutation(row);
         Value value = new Value(WritableUtils.toByteArray(map));
-        mutation.put(colf, new Text(datatype), value);
+        mutation.put(colf, new Text(datatype + NULL_BYTE + FrequencyMetadataAggregator.AGGREGATED), value);
         givenMutation(mutation);
     }
     

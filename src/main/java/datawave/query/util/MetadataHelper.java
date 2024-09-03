@@ -13,20 +13,24 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import datawave.iterators.FrequencyMetadataAggregator;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
+import org.apache.accumulo.core.client.BatchScanner;
 import org.apache.accumulo.core.client.BatchWriter;
 import org.apache.accumulo.core.client.BatchWriterConfig;
 import org.apache.accumulo.core.client.IteratorSetting;
@@ -55,6 +59,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -69,6 +74,7 @@ import datawave.data.ColumnFamilyConstants;
 import datawave.data.MetadataCardinalityCounts;
 import datawave.data.type.Type;
 import datawave.iterators.EdgeMetadataCombiner;
+import datawave.iterators.MetadataFColumnSeekingFilter;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
@@ -383,7 +389,7 @@ public class MetadataHelper {
     
     /**
      * Set the evaluation only fields
-     *
+     * 
      * @param evaluationOnlyFields
      *            a collection of evaluation only fields
      */
@@ -458,7 +464,7 @@ public class MetadataHelper {
     
     /**
      * Get a QueryModel from the specified table
-     *
+     * 
      * @param modelTableName
      *            the query model table
      * @param modelName
@@ -504,31 +510,32 @@ public class MetadataHelper {
                             accumuloClient.getClass().getCanonicalName(), auths, modelTableName, modelName, unevaluatedFields);
         }
         
-        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
-        scan.setRange(new Range());
-        scan.fetchColumnFamily(new Text(modelName));
-        // We need the entire Model so we can do both directions.
-        final Set<String> allFields = this.getAllFields(ingestTypeFilter);
-        
-        for (Map.Entry<Key,Value> entry : scan) {
-            try {
-                FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey(), entry.getValue());
-                if (!mapping.isFieldMapping()) {
-                    queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
-                } else if (mapping.getDirection() == Direction.FORWARD) {
-                    // Do not add a forward mapping entry
-                    // when the replacement does not exist in the database
-                    if (allFields.contains(mapping.getFieldName())) {
-                        queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
-                    } else if (log.isTraceEnabled()) {
-                        log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
-                                        mapping.getModelFieldName());
+        try (Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths)) {
+            scan.setRange(new Range());
+            scan.fetchColumnFamily(new Text(modelName));
+            // We need the entire Model so we can do both directions.
+            final Set<String> allFields = this.getAllFields(ingestTypeFilter);
+            
+            for (Entry<Key,Value> entry : scan) {
+                try {
+                    FieldMapping mapping = ModelKeyParser.parseKey(entry.getKey(), entry.getValue());
+                    if (!mapping.isFieldMapping()) {
+                        queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
+                    } else if (mapping.getDirection() == Direction.FORWARD) {
+                        // Do not add a forward mapping entry
+                        // when the replacement does not exist in the database
+                        if (allFields.contains(mapping.getFieldName())) {
+                            queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
+                        } else if (log.isTraceEnabled()) {
+                            log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
+                                            mapping.getModelFieldName());
+                        }
+                    } else {
+                        queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
                     }
-                } else {
-                    queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
+                } catch (IllegalArgumentException iae) {
+                    log.warn("Ignoring unparseable key {}", entry.getKey());
                 }
-            } catch (IllegalArgumentException iae) {
-                log.warn("Ignoring unparseable key {}", entry.getKey());
             }
         }
         
@@ -566,31 +573,33 @@ public class MetadataHelper {
             log.trace("using client: {} with auths: {} and model table name: {}", accumuloClient.getClass().getCanonicalName(), auths, modelTableName);
         }
         
-        Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths);
-        scan.setRange(new Range());
         Set<String> modelNames = new HashSet<>();
-        Set<Text> ignoreColfs = new HashSet<>();
-        ignoreColfs.addAll(metadataIndexColfs);
-        ignoreColfs.addAll(metadataNormalizedColfs);
-        ignoreColfs.addAll(metadataTypeColfs);
-        ignoreColfs.addAll(metadataCompositeIndexColfs);
-        ignoreColfs.addAll(metadataCardinalityColfs);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_E);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_DESC);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_EDGE);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_F);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_H);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_VI);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_TF);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_VERSION);
-        ignoreColfs.add(ColumnFamilyConstants.COLF_EXP);
-        
-        for (Map.Entry<Key,Value> entry : scan) {
-            Text cf = entry.getKey().getColumnFamily();
-            if (!ignoreColfs.contains(entry.getKey().getColumnFamily())) {
-                if (entry.getKey().getColumnQualifier().toString().endsWith("\0forward")) {
+        try (Scanner scan = ScannerHelper.createScanner(accumuloClient, modelTableName, auths)) {
+            scan.setRange(new Range());
+            Set<Text> ignoreColfs = new HashSet<>();
+            ignoreColfs.addAll(metadataIndexColfs);
+            ignoreColfs.addAll(metadataNormalizedColfs);
+            ignoreColfs.addAll(metadataTypeColfs);
+            ignoreColfs.addAll(metadataCompositeIndexColfs);
+            ignoreColfs.addAll(metadataCardinalityColfs);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_E);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_DESC);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_EDGE);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_F);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_H);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_VI);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_TF);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_VERSION);
+            ignoreColfs.add(ColumnFamilyConstants.COLF_EXP);
+            
+            for (Entry<Key,Value> entry : scan) {
+                Text cf = entry.getKey().getColumnFamily();
+                Text cq = entry.getKey().getColumnQualifier();
+                
+                if (!ignoreColfs.contains(cf) && cq.toString().endsWith("\0forward")) {
                     modelNames.add(cf.toString());
                 }
+                
             }
         }
         
@@ -690,25 +699,23 @@ public class MetadataHelper {
         log.debug("cache fault for getFacets({}, {})", this.auths, table);
         Multimap<String,String> fieldPivots = HashMultimap.create();
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        bs.fetchColumnFamily(PV);
-        
-        for (Entry<Key,Value> entry : bs) {
-            Key key = entry.getKey();
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, table, auths)) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(PV);
             
-            if (null != key.getRow()) {
-                String[] parts = StringUtils.split(key.getRow().toString(), "\0");
-                if (parts.length == 2) {
-                    fieldPivots.put(parts[0], parts[1]);
-                    fieldPivots.put(parts[1], parts[0]);
-                    fieldPivots.put(parts[0], parts[0]);
+            for (Entry<Key,Value> entry : bs) {
+                Key key = entry.getKey();
+                
+                if (null != key.getRow()) {
+                    String[] parts = StringUtils.split(key.getRow().toString(), "\0");
+                    if (parts.length == 2) {
+                        fieldPivots.put(parts[0], parts[1]);
+                        fieldPivots.put(parts[1], parts[0]);
+                        fieldPivots.put(parts[0], parts[0]);
+                    }
+                } else {
+                    log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
-            } else {
-                log.warn("Row null in ColumnFamilyConstants for key: {}", key);
             }
         }
         
@@ -735,17 +742,10 @@ public class MetadataHelper {
             log.trace("getTermCounts from table: {}", metadataTableName);
         }
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataCardinalityColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_COUNT);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -757,8 +757,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableMap(allCounts);
@@ -786,17 +784,10 @@ public class MetadataHelper {
         
         Authorizations rootAuths = accumuloClient.securityOperations().getUserAuthorizations(accumuloClient.whoami());
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths));
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataCardinalityColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, Collections.singleton(rootAuths))) {
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_COUNT);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -808,8 +799,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableMap(allCounts);
@@ -834,17 +823,11 @@ public class MetadataHelper {
             log.trace("getAllNormalized from table: {}", metadataTableName);
         }
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        Range range = new Range();
-        
-        bs.setRange(range);
-        
-        // Fetch all of the index columns
-        for (Text colf : metadataNormalizedColfs) {
-            bs.fetchColumnFamily(colf);
-        }
-        
-        try {
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_N);
+            
             for (Entry<Key,Value> entry : bs) {
                 Key key = entry.getKey();
                 
@@ -854,8 +837,6 @@ public class MetadataHelper {
                     log.warn("Row null in ColumnFamilyConstants for key: {}", key);
                 }
             }
-        } finally {
-            bs.close();
         }
         
         return Collections.unmodifiableSet(normalizedFields);
@@ -1029,21 +1010,22 @@ public class MetadataHelper {
         }
         // unlike other entries, the edges colf entries have many auths set. We'll use the fullUserAuths in the scanner instead
         // of the minimal set in this.auths
-        Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths);
-        
-        scanner.setRange(new Range());
-        scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
-        
-        // First iterator strips the optional attribute2 and attribute3 off the cq, second one
-        // combines the protocol buffer data.
-        IteratorSetting stripConfig = new IteratorSetting(50, EdgeMetadataCQStrippingIterator.class);
-        IteratorSetting combineConfig = new IteratorSetting(51, EdgeMetadataCombiner.class);
-        combineConfig.addOption("columns", ColumnFamilyConstants.COLF_EDGE.toString());
-        scanner.addScanIterator(stripConfig);
-        scanner.addScanIterator(combineConfig);
-        
-        for (Map.Entry<Key,Value> entry : scanner) {
-            edges.put(entry.getKey(), entry.getValue());
+        try (Scanner scanner = ScannerHelper.createScanner(accumuloClient, metadataTableName, fullUserAuths)) {
+            
+            scanner.setRange(new Range());
+            scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_EDGE);
+            
+            // First iterator strips the optional attribute2 and attribute3 off the cq, second one
+            // combines the protocol buffer data.
+            IteratorSetting stripConfig = new IteratorSetting(50, EdgeMetadataCQStrippingIterator.class);
+            IteratorSetting combineConfig = new IteratorSetting(51, EdgeMetadataCombiner.class);
+            combineConfig.addOption("columns", ColumnFamilyConstants.COLF_EDGE.toString());
+            scanner.addScanIterator(stripConfig);
+            scanner.addScanIterator(combineConfig);
+            
+            for (Entry<Key,Value> entry : scanner) {
+                edges.put(entry.getKey(), entry.getValue());
+            }
         }
         
         return Multimaps.unmodifiableSetMultimap(edges);
@@ -1274,73 +1256,61 @@ public class MetadataHelper {
         log.trace("getCardinalityForField from table: {}", metadataTableName);
         Text row = new Text(fieldName.toUpperCase());
         
-        // Get all the rows in DatawaveMetadata for the field, only in the 'f' column family.
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        
-        Key startKey = new Key(row);
-        bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
-        
+        // Get all the rows in DatawaveMetadata for the field, only in the 'f' colfam
         long count = 0;
-        
-        for (Entry<Key,Value> entry : bs) {
-            Text colq = entry.getKey().getColumnQualifier();
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
             
-            // Check for the presence of a null byte in the colq. If present, we have a non-aggregated entry with a Long value. If not present, we have an
-            // aggregated entry with a DateFrequencyMap value.
-            int index = colq.find(NULL_BYTE);
+            Key startKey = new Key(row);
+            bs.setRange(new Range(startKey, startKey.followingKey(PartialKey.ROW)));
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             
-            // If a null byte is present in the colq, this is a non-aggregated entry.
-            if (index != -1) {
-                // If a datatype was specified, sum the count only if the current datatype matches.
-                if (null != datatype) {
-                    try {
-                        String type = Text.decode(colq.getBytes(), 0, index);
-                        if (!type.equals(datatype)) {
-                            continue;
-                        }
-                    } catch (CharacterCodingException e) {
-                        log.warn("Could not deserialize colqual: {}", entry.getKey());
-                        continue;
-                    }
+            // If a datatype was specified, add a regex filter to only include entries with the datatype.
+            if (datatype != null) {
+                IteratorSetting colqRegex = new IteratorSetting(50, RegExFilter.class);
+                RegExFilter.setRegexs(colqRegex, null, null, datatype + "\u0000.*", null, false);
+                bs.addScanIterator(colqRegex);
+            }
+            
+            for (Entry<Key,Value> entry : bs) {
+                Text colq = entry.getKey().getColumnQualifier();
+                int index = colq.find(NULL_BYTE);
+                
+                String remainder;
+                try {
+                    remainder = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
+                } catch (CharacterCodingException e) {
+                    log.warn("Could not deserialize colqual: {} ", entry.getKey());
+                    continue;
                 }
                 
-                // Parse the date to ensure that we want this record.
-                String dateStr = null;
-                try {
-                    dateStr = Text.decode(colq.getBytes(), index + 1, colq.getLength() - (index + 1));
-                    Date date = DateHelper.parse(dateStr);
-                    // Add the provided count if we fall within begin and end, inclusively.
-                    if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
-                        count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                // This is an aggregated entry.
+                if (remainder.equals(FrequencyMetadataAggregator.AGGREGATED)) {
+                    try {
+                        DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                        // Fetch all entries within the target date range and sum the counts.
+                        long sum = map.subMap(DateHelper.format(begin), DateHelper.format(end)).values().stream().mapToLong(Frequency::getValue).sum();
+                        count += sum;
+                    } catch (IOException e) {
+                        log.warn("Could not convert the Value to a DateFrequencyMap: {}", entry.getValue());
+                        log.error("Failed to convert Value to DateFrequencyMap", e);
                     }
-                } catch (ValueFormatException e) {
-                    log.warn("Could not convert the Value to a long: {}", entry.getValue());
-                } catch (CharacterCodingException e) {
-                    log.warn("Could not deserialize colqual: {}", entry.getKey());
-                } catch (DateTimeParseException e) {
-                    log.warn("Could not convert date string: {}", dateStr);
-                }
-            } else {
-                // If a datatype was specified, sum the counts only if the current datatype matches.
-                if (datatype != null) {
-                    String type = colq.toString();
-                    if (!type.equals(datatype)) {
-                        continue;
+                } else {
+                    // This is an entry with a count for a single date.
+                    try {
+                        Date date = DateHelper.parse(remainder);
+                        // Add the provided count if we fall within begin and end, inclusively.
+                        if (date.compareTo(begin) >= 0 && date.compareTo(end) <= 0) {
+                            count += SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                        }
+                    } catch (ValueFormatException e) {
+                        log.warn("Could not convert the Value to a long: {}", entry.getValue());
+                    } catch (DateTimeParseException e) {
+                        log.warn("Could not convert date string: {}", remainder);
                     }
-                }
-                try {
-                    DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
-                    // Fetch all entries within the target date range and sum the counts.
-                    long sum = map.subMap(DateHelper.format(begin), DateHelper.format(end)).values().stream().mapToLong(Frequency::getValue).sum();
-                    count += sum;
-                } catch (IOException e) {
-                    log.debug("Could not convert the value to a " + DateFrequencyMap.class.getSimpleName());
                 }
             }
         }
         
-        bs.close();
         return count;
     }
     
@@ -1365,7 +1335,7 @@ public class MetadataHelper {
     
     /**
      * Returns the sum of counts for the given field across all datatypes in the date range
-     *
+     * 
      * @param fieldName
      *            the field
      * @param begin
@@ -1476,6 +1446,8 @@ public class MetadataHelper {
      * Get the counts for a field and date pair across all ingest types.
      * <p>
      * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
      *
      * @param identifier
      *            a pair of field and date
@@ -1501,26 +1473,46 @@ public class MetadataHelper {
         return datatypeToCounts;
     }
     
+    /**
+     * Get the counts for a field and date pair across all ingest typos
+     * <p>
+     * Note: the method name does not match the underlying operation.
+     * <p>
+     * Get the map of counts by datatype for the provided field. No filtering is done by ingest type, all types are searched.
+     *
+     * @param fieldName
+     *            the field name
+     * @param date
+     *            the date
+     * @param client
+     *            the AccumuloClient
+     * @param wrappedClient
+     *            the 'real' client, used to update a cache
+     * @return a map of counts by datatype
+     * @throws TableNotFoundException
+     *             if no table exists
+     * @throws IOException
+     *             if there is an IO problem
+     */
     protected HashMap<String,Long> getCountsByFieldInDayWithTypes(String fieldName, String date, AccumuloClient client, WrappedAccumuloClient wrappedClient)
                     throws TableNotFoundException, IOException {
         final HashMap<String,Long> datatypeToCounts = Maps.newHashMap();
         
         BatchWriter writer = null;
         
-        try {
-            // we have to use the real connector since the f column is not cached
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        // we have to use the real connector since the f column is not cached
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
-            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date> (non-aggregated
-            // entries).
-            // Filter out any non-aggregated entries that does not have the date in the column qualifier.
+            // It's possible to find rows with column qualifiers in the format <datatype>\0AGGREGATED (aggregated entries) and/or <datatype>\0<date>
+            // (non-aggregated entries). Filter out any non-aggregated entries that do not have the date in the column qualifier.
             IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-            // Allow any entries that do not contain the null byte delimiter, or contain it with the target date directly afterwards.
-            RegExFilter.setRegexs(cqRegex, null, null, "^((?!\u0000).)*$|^(.*\u0000" + date + ")$", null, false);
+            // Allow any entries that contain the aggregated marker, or contain the null byte with the target date directly afterwards.
+            RegExFilter.setRegexs(cqRegex, null, null, "^(.*\u0000" + FrequencyMetadataAggregator.AGGREGATED + ")$|^(.*\u0000" + date + ")$", null, false);
             scanner.addScanIterator(cqRegex);
             
+            final Text holder = new Text();
             for (Entry<Key,Value> entry : scanner) {
                 // if this is the real connector, and wrapped connector is not null, it means
                 // that we didn't get a hit in the cache. So, we will update the cache with the
@@ -1529,13 +1521,20 @@ public class MetadataHelper {
                     writer = updateCache(entry, writer, wrappedClient);
                 }
                 
-                Text colq = entry.getKey().getColumnQualifier();
-                int nullBytePos = colq.find(NULL_BYTE);
+                entry.getKey().getColumnQualifier(holder);
+                int offset = holder.find(NULL_BYTE);
                 
-                // If the null byte is not present in the colq, this is an aggregated entry. The colq consists solely of the datatype, and the value is a
-                // DateFrequencyMap.
-                if (nullBytePos == -1) {
-                    String datatype = Text.decode(colq.getBytes());
+                String datatype = Text.decode(holder.getBytes(), 0, offset);
+                String remainder;
+                try {
+                    remainder = Text.decode(holder.getBytes(), offset + 1, holder.getLength() - (offset + 1));
+                } catch (CharacterCodingException e) {
+                    log.warn("Could not deserialize colqual: {} ", entry.getKey());
+                    continue;
+                }
+                
+                // This is an aggregated entry.
+                if (remainder.equals(FrequencyMetadataAggregator.AGGREGATED)) {
                     DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
                     // If a count is present for the target date, merge in the sum.
                     if (map.contains(date)) {
@@ -1543,11 +1542,10 @@ public class MetadataHelper {
                         datatypeToCounts.merge(datatype, count, Long::sum);
                     }
                 } else {
-                    // If the null byte is present, this is an entry that hasn't been compacted yet. The colq consists of the datatype and date, and the value
-                    // is a
-                    // long.
-                    String datatype = Text.decode(colq.getBytes(), 0, nullBytePos);
-                    Long count = SummingCombiner.VAR_LEN_ENCODER.decode(entry.getValue().get());
+                    // This is an entry with a count for a single date.
+                    ByteArrayInputStream bais = new ByteArrayInputStream(entry.getValue().get());
+                    DataInputStream inputStream = new DataInputStream(bais);
+                    long count = WritableUtils.readVLong(inputStream);
                     datatypeToCounts.merge(datatype, count, Long::sum);
                 }
             }
@@ -1565,8 +1563,154 @@ public class MetadataHelper {
     }
     
     /**
-     * Get the earliest occurrence of a field across all datatypes
+     * Get counts for each field across the date range.
+     * <p>
+     * Note: it is highly recommended to use this method instead {@link #getCountsForFieldsInDateRange(Set, Set, Date, Date)}.
      *
+     * @param fields
+     *            the fields
+     * @param begin
+     *            the start date
+     * @param end
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Date begin, Date end) {
+        return getCountsForFieldsInDateRange(fields, Collections.emptySet(), begin, end);
+    }
+    
+    /**
+     * Get counts for each field across the date range. Optionally filter by datatypes if provided.
+     *
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param begin
+     *            the start date
+     * @param end
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Set<String> datatypes, Date begin, Date end) {
+        Date truncatedBegin = DateUtils.truncate(begin, Calendar.DATE);
+        Date truncatedEnd = DateUtils.truncate(end, Calendar.DATE);
+        String startDate = DateHelper.format(truncatedBegin);
+        String endDate = DateHelper.format(truncatedEnd);
+        return getCountsForFieldsInDateRange(fields, datatypes, startDate, endDate);
+    }
+    
+    /**
+     * Get counts for each field across the date range. Optionally filter by datatypes if provided.
+     *
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param beginDate
+     *            the start date
+     * @param endDate
+     *            the end date
+     * @return a map of field counts
+     */
+    public Map<String,Long> getCountsForFieldsInDateRange(Set<String> fields, Set<String> datatypes, String beginDate, String endDate) {
+        
+        SortedSet<String> sortedDatatypes = new TreeSet<>(datatypes);
+        Map<String,Long> fieldCounts = new HashMap<>();
+        Set<Range> ranges = createFieldCountRanges(fields, sortedDatatypes, beginDate, endDate);
+        
+        if (ranges.isEmpty()) {
+            return fieldCounts;
+        }
+        
+        AccumuloClient client = accumuloClient;
+        if (client instanceof WrappedAccumuloClient) {
+            client = ((WrappedAccumuloClient) client).getReal();
+        }
+        
+        try (BatchScanner bs = ScannerHelper.createBatchScanner(client, getMetadataTableName(), getAuths(), fields.size())) {
+            
+            bs.setRanges(ranges);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
+            
+            IteratorSetting setting = new IteratorSetting(50, "MetadataFrequencySeekingIterator", MetadataFColumnSeekingFilter.class);
+            setting.addOption(MetadataFColumnSeekingFilter.DATATYPES_OPT, Joiner.on(',').join(sortedDatatypes));
+            setting.addOption(MetadataFColumnSeekingFilter.START_DATE, beginDate);
+            setting.addOption(MetadataFColumnSeekingFilter.END_DATE, endDate);
+            bs.addScanIterator(setting);
+            
+            for (Entry<Key,Value> entry : bs) {
+                
+                String field = entry.getKey().getRow().toString();
+                Long count = readLongFromValue(entry.getValue());
+                
+                if (fieldCounts.containsKey(field)) {
+                    Long existingCount = fieldCounts.get(field);
+                    existingCount += count;
+                    fieldCounts.put(field, existingCount);
+                } else {
+                    fieldCounts.put(field, count);
+                }
+            }
+            
+        } catch (TableNotFoundException | IOException e) {
+            throw new RuntimeException(e);
+        }
+        return fieldCounts;
+    }
+    
+    /**
+     * Build ranges for the {@link #getCountsForFieldsInDateRange(Set, Set, String, String)} method.
+     * <p>
+     * The {@link MetadataFColumnSeekingFilter} can handle a field range, but providing datatypes enables more precise ranges.
+     *
+     * @param fields
+     *            the fields
+     * @param datatypes
+     *            the datatypes
+     * @param beginDate
+     *            the start date
+     * @param endDate
+     *            the end date
+     * @return a set of ranges for the provided fields, bounded by date and optionally datatypes
+     */
+    private Set<Range> createFieldCountRanges(Set<String> fields, SortedSet<String> datatypes, String beginDate, String endDate) {
+        Set<Range> ranges = new HashSet<>();
+        for (String field : fields) {
+            if (datatypes.isEmpty()) {
+                // punt the hard work to the MetadataFColumnSeekingFilter
+                ranges.add(Range.exact(field, "f"));
+            } else {
+                // more precise range, the MetadataFColumnSeekingFilter will handle seeing between the first and
+                // last datatypes as necessary
+                Key start = new Key(field, "f", datatypes.first() + '\u0000' + beginDate);
+                Key end = new Key(field, "f", datatypes.last() + '\u0000' + endDate + '\u0000');
+                ranges.add(new Range(start, true, end, false));
+            }
+        }
+        return ranges;
+    }
+    
+    /**
+     * Deserialize a Value that contains a Long
+     *
+     * @param value
+     *            an accumulo Value
+     * @return a long
+     * @throws IOException
+     *             if there is a deserialization problem
+     */
+    private Long readLongFromValue(Value value) throws IOException {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(value.get())) {
+            try (DataInputStream inputStream = new DataInputStream(bais)) {
+                return WritableUtils.readVLong(inputStream);
+            }
+        }
+    }
+    
+    /**
+     * Get the earliest occurrence of a field across all datatypes
+     * 
      * @param fieldName
      *            the field
      * @return the earliest date that this field occurs
@@ -1577,7 +1721,7 @@ public class MetadataHelper {
     
     /**
      * Get the earliest occurrence of a field for the given datatype
-     *
+     * 
      * @param fieldName
      *            the field
      * @param dataType
@@ -1599,101 +1743,90 @@ public class MetadataHelper {
     
     /**
      * Get the earliest occurrence of a field given a datatype
-     *
+     * 
      * @param fieldName
      *            the field
-     * @param dataTypeFilter
-     *            the datatype to filter on
+     * @param datatypeFilter
+     *            the datatype
      * @param client
      *            an AccumuloClient
      * @param wrappedClient
      *            a wrapped AccumuloClient
      * @return the earliest date the field is found, or null otherwise
      */
-    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String dataTypeFilter, AccumuloClient client,
-                    WrappedAccumuloClient wrappedClient) {
-        String prevDatatype = null;
-        boolean prevEntryAggregated = false;
+    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String datatypeFilter, AccumuloClient client, WrappedAccumuloClient wrappedClient) {
         String earliestDate = null;
+        String prevDatatype = null;
+        boolean skipToAggregated = false;
         BatchWriter writer = null;
         
-        try {
-            Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths);
+        try (Scanner scanner = ScannerHelper.createScanner(client, metadataTableName, auths)) {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
-            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date>
-            // (non-aggregated entries). Filter out any non-aggregated entries that does not have the date in the column qualifier.
-            if (dataTypeFilter != null) {
+            // if a type was specified, add a regex filter for it
+            if (datatypeFilter != null) {
                 IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
-                // Allow any entries that match the datatype exactly, or contain it with a null byte afterwards..
-                RegExFilter.setRegexs(cqRegex, null, null, "^" + dataTypeFilter + "$|^(" + dataTypeFilter + "\u0000.*" + ")$", null, false);
+                RegExFilter.setRegexs(cqRegex, null, null, datatypeFilter + "\u0000.*", null, false);
                 scanner.addScanIterator(cqRegex);
             }
             
-            try {
-                for (Entry<Key,Value> entry : scanner) {
-                    // if this is the real connector, and wrapped connector is not null, it means that we didn't get a hit in the cache. So, we will update the
-                    // cache with the entries from the real table.
-                    if (wrappedClient != null && client == wrappedClient.getReal()) {
-                        writer = updateCache(entry, writer, wrappedClient);
+            final Text holder = new Text();
+            
+            for (Entry<Key,Value> entry : scanner) {
+                // if this is the real connector, and wrapped connector is not null, it means
+                // that we didn't get a hit in the cache. So, we will update the cache with the
+                // entries from the real table
+                if (wrappedClient != null && client == wrappedClient.getReal()) {
+                    writer = updateCache(entry, writer, wrappedClient);
+                }
+                
+                entry.getKey().getColumnQualifier(holder);
+                int offset = holder.find(NULL_BYTE);
+                
+                // Extract the datatype and the remainder of the colq.
+                String datatype;
+                String remainder;
+                try {
+                    datatype = Text.decode(holder.getBytes(), 0, offset);
+                    remainder = Text.decode(holder.getBytes(), (offset + 1), holder.getLength() - (offset + 1));
+                } catch (CharacterCodingException e) {
+                    log.trace("Could not deserialize colqual: {} ", entry.getKey());
+                    continue;
+                }
+                
+                // If this is the first datatype we've seen, or a new datatype (if a datatype filter was not specified) was seen, update the prev datatype seen
+                // and do not skip to the next aggregated entry.
+                if (prevDatatype == null || !prevDatatype.equals(datatype)) {
+                    prevDatatype = datatype;
+                    skipToAggregated = false;
+                }
+                
+                // This is an aggregated entry with counts for multiple dates. These entries have the colq format <datatype>\0AGGREGATED, and will thus be
+                // sorted after entries with the colq format <datatype>\0<yyyyMMdd>. Check if the earliest date in the aggregated counts map is earlier than
+                // any dates seen thus far.
+                if (remainder.equals(FrequencyMetadataAggregator.AGGREGATED)) {
+                    try {
+                        DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
+                        String earliest = map.earliestDate();
+                        if (earliestDate == null || earliest.compareTo(earliestDate) < 0) {
+                            earliestDate = earliest;
+                        }
+                    } catch (IOException e) {
+                        log.trace("Could not convert the Value to a DateFrequencyMap: {}", entry.getValue());
+                        log.error("Failed to convert Value to DateFrequencyMap", e);
                     }
-                    
-                    String colq = entry.getKey().getColumnQualifier().toString();
-                    int nullBytePos = colq.indexOf(NULL_BYTE);
-                    
-                    // If the null byte is not present in the colq, this is an aggregated entry. The colq consists solely of the datatype, and the value is a
-                    // DateFrequencyMap.
-                    if (nullBytePos == -1) {
-                        // If a datatype filter was not specified, track/update the current datatype.
-                        if (dataTypeFilter == null) {
-                            if (prevDatatype == null || !prevDatatype.equals(colq)) {
-                                prevDatatype = colq;
-                            }
+                } else {
+                    // If skipToAggregated is false, this is the first entry seen for the current datatype with the colq format <datatype>\0<yyyyMMdd>, and will
+                    // have the earliest date for the current datatype for entries with this colq format. Check if the date is the earliest date seen thus far,
+                    // and then skip ahead to any aggregated entries for the current datatype with the colq format <datatype>\0<yyyyMMdd>.
+                    if (!skipToAggregated) {
+                        if (earliestDate == null || remainder.compareTo(earliestDate) < 0) {
+                            earliestDate = remainder;
                         }
-                        try {
-                            // The value is a DateFrequencyMap. Fetch the earliest date from it.
-                            DateFrequencyMap map = new DateFrequencyMap(entry.getValue().get());
-                            String earliestKey = map.earliestDate();
-                            // If the earliest date has not been set yet, or the previous earliest date value is later than the current date, update it.
-                            if (earliestDate == null || earliestKey.compareTo(earliestDate) < 0) {
-                                earliestDate = earliestKey;
-                            }
-                        } catch (IOException e) {
-                            log.trace("Could not parse DateFrequencyMap from value for {}", entry.getKey());
-                        }
-                        // Mark that we saw an aggregated entry last.
-                        prevEntryAggregated = true;
-                    } else {
-                        // If a datatype filter was specified, we only need to check the date of the first non-aggregated entry we see.
-                        if (dataTypeFilter != null) {
-                            String date = colq.substring((nullBytePos + 1));
-                            // If the earliest date has not been set yet, or the previous earliest date from an aggregated entry is later than the current date,
-                            // we have found the earliest date.
-                            if (earliestDate == null || date.compareTo(earliestDate) < 0) {
-                                earliestDate = date;
-                            }
-                            break;
-                        } else {
-                            // If a datatype filter was specified, we need to check for a possible earlier date if either the previous entry was an aggregated
-                            // entry, or if the current datatype differs from the previous datatype.
-                            String datatype = colq.substring(0, nullBytePos);
-                            if (prevEntryAggregated || prevDatatype == null || !prevDatatype.equals(datatype)) {
-                                String date = colq.substring((nullBytePos + 1));
-                                // If the earliest date has not been set yet, or the previous earliest date value is later than the current date, update it.
-                                if (earliestDate == null || date.compareTo(earliestDate) < 0) {
-                                    earliestDate = date;
-                                }
-                            }
-                            // Update the last datatype seen.
-                            prevDatatype = datatype;
-                        }
-                        // Mark that we saw a non-aggregated entry last.
-                        prevEntryAggregated = false;
+                        skipToAggregated = true;
                     }
                 }
-            } finally {
-                scanner.close();
             }
         } catch (TableNotFoundException e) {
             log.warn("Error creating scanner against table: {}", metadataTableName, e);
@@ -1712,6 +1845,7 @@ public class MetadataHelper {
         if (earliestDate != null) {
             date = DateHelper.parse(earliestDate);
         }
+        
         return date;
     }
     
@@ -1838,35 +1972,29 @@ public class MetadataHelper {
     protected Multimap<String,String> loadAllFields() throws TableNotFoundException {
         Multimap<String,String> fields = HashMultimap.create();
         
-        // TODO -- close this scanner
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        if (log.isTraceEnabled()) {
-            log.trace("loadAllFields from table: {}", metadataTableName);
-        }
-        
-        bs.setRange(new Range());
-        
-        // We don't want to fetch all columns because that could include model
-        // field names
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_T);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_RI);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
-        
-        Iterator<Entry<Key,Value>> iterator = bs.iterator();
-        
-        while (iterator.hasNext()) {
-            Entry<Key,Value> entry = iterator.next();
-            Key k = entry.getKey();
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            if (log.isTraceEnabled()) {
+                log.trace("loadAllFields from table: {}", metadataTableName);
+            }
             
-            String fieldname = k.getRow().toString();
-            String datatype = getDatatype(k);
+            bs.setRange(new Range());
             
-            fields.put(datatype, fieldname);
+            // We don't want to fetch all columns because that could include model
+            // field names
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_T);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_RI);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
+            
+            for (Entry<Key,Value> entry : bs) {
+                Key k = entry.getKey();
+                String fieldname = k.getRow().toString();
+                String datatype = getDatatype(k);
+                fields.put(datatype, fieldname);
+            }
         }
-        
         return Multimaps.unmodifiableMultimap(fields);
     }
     
@@ -1896,13 +2024,14 @@ public class MetadataHelper {
         }
         
         // Scanner to the provided metadata table
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        
-        bs.setRange(new Range());
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
-        
-        for (Entry<Key,Value> entry : bs) {
-            fields.put(getDatatype(entry.getKey()), entry.getKey().getRow().toString());
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            
+            bs.setRange(new Range());
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_TF);
+            
+            for (Entry<Key,Value> entry : bs) {
+                fields.put(getDatatype(entry.getKey()), entry.getKey().getRow().toString());
+            }
         }
         
         return Multimaps.unmodifiableMultimap(fields);
@@ -1938,24 +2067,42 @@ public class MetadataHelper {
      * @throws InvalidProtocolBufferException
      *             can't be thrown, remove
      */
+    @Deprecated(forRemoval = true, since = "4.0.0")
     public static void basicIterator(AccumuloClient client, String tableName, Collection<Authorizations> auths)
                     throws TableNotFoundException, InvalidProtocolBufferException {
-        if (log.isTraceEnabled())
+        if (log.isTraceEnabled()) {
             log.trace("--- basicIterator --- {}", tableName);
-        Scanner scanner = client.createScanner(tableName, auths.iterator().next());
-        Range range = new Range();
-        scanner.setRange(range);
-        Iterator<Entry<Key,Value>> iter = scanner.iterator();
-        while (iter.hasNext()) {
-            Entry<Key,Value> entry = iter.next();
-            Key k = entry.getKey();
-            if (log.isTraceEnabled()) {
-                log.trace("Key: {}", k);
+        }
+        
+        try (Scanner scanner = client.createScanner(tableName, auths.iterator().next())) {
+            Range range = new Range();
+            scanner.setRange(range);
+            for (Entry<Key,Value> entry : scanner) {
+                Key k = entry.getKey();
+                if (log.isTraceEnabled()) {
+                    log.trace("Key: {}", k);
+                }
             }
         }
     }
     
     public String getMetadataTableName() {
         return metadataTableName;
+    }
+    
+    public int getTypeCacheSize() {
+        return allFieldMetadataHelper.getTypeCacheSize();
+    }
+    
+    public void setTypeCacheSize(int typeCacheSize) {
+        allFieldMetadataHelper.setTypeCacheSize(typeCacheSize);
+    }
+    
+    public int getTypeCacheExpirationInMinutes() {
+        return allFieldMetadataHelper.getTypeCacheExpirationInMinutes();
+    }
+    
+    public void setTypeCacheExpirationInMinutes(int typeCacheExpirationInMinutes) {
+        allFieldMetadataHelper.setTypeCacheExpirationInMinutes(typeCacheExpirationInMinutes);
     }
 }

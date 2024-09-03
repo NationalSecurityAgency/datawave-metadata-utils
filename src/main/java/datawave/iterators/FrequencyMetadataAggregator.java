@@ -1,6 +1,7 @@
 package datawave.iterators;
 
 import java.io.IOException;
+import java.time.format.DateTimeParseException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import datawave.util.time.DateHelper;
 import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.PartialKey;
@@ -43,6 +45,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
     
     public static final String COMBINE_VISIBILITIES_OPTION = "COMBINE_VISIBILITIES";
     public static final String COLUMNS_OPTION = "columns";
+    public static final String AGGREGATED = "AGGREGATED";
     
     private static final Logger log = Logger.getLogger(FrequencyMetadataAggregator.class);
     private static final String NULL_BYTE = "\0";
@@ -305,14 +308,41 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
         
         String columnQualifier = key.getColumnQualifier().toString();
         int separatorPos = columnQualifier.indexOf(NULL_BYTE);
-        // If a null byte was not found, the column qualifier has the format <datatype> and is from a previously aggregated entry. Otherwise, the column
-        // qualifier has the format <datatype>\0<yyyyMMdd> and is from a non-aggregated entry.
-        isCurrentAggregated = separatorPos == -1;
-        String datatype;
-        if (isCurrentAggregated) {
-            datatype = columnQualifier;
+        
+        // If a null byte is not present, this is an entry with a legacy format and should not be aggregated.
+        if (separatorPos == -1) {
+            if (log.isTraceEnabled()) {
+                log.trace("Found column qualifier that does not contain null byte: " + columnQualifier);
+            }
+            return false;
+        }
+        
+        String datatype = columnQualifier.substring(0, separatorPos);
+        String remainder = columnQualifier.substring((separatorPos + 1));
+        
+        // If a second null byte is present, this is an entry with an index boundary marker in the format <datatype>\0<date>\0<true|false> and should not be
+        // aggregated.
+        if (remainder.contains(NULL_BYTE)) {
+            if (log.isTraceEnabled()) {
+                log.trace("Found index boundary marker: " + columnQualifier);
+            }
+            return false;
+        }
+        
+        // This is an aggregated entry.
+        if (remainder.equals(AGGREGATED)) {
+            isCurrentAggregated = true;
         } else {
-            datatype = columnQualifier.substring(0, separatorPos);
+            // The remainder should typically be a date, but in rare cases may be a legacy format with the type class name instead of the date, and cannot be
+            // aggregated if so. Check if the remainder can be parsed as a date.
+            try {
+                DateHelper.parse(remainder);
+            } catch (DateTimeParseException e) {
+                if (log.isTraceEnabled()) {
+                    log.trace("Found unparseable date: " + columnQualifier);
+                }
+                return false;
+            }
             currentDate = columnQualifier.substring((separatorPos + 1));
             if (log.isTraceEnabled()) {
                 log.trace("Set current date to " + currentDate);
@@ -396,7 +426,7 @@ public class FrequencyMetadataAggregator extends WrappingIterator implements Opt
             log.trace("buildTopKeys, currentDatatype: " + currentDatatype);
         }
         
-        Text columnQualifier = new Text(currentDatatype);
+        Text columnQualifier = new Text(currentDatatype + NULL_BYTE + AGGREGATED);
         
         // If we are combining all entries regardless of column visibility, we will end up with one entry to return.
         if (combineVisibilities) {
