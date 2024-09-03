@@ -1,7 +1,6 @@
 package datawave.query.util;
 
 import java.io.ByteArrayInputStream;
-import java.io.Console;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
@@ -17,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeSet;
@@ -47,7 +45,6 @@ import org.apache.accumulo.core.iterators.user.SummingCombiner;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.commons.lang3.time.DateUtils;
-import org.apache.hadoop.fs.shell.Concat;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.slf4j.Logger;
