@@ -412,6 +412,101 @@ public class FrequencyMetadataAggregatorTest {
     }
     
     /**
+     * Test aggregation over a dataset that contains index markers.
+     */
+    @Test
+    void testIndexMarkers() throws TableNotFoundException {
+        givenAggregatedRow("AGE", COLF_F, "num", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "num", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("GENDER", COLF_F, "text", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_F, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_I, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        givenNonAggregatedRow("AGE", COLF_F, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "var", "BAR", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new datatype.
+        givenNonAggregatedRow("GENDER", COLF_F, "text", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new colvis.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_I, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        
+        // Entries with index markers that should not be aggregated.
+        givenMutation("AGE", COLF_I, "num" + NULL_BYTE + "20191230" + NULL_BYTE + "true", "BAR", 1400000005L, new Value());
+        givenMutation("JOB", COLF_RI, "attr" + NULL_BYTE + "20190530" + NULL_BYTE + "false", "FOO", 1500000004L, new Value());
+        givenMutation("NAME", COLF_I, "attr" + NULL_BYTE + "20171201" + NULL_BYTE + "true", "BAR", 1500000004L, new Value());
+        
+        
+        expect("AGE", COLF_F, "lifetime" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "num" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "var" + NULL_BYTE + "AGGREGATED", "BAR", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("AGE", COLF_I, "lifetime" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_I, "num" + NULL_BYTE + "20191230" + NULL_BYTE + "true", "BAR", 1400000005L, new Value());
+        expect("AGE", COLF_I, "num" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("GENDER", COLF_F, "text" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("GENDER", COLF_F, "text" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", COLF_F, "attr" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 3L));
+        expect("JOB", COLF_I, "attr" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", COLF_RI, "attr" + NULL_BYTE + "20190530" + NULL_BYTE + "false", "FOO", 1500000004L, new Value());
+        expect("NAME", COLF_F, "attr" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("NAME", COLF_I, "attr" + NULL_BYTE + "20171201" + NULL_BYTE + "true", "BAR", 1500000004L, new Value());
+        expect("NAME", COLF_I, "attr" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        assertResults();
+    }
+    
+    /**
+     * Test aggregation over a dataset that contains legacy formats.
+     */
+    @Test
+    void testLegacyFormats() throws TableNotFoundException {
+        givenAggregatedRow("AGE", COLF_F, "num", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1499999995L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "num", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1499999999L, createDateFrequencyMap("20191225", 1L, "20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("GENDER", COLF_F, "text", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_F, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        givenAggregatedRow("NAME", COLF_I, "attr", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        givenNonAggregatedRow("AGE", COLF_F, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "num", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_I, "lifetime", "FOO", 1500000004L, "20200101", 1L); // Should be aggregated into existing aggregated entry.
+        givenNonAggregatedRow("AGE", COLF_F, "var", "BAR", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new datatype.
+        givenNonAggregatedRow("GENDER", COLF_F, "text", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new colvis.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_F, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        givenNonAggregatedRow("JOB", COLF_I, "attr", "FOO", 1500000004L, "20200101", 1L); // Should result in new aggregated entry because new row.
+        
+        // Entries with legacy formats that should not be aggregated.
+        givenMutation("AGE", COLF_I, "num", "BAR", 1400000005L, new Value());
+        givenMutation("JOB", COLF_RI, "attr" + NULL_BYTE + "FakeTypeClassName", "FOO", 1500000004L, new Value());
+        
+        
+        expect("AGE", COLF_F, "lifetime" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "num" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_F, "var" + NULL_BYTE + "AGGREGATED", "BAR", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("AGE", COLF_I, "lifetime" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("AGE", COLF_I, "num", "BAR", 1400000005L, new Value());
+        expect("AGE", COLF_I, "num" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20191225", 1L, "20200101", 2L, "20200102", 1L));
+        expect("GENDER", COLF_F, "text" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("GENDER", COLF_F, "text" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", COLF_F, "attr" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 3L));
+        expect("JOB", COLF_I, "attr" + NULL_BYTE + "AGGREGATED", "FOO", 1500000004L, createDateFrequencyMap("20200101", 1L));
+        expect("JOB", COLF_RI, "attr" + NULL_BYTE + "FakeTypeClassName", "FOO", 1500000004L, new Value());
+        expect("NAME", COLF_F, "attr" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        expect("NAME", COLF_I, "attr" + NULL_BYTE + "AGGREGATED", "BAR", 1499999999L, createDateFrequencyMap("20200101", 1L, "20200102", 1L));
+        
+        assertResults();
+    }
+    
+    
+    /**
      * Verify that scanning over a table with columns that are not to be aggregated result in them being unchanged.
      */
     @Test
@@ -476,10 +571,8 @@ public class FrequencyMetadataAggregatorTest {
         List<Map.Entry<Key,Value>> actual = new ArrayList<>();
         for (Map.Entry<Key,Value> entry : scanner) {
             actual.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
-            System.out.println("Key: '" + entry.getKey() + "'");
+            System.out.println("Key: " + entry.getKey());
         }
-        System.out.println("Expected:");
-        expected.forEach(e -> System.out.println("Key: '" + e.getKey() + "'"));
         
         Assertions.assertEquals(expected, actual);
     }
