@@ -1301,15 +1301,12 @@ public class AllFieldMetadataHelper {
      */
     private Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
-        // create local copies to avoid side effects
-        fields = new HashSet<>(fields);
-        datatypes = new HashSet<>(datatypes);
-        
         // Handle null fields if given.
         if (fields == null) {
             fields = Collections.emptySet();
         } else {
-            // Ensure null is not present as an entry.
+            // Ensure null is not present as an entry in a local copy.
+            fields = new HashSet<>(fields);
             fields.remove(null);
         }
         
@@ -1317,15 +1314,16 @@ public class AllFieldMetadataHelper {
         if (datatypes == null) {
             datatypes = Collections.emptySet();
         } else {
-            // Ensure null is not present as an entry.
+            // Ensure null is not present as an entry in a local copy.
+            datatypes = new HashSet<>(datatypes);
             datatypes.remove(null);
         }
         
         // remove fields that are not indexed at all by the specified datatypes
         Multimap<String,String> indexedFieldMap = (targetColumnFamily == ColumnFamilyConstants.COLF_I ? loadIndexedFields() : loadReverseIndexedFields());
-        Set<String> indexedFields = new HashSet<>();
+        Set<String> indexedFields;
         if (datatypes.isEmpty()) {
-            indexedFields.addAll(indexedFieldMap.values());
+            indexedFields = new HashSet<>(indexedFieldMap.values());
         } else {
             indexedFields = new HashSet<>();
             for (String datatype : datatypes) {
