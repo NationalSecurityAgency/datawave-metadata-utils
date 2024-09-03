@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import datawave.iterators.FrequencyMetadataAggregator;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -74,6 +73,7 @@ import datawave.data.ColumnFamilyConstants;
 import datawave.data.MetadataCardinalityCounts;
 import datawave.data.type.Type;
 import datawave.iterators.EdgeMetadataCombiner;
+import datawave.iterators.FrequencyMetadataAggregator;
 import datawave.iterators.MetadataFColumnSeekingFilter;
 import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
@@ -1754,7 +1754,8 @@ public class MetadataHelper {
      *            a wrapped AccumuloClient
      * @return the earliest date the field is found, or null otherwise
      */
-    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String datatypeFilter, AccumuloClient client, WrappedAccumuloClient wrappedClient) {
+    protected Date getEarliestOccurrenceOfFieldWithType(String fieldName, final String datatypeFilter, AccumuloClient client,
+                    WrappedAccumuloClient wrappedClient) {
         String earliestDate = null;
         String prevDatatype = null;
         boolean skipToAggregated = false;

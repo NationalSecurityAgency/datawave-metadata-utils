@@ -24,7 +24,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 
-import datawave.iterators.FrequencyMetadataAggregator;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.client.Scanner;
@@ -60,6 +59,7 @@ import com.google.common.collect.Sets;
 import datawave.data.ColumnFamilyConstants;
 import datawave.data.type.Type;
 import datawave.data.type.TypeFactory;
+import datawave.iterators.FrequencyMetadataAggregator;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.composite.CompositeMetadataHelper;
 import datawave.query.model.DateFrequencyMap;
@@ -857,7 +857,8 @@ public class AllFieldMetadataHelper {
             scanner.fetchColumnFamily(ColumnFamilyConstants.COLF_F);
             scanner.setRange(Range.exact(fieldName));
             
-            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date> (non-aggregated entries).
+            // It's possible to find rows with column qualifiers in the format <datatype> (aggregated entries) and/or <datatype>\0<date> (non-aggregated
+            // entries).
             // Filter out any non-aggregated entries that does not have the date in the column qualifier.
             IteratorSetting cqRegex = new IteratorSetting(50, RegExFilter.class);
             // Allow any entries that do not contain the null byte delimiter, or contain it with the target date directly afterwards.
@@ -1637,7 +1638,6 @@ public class AllFieldMetadataHelper {
                 fieldCount.increment(entry.getValue().getValue());
             }
         }
-        
         
         /**
          * Add the current date and count to the current target map for the given datatype.

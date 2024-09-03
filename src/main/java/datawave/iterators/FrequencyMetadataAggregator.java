@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import datawave.util.time.DateHelper;
 import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.accumulo.core.data.Key;
 import org.apache.accumulo.core.data.PartialKey;
@@ -33,6 +32,7 @@ import com.google.common.base.Splitter;
 import datawave.marking.MarkingFunctions;
 import datawave.query.model.DateFrequencyMap;
 import datawave.util.StringUtils;
+import datawave.util.time.DateHelper;
 
 /**
  * Aggregates entries in the metadata table for the "f", "i", and "ri" columns. When initially ingested, entries for these columns have a column qualifier with

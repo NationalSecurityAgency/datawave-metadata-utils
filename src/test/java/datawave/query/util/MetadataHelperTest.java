@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import datawave.iterators.FrequencyMetadataAggregator;
 import org.apache.accumulo.core.client.AccumuloClient;
 import org.apache.accumulo.core.client.AccumuloException;
 import org.apache.accumulo.core.client.AccumuloSecurityException;
@@ -39,6 +38,7 @@ import com.google.common.collect.Sets;
 
 import datawave.accumulo.inmemory.InMemoryAccumuloClient;
 import datawave.accumulo.inmemory.InMemoryInstance;
+import datawave.iterators.FrequencyMetadataAggregator;
 import datawave.query.composite.CompositeMetadataHelper;
 import datawave.query.model.DateFrequencyMap;
 import datawave.util.time.DateHelper;
