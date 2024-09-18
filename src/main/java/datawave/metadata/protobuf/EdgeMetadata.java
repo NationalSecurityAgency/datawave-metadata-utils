@@ -1996,14 +1996,7 @@ public final class EdgeMetadata {
                                 + " \002(\t\022\014\n\004sink\030\002 \002(\t\022\022\n\nenrichment\030\003 \001(\t\022\027"
                                 + "\n\017enrichmentIndex\030\004 \001(\t\022\014\n\004date\030\005 \001(\t\022\030\n"
                                 + "\020jexlPrecondition\030\006 \001(\tB\036\n\032datawave.meta" + "data.protobufH\001"};
-        com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner = new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
-            public com.google.protobuf.ExtensionRegistry assignDescriptors(com.google.protobuf.Descriptors.FileDescriptor root) {
-                descriptor = root;
-                return null;
-            }
-        };
-        com.google.protobuf.Descriptors.FileDescriptor.internalBuildGeneratedFileFrom(descriptorData, new com.google.protobuf.Descriptors.FileDescriptor[] {},
-                        assigner);
+        com.google.protobuf.Descriptors.FileDescriptor.internalBuildGeneratedFileFrom(descriptorData, new com.google.protobuf.Descriptors.FileDescriptor[] {});
         internal_static_datawave_metadata_protobuf_MetadataValue_descriptor = getDescriptor().getMessageTypes().get(0);
         internal_static_datawave_metadata_protobuf_MetadataValue_fieldAccessorTable = new com.google.protobuf.GeneratedMessage.FieldAccessorTable(
                         internal_static_datawave_metadata_protobuf_MetadataValue_descriptor, new java.lang.String[] {"Metadata",});
