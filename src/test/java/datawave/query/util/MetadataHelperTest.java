@@ -73,7 +73,7 @@ public class MetadataHelperTest {
         
         Assertions.assertEquals(Collections.singleton("rowA"), helper.getAllFields(Collections.singleton("dataTypeA")));
         Assertions.assertEquals(Collections.singleton("rowA"), helper.getAllFields(null));
-        Assertions.assertEquals(Collections.singleton("rowA"), helper.getAllFields(Collections.emptySet()));
+        Assertions.assertEquals(Collections.emptySet(), helper.getAllFields(Collections.emptySet()));
     }
     
     @Test
@@ -83,7 +83,7 @@ public class MetadataHelperTest {
         
         Assertions.assertEquals(Collections.singleton("rowB"), helper.getAllFields(Collections.singleton("dataTypeB")));
         Assertions.assertEquals(Sets.newHashSet("rowA", "rowB"), helper.getAllFields(null));
-        Assertions.assertEquals(Sets.newHashSet("rowA", "rowB"), helper.getAllFields(Collections.emptySet()));
+        Assertions.assertEquals(Collections.emptySet(), helper.getAllFields(Collections.emptySet()));
     }
     
     @Test
@@ -94,7 +94,7 @@ public class MetadataHelperTest {
         
         Assertions.assertEquals(Collections.singleton("rowB"), helper.getAllFields(Collections.singleton("dataTypeB")));
         Assertions.assertEquals(Sets.newHashSet("rowA", "rowB", "rowC"), helper.getAllFields(null));
-        Assertions.assertEquals(Sets.newHashSet("rowA", "rowB", "rowC"), helper.getAllFields(Collections.emptySet()));
+        Assertions.assertEquals(Collections.emptySet(), helper.getAllFields(Collections.emptySet()));
     }
     
     private void writeMutation(String row, String columnFamily, String columnQualifier, Value value) throws TableNotFoundException {
