@@ -2,7 +2,9 @@ package datawave.query.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.accumulo.core.client.AccumuloClient;
@@ -207,9 +210,7 @@ public class MetadataHelperTableTest {
     @BeforeEach
     public void beforeEach() {
         allFieldHelper = createAllFieldMetadataHelper();
-        Set<Authorizations> userAuths = Collections.singleton(new Authorizations(authorizations));
-        Set<Authorizations> metadataAuths = Collections.singleton(new Authorizations(authorizations));
-        helper = new MetadataHelper(allFieldHelper, metadataAuths, client, METADATA_TABLE_NAME, userAuths, metadataAuths);
+        helper = createMetadataHelper(allFieldHelper);
     }
     
     private AllFieldMetadataHelper createAllFieldMetadataHelper() {
@@ -218,6 +219,16 @@ public class MetadataHelperTableTest {
         TypeMetadataHelper typeMetadataHelper = new TypeMetadataHelper(new HashMap<>(), auths, client, METADATA_TABLE_NAME, auths, false);
         CompositeMetadataHelper compositeMetadataHelper = new CompositeMetadataHelper(client, METADATA_TABLE_NAME, auths);
         return new AllFieldMetadataHelper(typeMetadataHelper, compositeMetadataHelper, client, METADATA_TABLE_NAME, auths, allAuths);
+    }
+    
+    private MetadataHelper createMetadataHelper(AllFieldMetadataHelper allFieldHelper) {
+        if (allFieldHelper == null) {
+            allFieldHelper = createAllFieldMetadataHelper();
+        }
+        
+        Set<Authorizations> userAuths = Collections.singleton(new Authorizations(authorizations));
+        Set<Authorizations> metadataAuths = Collections.singleton(new Authorizations(authorizations));
+        return new MetadataHelper(allFieldHelper, metadataAuths, client, METADATA_TABLE_NAME, userAuths, metadataAuths);
     }
     
     @Test
@@ -869,6 +880,31 @@ public class MetadataHelperTableTest {
         
         assertTrue(counts.containsKey("SHAPE"));
         assertEquals(536L, counts.get("SHAPE"));
+    }
+    
+    @Test
+    public void testInternalTypeCache() throws TableNotFoundException, InstantiationException, IllegalAccessException {
+        MetadataHelper helperWithDefaultCache = createMetadataHelper(null);
+        
+        // repeated calls to method that returns Types should return the same objects
+        Set<Type<?>> typesFirstCall = helperWithDefaultCache.getAllDatatypes();
+        Set<Type<?>> typesSecondCall = helperWithDefaultCache.getAllDatatypes();
+        
+        assertEquals(1, typesFirstCall.size());
+        assertEquals(1, typesSecondCall.size());
+        assertSame(typesFirstCall.iterator().next(), typesSecondCall.iterator().next());
+        
+        MetadataHelper helperWithConfiguredCache = createMetadataHelper(null);
+        helperWithConfiguredCache.setTypeCacheSize(1);
+        helperWithConfiguredCache.setTypeCacheExpirationInMinutes(0);
+        
+        // lowering the cache size and making repeated calls to methods that return Types should return different objects
+        typesFirstCall = helperWithConfiguredCache.getAllDatatypes();
+        typesSecondCall = helperWithConfiguredCache.getAllDatatypes();
+        
+        assertEquals(1, typesFirstCall.size());
+        assertEquals(1, typesSecondCall.size());
+        assertNotSame(typesFirstCall.iterator().next(), typesSecondCall.iterator().next());
     }
     
     @Test

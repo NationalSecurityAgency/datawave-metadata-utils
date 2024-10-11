@@ -2040,4 +2040,19 @@ public class MetadataHelper {
         return metadataTableName;
     }
     
+    public int getTypeCacheSize() {
+        return allFieldMetadataHelper.getTypeCacheSize();
+    }
+    
+    public void setTypeCacheSize(int typeCacheSize) {
+        allFieldMetadataHelper.setTypeCacheSize(typeCacheSize);
+    }
+    
+    public int getTypeCacheExpirationInMinutes() {
+        return allFieldMetadataHelper.getTypeCacheExpirationInMinutes();
+    }
+    
+    public void setTypeCacheExpirationInMinutes(int typeCacheExpirationInMinutes) {
+        allFieldMetadataHelper.setTypeCacheExpirationInMinutes(typeCacheExpirationInMinutes);
+    }
 }
