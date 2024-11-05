@@ -548,7 +548,7 @@ public class MetadataHelper {
                 log.trace("empty query model for {}", this);
             }
             if ("DatawaveMetadata".equals(modelTableName)) {
-                log.error("Query Model should not be empty...");
+                log.warn("Query Model {} has no reverse mappings", modelName);
             }
         }
         
