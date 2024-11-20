@@ -552,7 +552,7 @@ public class MetadataHelper {
      * @return a list of query model names
      * @throws TableNotFoundException
      */
-    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#table}", cacheManager = "metadataHelperCacheManager")
+    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#modelTableName}", cacheManager = "metadataHelperCacheManager")
     public Set<String> getQueryModelNames(String modelTableName) throws TableNotFoundException {
         Preconditions.checkNotNull(modelTableName);
         
