@@ -5,6 +5,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -70,6 +72,14 @@ public class FieldMapping implements Serializable, Comparable<FieldMapping> {
             // note datatype can be null
             if (fieldName == null || modelFieldName == null || columnVisibility == null) {
                 throw new IllegalArgumentException("Cannot have a model mapping with without all members: " + this);
+            }
+            // If this is a forward mapping, it's possible that a regex pattern is supplied for the field name. Verify that the field name compiles.
+            if (direction == Direction.FORWARD) {
+                try {
+                    Pattern.compile(fieldName);
+                } catch (PatternSyntaxException e) {
+                    throw new IllegalArgumentException("Invalid regex pattern supplied for field name: " + fieldName, e);
+                }
             }
         }
     }
