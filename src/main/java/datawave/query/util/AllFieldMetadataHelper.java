@@ -992,49 +992,49 @@ public class AllFieldMetadataHelper {
         
         final Map<String,Multimap<Text,Text>> metadata = new HashMap<>();
         
-        Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths);
-        
-        // Fetch the 'e' and 'i' columns
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
-        bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
-        
-        // For all keys in the DatawaveMetadata table
-        bs.setRange(new Range());
-        
-        Iterator<Entry<Key,Value>> iterator = bs.iterator();
-        Set<String> compositeFields = Sets.newHashSet();
-        // Collect the results and put them into a Multimap
-        while (iterator.hasNext()) {
-            Entry<Key,Value> entry = iterator.next();
-            Key k = entry.getKey();
-            Text fieldName = k.getRow();
-            Text fieldType = k.getColumnFamily();
-            String dataType = getDatatype(k);
-            if (fieldType.equals(ColumnFamilyConstants.COLF_CI)) {
-                compositeFields.add(getCompositeFieldName(k));
+        try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
+            // Fetch the 'e' and 'i' columns
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_E);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_I);
+            bs.fetchColumnFamily(ColumnFamilyConstants.COLF_CI);
+            
+            // For all keys in the DatawaveMetadata table
+            bs.setRange(new Range());
+            
+            Iterator<Entry<Key,Value>> iterator = bs.iterator();
+            Set<String> compositeFields = Sets.newHashSet();
+            // Collect the results and put them into a Multimap
+            while (iterator.hasNext()) {
+                Entry<Key,Value> entry = iterator.next();
+                Key k = entry.getKey();
+                Text fieldName = k.getRow();
+                Text fieldType = k.getColumnFamily();
+                String dataType = getDatatype(k);
+                if (fieldType.equals(ColumnFamilyConstants.COLF_CI)) {
+                    compositeFields.add(getCompositeFieldName(k));
+                }
+                
+                Multimap<Text,Text> md = metadata.get(dataType);
+                if (md == null) {
+                    md = HashMultimap.create();
+                    metadata.put(dataType, md);
+                    
+                }
+                md.put(fieldName, fieldType);
             }
             
-            Multimap<Text,Text> md = metadata.get(dataType);
-            if (md == null) {
-                md = HashMultimap.create();
-                metadata.put(dataType, md);
-                
-            }
-            md.put(fieldName, fieldType);
-        }
-        
-        // Find all of the fields which only have the 'i' column
-        for (String dataType : metadata.keySet()) {
-            for (Text fieldName : metadata.get(dataType).keySet()) {
-                Collection<Text> columns = metadata.get(dataType).get(fieldName);
-                
-                if (1 == columns.size()) {
-                    Text c = columns.iterator().next();
+            // Find all of the fields which only have the 'i' column
+            for (String dataType : metadata.keySet()) {
+                for (Text fieldName : metadata.get(dataType).keySet()) {
+                    Collection<Text> columns = metadata.get(dataType).get(fieldName);
                     
-                    if (c.equals(ColumnFamilyConstants.COLF_I)) {
-                        if (compositeFields.contains(fieldName.toString()) == false) {
-                            fields.put(dataType, fieldName.toString());
+                    if (1 == columns.size()) {
+                        Text c = columns.iterator().next();
+                        
+                        if (c.equals(ColumnFamilyConstants.COLF_I)) {
+                            if (compositeFields.contains(fieldName.toString()) == false) {
+                                fields.put(dataType, fieldName.toString());
+                            }
                         }
                     }
                 }

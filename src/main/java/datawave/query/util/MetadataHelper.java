@@ -21,6 +21,7 @@ import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -519,13 +520,22 @@ public class MetadataHelper {
                     if (!mapping.isFieldMapping()) {
                         queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
                     } else if (mapping.getDirection() == Direction.FORWARD) {
-                        // Do not add a forward mapping entry
-                        // when the replacement does not exist in the database
+                        // If a direct match is found for the field in the database, add a forward mapping entry.
                         if (allFields.contains(mapping.getFieldName())) {
                             queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
-                                            mapping.getModelFieldName());
+                        } else {
+                            // If a direct match was not found for the field name, it's possible that a regex pattern was supplied. Attempt to find matches
+                            // based off matching against the field name as a pattern.
+                            Pattern pattern = Pattern.compile(mapping.getFieldName());
+                            Set<String> matches = allFields.stream().filter(field -> pattern.matcher(field).matches()).collect(Collectors.toSet());
+                            if (!matches.isEmpty()) {
+                                matches.forEach(field -> queryModel.addTermToModel(mapping.getModelFieldName(), field));
+                            } else {
+                                if (log.isTraceEnabled()) {
+                                    log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
+                                                    mapping.getModelFieldName());
+                                }
+                            }
                         }
                     } else {
                         queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
@@ -541,7 +551,7 @@ public class MetadataHelper {
                 log.trace("empty query model for {}", this);
             }
             if ("DatawaveMetadata".equals(modelTableName)) {
-                log.error("Query Model should not be empty...");
+                log.warn("Query Model {} has no reverse mappings", modelName);
             }
         }
         
@@ -555,7 +565,7 @@ public class MetadataHelper {
      * @return a list of query model names
      * @throws TableNotFoundException
      */
-    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#table}", cacheManager = "metadataHelperCacheManager")
+    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#modelTableName}", cacheManager = "metadataHelperCacheManager")
     public Set<String> getQueryModelNames(String modelTableName) throws TableNotFoundException {
         Preconditions.checkNotNull(modelTableName);
         
