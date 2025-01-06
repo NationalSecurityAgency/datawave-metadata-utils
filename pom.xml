@@ -33,7 +33,7 @@
         <version.kryo>2.20</version.kryo>
         <version.powermock>2.0.2</version.powermock>
         <version.protobuf-java>3.22.0</version.protobuf-java>
-        <version.protostuff-api>1.6.2</version.protostuff-api>
+        <version.protostuff>1.6.2</version.protostuff>
         <version.slf4j-api>1.7.29</version.slf4j-api>
         <version.type-utils>3.0.2</version.type-utils>
     </properties>
@@ -147,7 +147,7 @@
         <dependency>
             <groupId>io.protostuff</groupId>
             <artifactId>protostuff-api</artifactId>
-            <version>${version.protostuff-api}</version>
+            <version>${version.protostuff}</version>
         </dependency>
         <dependency>
             <groupId>io.protostuff</groupId>
