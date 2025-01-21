@@ -16,13 +16,13 @@ import com.google.common.collect.ImmutableSortedSet;
  * This class represents a set of calculated field index holes for a given fieldName and datatype. A field index hole is effectively a date where a frequency
  * row was seen, but an index and/or reversed indexed row was not.
  */
-public class FieldIndexHole {
+public class IndexFieldGap {
     
     private final String fieldName;
     private final String datatype;
     private final SortedSet<Pair<Date,Date>> dateRanges;
     
-    public FieldIndexHole(String fieldName, String dataType, Collection<Pair<Date,Date>> holes) {
+    public IndexFieldGap(String fieldName, String dataType, Collection<Pair<Date,Date>> holes) {
         this.fieldName = fieldName;
         this.datatype = dataType;
         // Ensure the date range set is immutable.
@@ -50,7 +50,7 @@ public class FieldIndexHole {
     }
     
     /**
-     * Returns the set of date ranges that span over field index holes for the fieldName and datatype of this {@link FieldIndexHole}. Each date range represents
+     * Returns the set of date ranges that span over field index holes for the fieldName and datatype of this {@link IndexFieldGap}. Each date range represents
      * a span of consecutive days for which a frequency row exist, but an index row does not. All date ranges are start(inclusive)-end(inclusive).
      * 
      * @return the date ranges
@@ -67,7 +67,7 @@ public class FieldIndexHole {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        FieldIndexHole indexHole = (FieldIndexHole) o;
+        IndexFieldGap indexHole = (IndexFieldGap) o;
         return Objects.equals(fieldName, indexHole.fieldName) && Objects.equals(datatype, indexHole.datatype)
                         && Objects.equals(dateRanges, indexHole.dateRanges);
     }
@@ -79,7 +79,7 @@ public class FieldIndexHole {
     
     @Override
     public String toString() {
-        return new StringJoiner(", ", FieldIndexHole.class.getSimpleName() + "[", "]").add("fieldName='" + fieldName + "'").add("dataType='" + datatype + "'")
+        return new StringJoiner(", ", IndexFieldGap.class.getSimpleName() + "[", "]").add("fieldName='" + fieldName + "'").add("dataType='" + datatype + "'")
                         .add("dateRanges=" + dateRanges).toString();
     }
 }

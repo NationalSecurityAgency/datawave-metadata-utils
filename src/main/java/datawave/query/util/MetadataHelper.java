@@ -76,7 +76,7 @@ import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.model.Direction;
-import datawave.query.model.FieldIndexHole;
+import datawave.query.model.IndexFieldGap;
 import datawave.query.model.FieldMapping;
 import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
@@ -1811,7 +1811,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String, IndexFieldGap>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getFieldIndexHoles(fields, datatypes, minThreshold);
     }
@@ -1828,7 +1828,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String, IndexFieldGap>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getReversedFieldIndexHoles(fields, datatypes, minThreshold);
     }
