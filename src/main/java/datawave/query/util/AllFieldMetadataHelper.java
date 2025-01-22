@@ -60,7 +60,7 @@ import datawave.data.type.Type;
 import datawave.data.type.TypeFactory;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.composite.CompositeMetadataHelper;
-import datawave.query.model.IndexFieldGap;
+import datawave.query.model.IndexFieldHole;
 import datawave.security.util.AuthorizationsMinimizer;
 import datawave.security.util.ScannerHelper;
 import datawave.util.time.DateHelper;
@@ -1247,7 +1247,7 @@ public class AllFieldMetadataHelper {
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
-    public Map<String,Map<String, IndexFieldGap>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String, IndexFieldHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_I, fields, datatypes, minThreshold);
     }
@@ -1265,7 +1265,7 @@ public class AllFieldMetadataHelper {
      *            range 0.0 to 1.0
      * @return a map of field names and datatype pairs to field index holes
      */
-    public Map<String,Map<String, IndexFieldGap>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String, IndexFieldHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return getFieldIndexHoles(ColumnFamilyConstants.COLF_RI, fields, datatypes, minThreshold);
     }
@@ -1287,7 +1287,7 @@ public class AllFieldMetadataHelper {
      * @throws IOException
      *             if a value fails to deserialize
      */
-    private Map<String,Map<String, IndexFieldGap>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
+    private Map<String,Map<String, IndexFieldHole>> getFieldIndexHoles(Text targetColumnFamily, Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         // create local copies to avoid side effects
         fields = new HashSet<>(fields);
@@ -1340,7 +1340,7 @@ public class AllFieldMetadataHelper {
             minThreshold = 0.0d;
         }
         
-        Map<String,Map<String, IndexFieldGap>> indexHoles;
+        Map<String,Map<String, IndexFieldHole>> indexHoles;
         try (Scanner bs = ScannerHelper.createScanner(accumuloClient, metadataTableName, auths)) {
             
             // Fetch the frequency column and the specified index column.
@@ -1459,7 +1459,7 @@ public class AllFieldMetadataHelper {
          * @throws IOException
          *             if a value fails to deserialize
          */
-        Map<String,Map<String, IndexFieldGap>> findHoles() throws IOException {
+        Map<String,Map<String, IndexFieldHole>> findHoles() throws IOException {
             String prevFieldName = null;
             Text prevColumnFamily = null;
             
@@ -1755,15 +1755,15 @@ public class AllFieldMetadataHelper {
          * 
          * @return an immutable map.
          */
-        private Map<String,Map<String, IndexFieldGap>> getImmutableFieldIndexHoles() {
-            ImmutableMap.Builder<String,Map<String, IndexFieldGap>> fieldMapBuilder = new ImmutableMap.Builder<>();
+        private Map<String,Map<String, IndexFieldHole>> getImmutableFieldIndexHoles() {
+            ImmutableMap.Builder<String,Map<String, IndexFieldHole>> fieldMapBuilder = new ImmutableMap.Builder<>();
             
             for (String fieldName : this.fieldIndexHoles.keySet()) {
                 Multimap<String,Pair<Date,Date>> datatypeMap = this.fieldIndexHoles.get(fieldName);
                 if (!datatypeMap.isEmpty()) {
-                    ImmutableMap.Builder<String, IndexFieldGap> datatypeMapBuilder = new ImmutableMap.Builder<>();
+                    ImmutableMap.Builder<String, IndexFieldHole> datatypeMapBuilder = new ImmutableMap.Builder<>();
                     for (String datatype : datatypeMap.keySet()) {
-                        IndexFieldGap fieldIndexHole = new IndexFieldGap(fieldName, datatype, datatypeMap.get(datatype));
+                        IndexFieldHole fieldIndexHole = new IndexFieldHole(fieldName, datatype, datatypeMap.get(datatype));
                         datatypeMapBuilder.put(datatype, fieldIndexHole);
                     }
                     fieldMapBuilder.put(fieldName, datatypeMapBuilder.build());
