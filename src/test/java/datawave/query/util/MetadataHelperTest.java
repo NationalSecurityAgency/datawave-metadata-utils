@@ -26,8 +26,8 @@ import org.junit.jupiter.api.Test;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import datawave.accumulo.inmemory.InMemoryAccumulo;
 import datawave.accumulo.inmemory.InMemoryAccumuloClient;
-import datawave.accumulo.inmemory.InMemoryInstance;
 import datawave.query.composite.CompositeMetadataHelper;
 
 public class MetadataHelperTest {
@@ -46,7 +46,7 @@ public class MetadataHelperTest {
     
     @BeforeEach
     public void setup() throws TableNotFoundException, AccumuloException, TableExistsException, AccumuloSecurityException {
-        accumuloClient = new InMemoryAccumuloClient("root", new InMemoryInstance(MetadataHelperTest.class.toString()));
+        accumuloClient = new InMemoryAccumuloClient("root", new InMemoryAccumulo(MetadataHelperTest.class.toString()));
         if (!accumuloClient.tableOperations().exists(TABLE_METADATA)) {
             accumuloClient.tableOperations().create(TABLE_METADATA);
         }

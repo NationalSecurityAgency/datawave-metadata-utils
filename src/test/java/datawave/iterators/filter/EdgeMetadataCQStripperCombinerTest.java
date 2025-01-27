@@ -18,21 +18,22 @@ import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
-import org.apache.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import datawave.accumulo.inmemory.InMemoryAccumulo;
 import datawave.accumulo.inmemory.InMemoryAccumuloClient;
-import datawave.accumulo.inmemory.InMemoryInstance;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue;
 import datawave.metadata.protobuf.EdgeMetadata.MetadataValue.Metadata;
 import datawave.util.time.DateHelper;
 
 public class EdgeMetadataCQStripperCombinerTest {
-    private static final Logger log = Logger.getLogger(EdgeMetadataCQStripperCombinerTest.class);
+    private static final Logger log = LoggerFactory.getLogger(EdgeMetadataCQStripperCombinerTest.class);
     private AccumuloClient accumuloClient;
     private static String EDGE_TABLE_NAME = "DatawaveMetadata";
     private static String ROW_VISIBILITY = "IN_VISIBLE";
@@ -45,7 +46,7 @@ public class EdgeMetadataCQStripperCombinerTest {
     @BeforeEach
     public void init() throws Exception {
         
-        InMemoryInstance i = new InMemoryInstance(EdgeMetadataCQStripperCombinerTest.class.toString());
+        InMemoryAccumulo i = new InMemoryAccumulo(EdgeMetadataCQStripperCombinerTest.class.toString());
         accumuloClient = new InMemoryAccumuloClient("root", i);
         
         // Create a table

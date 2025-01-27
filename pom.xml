@@ -8,7 +8,7 @@
         <relativePath>../../../microservices/microservice-parent/pom.xml</relativePath>
     </parent>
     <artifactId>metadata-utils</artifactId>
-    <version>4.0.9-SNAPSHOT</version>
+    <version>4.0.9-accumulo4</version>
     <url>https://code.nsa.gov/datawave-metadata-utils</url>
     <licenses>
         <license>
@@ -29,6 +29,7 @@
         <version.easymock>4.0.2</version.easymock>
         <version.kryo>2.20</version.kryo>
         <version.powermock>2.0.2</version.powermock>
+        <version.protobuf>3.22.0</version.protobuf>
         <version.type-utils>3.0.2</version.type-utils>
     </properties>
     <dependencyManagement>
@@ -42,6 +43,11 @@
                 <groupId>com.github.ben-manes.caffeine</groupId>
                 <artifactId>caffeine</artifactId>
                 <version>${version.caffeine}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${version.protobuf}</version>
             </dependency>
             <dependency>
                 <groupId>com.sun.xml.bind</groupId>
@@ -110,6 +116,10 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
         </dependency>
         <dependency>
             <groupId>com.sun.xml.bind</groupId>

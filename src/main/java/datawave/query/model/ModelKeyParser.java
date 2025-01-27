@@ -12,7 +12,8 @@ import org.apache.accumulo.core.data.Mutation;
 import org.apache.accumulo.core.data.Value;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 
@@ -56,7 +57,7 @@ public class ModelKeyParser {
     
     public static final String MODEL = "model";
     
-    private static Logger log = Logger.getLogger(ModelKeyParser.class);
+    private static Logger log = LoggerFactory.getLogger(ModelKeyParser.class);
     
     public static FieldMapping parseKey(Key key) {
         return parseKey(key, NULL_VALUE);

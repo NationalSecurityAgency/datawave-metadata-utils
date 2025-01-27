@@ -23,8 +23,8 @@ public class EdgeMetadataCombinerTest {
         
         Metadata.Builder builder = Metadata.newBuilder();
         MetadataValue.Builder mBuilder = MetadataValue.newBuilder();
-        List<Value> testValues = new ArrayList();
-        List<Metadata> expectedMetadata = new ArrayList();
+        List<Value> testValues = new ArrayList<Value>();
+        List<Metadata> expectedMetadata = new ArrayList<Metadata>();
         
         builder.setSource("field_1");
         builder.setSink("field_3");
