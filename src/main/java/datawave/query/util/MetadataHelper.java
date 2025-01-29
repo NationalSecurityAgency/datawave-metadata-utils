@@ -1811,7 +1811,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String, IndexFieldHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String,IndexFieldHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getFieldIndexHoles(fields, datatypes, minThreshold);
     }
@@ -1828,7 +1828,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String, IndexFieldHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String,IndexFieldHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getReversedFieldIndexHoles(fields, datatypes, minThreshold);
     }

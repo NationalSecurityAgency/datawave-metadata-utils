@@ -1,5 +1,6 @@
 package datawave.query.model;
 
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Comparator;
@@ -7,7 +8,6 @@ import java.util.Date;
 import java.util.Objects;
 import java.util.SortedSet;
 import java.util.StringJoiner;
-import java.time.Instant;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -19,12 +19,12 @@ import com.google.common.collect.ImmutableSortedSet;
  * row was seen, but an index and/or reversed indexed row was not.
  */
 public class IndexFieldHole {
-
+    
     private final String fieldName;
     private final String datatype;
     private final SortedSet<Pair<Date,Date>> dateRanges;
     private static long DAY_MILLIS = 1000L * 60 * 60 * 24;
-
+    
     public IndexFieldHole(String fieldName, String dataType, Collection<Pair<Date,Date>> holes) {
         this.fieldName = fieldName;
         this.datatype = dataType;
@@ -33,28 +33,30 @@ public class IndexFieldHole {
         holes.forEach(p -> builder.add(new ImmutablePair<>(floor(p.getLeft()), ceil(p.getRight()))));
         dateRanges = builder.build();
     }
-
+    
     /**
      * return the date instant at 00:00:00
+     * 
      * @param d
      * @return instant of d with time reset to 00:00:00
      */
     private static Instant floorInstant(Date d) {
         return Instant.ofEpochMilli(d.getTime()).truncatedTo(ChronoUnit.DAYS);
     }
-
+    
     /**
      * return the date at 00:00:00
+     * 
      * @param d
      * @return d with time reset to 00:00:00
      */
     private static Date floor(Date d) {
         return Date.from(floorInstant(d));
     }
-
-
+    
     /**
      * return the date at 23:59:59
+     * 
      * @param d
      * @return d with time reset to 23:59:59
      */

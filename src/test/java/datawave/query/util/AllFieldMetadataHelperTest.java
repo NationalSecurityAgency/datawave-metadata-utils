@@ -111,7 +111,7 @@ class AllFieldMetadataHelperTest {
         private Set<String> datatypes = new HashSet<>();
         private double minimumThreshold = 1.0d;
         
-        protected final Supplier<Map<String,Map<String, IndexFieldHole>>> INDEX_FUNCTION = () -> {
+        protected final Supplier<Map<String,Map<String,IndexFieldHole>>> INDEX_FUNCTION = () -> {
             try {
                 return helper.getFieldIndexHoles(fields, datatypes, minimumThreshold);
             } catch (TableNotFoundException | IOException e) {
@@ -119,7 +119,7 @@ class AllFieldMetadataHelperTest {
             }
         };
         
-        protected final Supplier<Map<String,Map<String, IndexFieldHole>>> REVERSED_INDEX_FUNCTION = () -> {
+        protected final Supplier<Map<String,Map<String,IndexFieldHole>>> REVERSED_INDEX_FUNCTION = () -> {
             try {
                 return helper.getReversedFieldIndexHoles(fields, datatypes, minimumThreshold);
             } catch (TableNotFoundException | IOException e) {
@@ -127,7 +127,7 @@ class AllFieldMetadataHelperTest {
             }
         };
         
-        protected Supplier<Map<String,Map<String, IndexFieldHole>>> getIndexHoleFunction(String cf) {
+        protected Supplier<Map<String,Map<String,IndexFieldHole>>> getIndexHoleFunction(String cf) {
             return cf.equals("i") ? INDEX_FUNCTION : REVERSED_INDEX_FUNCTION;
         }
         
@@ -161,7 +161,7 @@ class AllFieldMetadataHelperTest {
             writeMutations(mutationCreator.getMutations());
             
             // Verify that no index holes were found.
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             Assertions.assertTrue(fieldIndexHoles.isEmpty());
         }
         
@@ -177,9 +177,9 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 1L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -199,7 +199,7 @@ class AllFieldMetadataHelperTest {
         
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -219,7 +219,7 @@ class AllFieldMetadataHelperTest {
     
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200103")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200103")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -241,7 +241,7 @@ class AllFieldMetadataHelperTest {
         
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200103")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200103")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -261,7 +261,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -283,7 +283,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -306,7 +306,7 @@ class AllFieldMetadataHelperTest {
     
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200109")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200109")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -329,7 +329,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -352,7 +352,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -375,7 +375,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -394,7 +394,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -450,9 +450,9 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String, IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -498,7 +498,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200119", "20200120", 1L); // Will not meet threshold.
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200103"),
@@ -523,7 +523,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200101", "20200105", 1L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
@@ -546,7 +546,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "ZETA", "csv", "20200101", "20200105", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200105")));
@@ -567,7 +567,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200113", "20200115", 1L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200112")));
@@ -590,7 +590,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200113", "20200115", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200112")));
@@ -611,7 +611,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addFrequencyMutations("URI", "maze", "20200216", "20200328", 1L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")),
@@ -639,7 +639,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200216", "20200328", 1L); // Will not meet threshold.
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200101", "20200105")),
@@ -677,7 +677,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 1L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -724,7 +724,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -768,7 +768,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -814,7 +814,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 99L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -861,7 +861,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "URI", "maze", "20200317", "20200328", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -913,7 +913,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "ZETA", "wiki", "20200123", "20200125", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("EVENT_DATE", "wiki", dateRange("20200122", "20200122")),
@@ -982,7 +982,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200123", "20200125", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -1054,7 +1054,7 @@ class AllFieldMetadataHelperTest {
             mutationCreator.addIndexMutations(cf, "ZETA", "imdb", "20200123", "20200125", 5L);
             writeMutations(mutationCreator.getMutations());
             
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:off
             Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(
                             createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200103"), dateRange("20200105", "20200105")),
@@ -1075,10 +1075,10 @@ class AllFieldMetadataHelperTest {
             this.minimumThreshold = minimumThreshold;
         }
         
-        protected Map<String,Map<String, IndexFieldHole>> createFieldIndexHoleMap(IndexFieldHole... holes) {
-            Map<String,Map<String, IndexFieldHole>> fieldIndexHoles = new HashMap<>();
+        protected Map<String,Map<String,IndexFieldHole>> createFieldIndexHoleMap(IndexFieldHole... holes) {
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = new HashMap<>();
             for (IndexFieldHole hole : holes) {
-                Map<String, IndexFieldHole> datatypeMap = fieldIndexHoles.computeIfAbsent(hole.getFieldName(), k -> new HashMap<>());
+                Map<String,IndexFieldHole> datatypeMap = fieldIndexHoles.computeIfAbsent(hole.getFieldName(), k -> new HashMap<>());
                 datatypeMap.put(hole.getDatatype(), hole);
             }
             return fieldIndexHoles;
