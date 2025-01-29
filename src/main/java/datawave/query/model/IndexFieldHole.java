@@ -1,12 +1,13 @@
 package datawave.query.model;
 
-import java.util.Calendar;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Objects;
 import java.util.SortedSet;
 import java.util.StringJoiner;
+import java.time.Instant;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -19,18 +20,27 @@ import com.google.common.collect.ImmutableSortedSet;
  */
 public class IndexFieldHole {
 
-    private static ThreadLocal<Calendar> calendar = ThreadLocal.withInitial(() -> Calendar.getInstance());
     private final String fieldName;
     private final String datatype;
     private final SortedSet<Pair<Date,Date>> dateRanges;
-    
+    private static long DAY_MILLIS = 1000L * 60 * 60 * 24;
+
     public IndexFieldHole(String fieldName, String dataType, Collection<Pair<Date,Date>> holes) {
         this.fieldName = fieldName;
         this.datatype = dataType;
-        // Ensure the date range set is immutable.
+        // Ensure the date range set is immutable, and starts at the beginning of the start date, and ends at the end of the end date
         ImmutableSortedSet.Builder<Pair<Date,Date>> builder = new ImmutableSortedSet.Builder<>(Comparator.naturalOrder());
         holes.forEach(p -> builder.add(new ImmutablePair<>(floor(p.getLeft()), ceil(p.getRight()))));
         dateRanges = builder.build();
+    }
+
+    /**
+     * return the date instant at 00:00:00
+     * @param d
+     * @return instant of d with time reset to 00:00:00
+     */
+    private static Instant floorInstant(Date d) {
+        return Instant.ofEpochMilli(d.getTime()).truncatedTo(ChronoUnit.DAYS);
     }
 
     /**
@@ -39,14 +49,9 @@ public class IndexFieldHole {
      * @return d with time reset to 00:00:00
      */
     private static Date floor(Date d) {
-        Calendar begin = calendar.get();
-        begin.setTime(d);
-        begin.set(Calendar.HOUR, 0);
-        begin.set(Calendar.MINUTE, 0);
-        begin.set(Calendar.SECOND, 0);
-        begin.set(Calendar.MILLISECOND, 0);
-        return begin.getTime();
+        return Date.from(floorInstant(d));
     }
+
 
     /**
      * return the date at 23:59:59
@@ -54,13 +59,7 @@ public class IndexFieldHole {
      * @return d with time reset to 23:59:59
      */
     private static Date ceil(Date d) {
-        Calendar end = calendar.get();
-        end.setTime(d);
-        end.set(Calendar.HOUR, 23);
-        end.set(Calendar.MINUTE, 59);
-        end.set(Calendar.SECOND, 59);
-        end.set(Calendar.MILLISECOND, 999);
-        return end.getTime();
+        return Date.from(floorInstant(d).plusMillis(DAY_MILLIS - 1));
     }
     
     /**
