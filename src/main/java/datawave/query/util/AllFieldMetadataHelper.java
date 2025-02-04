@@ -1487,7 +1487,7 @@ public class AllFieldMetadataHelper {
                     }
                     
                     // we can treat this like an index marker but the ts of the entry denotes the boundary
-                    currDate = getBaseDate(key.getTimestamp());
+                    currDate = getPreviousDay(key.getTimestamp());
                     log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
                     currBoundaryValue = true;
                     currCount = 0;
@@ -1517,7 +1517,7 @@ public class AllFieldMetadataHelper {
                         } catch (DateTimeParseException e) {
                             // probably the really old type classname format instead of a date.
                             // we can treat this like an index marker but the ts of the entry denotes the boundary
-                            currDate = getBaseDate(key.getTimestamp());
+                            currDate = getPreviousDay(key.getTimestamp());
                             log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
                             currBoundaryValue = true;
                             currCount = 0;
@@ -1588,13 +1588,14 @@ public class AllFieldMetadataHelper {
             return getImmutableFieldIndexHoles();
         }
         
-        private Date getBaseDate(long ts) {
+        private Date getPreviousDay(long ts) {
             Calendar c = Calendar.getInstance();
             c.setTimeInMillis(ts);
             c.set(Calendar.HOUR_OF_DAY, 0);
             c.set(Calendar.SECOND, 0);
             c.set(Calendar.MINUTE, 0);
             c.set(Calendar.MILLISECOND, 0);
+            c.add(Calendar.DATE, -1);
             return c.getTime();
         }
         
