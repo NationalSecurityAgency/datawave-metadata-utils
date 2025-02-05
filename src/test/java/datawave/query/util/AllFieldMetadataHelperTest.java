@@ -352,7 +352,32 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
+            // @formatter:off
+            Assertions.assertEquals(expected, fieldIndexHoles);
+        }
+
+        /**
+         * Test against data that has a field index hole in the middle of a frequency date range for a given fieldName-datatype combination based on the
+         * threshold.
+         * This uses a positive index marker derived from an older date-less format
+         * This tests that the having and old style marker and new style index mutations on the same day works correctly
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {"i", "ri"})
+        void testFieldIndexHoleWithIndexedMarkerSansDateAndCount(String cf) {
+            FieldIndexHoleMutationCreator mutationCreator = new FieldIndexHoleMutationCreator();
+            mutationCreator.addFrequencyMutations("NAME", "wiki", "20200101", "20200110", 2L);
+            mutationCreator.addIndexMarkerMutation(cf, "NAME", "wiki", "20200103");
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200103", "20200103", 1L);
+            mutationCreator.addIndexMutations(cf, "NAME", "wiki", "20200104", "20200106", 2L);
+            mutationCreator.addFrequencyMutations("NAME", "csv", "20200101", "20200105", 1L);
+            mutationCreator.addIndexMutations(cf, "NAME", "csv", "20200101", "20200105", 1L);
+            writeMutations(mutationCreator.getMutations());
+
+            Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
+            // @formatter:on
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200107", "20200110")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }
@@ -375,7 +400,7 @@ class AllFieldMetadataHelperTest {
 
             Map<String,Map<String,IndexFieldHole>> fieldIndexHoles = getIndexHoleFunction(cf).get();
             // @formatter:on
-            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200103", "20200106")));
+            Map<String,Map<String,IndexFieldHole>> expected = createFieldIndexHoleMap(createFieldIndexHole("NAME", "wiki", dateRange("20200104", "20200106")));
             // @formatter:off
             Assertions.assertEquals(expected, fieldIndexHoles);
         }

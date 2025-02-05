@@ -1384,24 +1384,48 @@ public class AllFieldMetadataHelper {
         this.typeCacheExpirationInMinutes = typeCacheExpirationInMinutes;
     }
     
+    private enum BOUNDARY_TYPE {
+        NONE, // denoting a non-boundary marker
+        IMPLIED, // denoting a boundary implied by the old style index entry (using timestamp for date)
+        MANUAL_INDEXED, // denoting a boundary that was manually injected including the date in the key and a true value
+        MANUAL_UNINDEXED // denoting a boundary that was manually injected including the date in the key and a false value
+    }
+    
     private static class FieldCount {
         private long count = 0;
-        private Boolean boundaryValue;
+        private Date date = null;
+        private BOUNDARY_TYPE boundaryType = BOUNDARY_TYPE.NONE;
         
         public void increment(long value) {
             this.count += value;
         }
         
-        public void setBoundaryValue(boolean boundaryValue) {
-            this.boundaryValue = boundaryValue;
+        public void setBoundaryValue(BOUNDARY_TYPE boundaryType) {
+            this.boundaryType = boundaryType;
         }
         
         public boolean isBoundary() {
-            return this.boundaryValue != null;
+            return this.boundaryType != null && this.boundaryType != BOUNDARY_TYPE.NONE;
         }
         
-        public boolean getBoundaryValue() {
-            return this.boundaryValue;
+        public boolean isIndexBoundary() {
+            return this.boundaryType == BOUNDARY_TYPE.IMPLIED || this.boundaryType == BOUNDARY_TYPE.MANUAL_INDEXED;
+        }
+        
+        public boolean isUnindexedBoundary() {
+            return this.boundaryType == BOUNDARY_TYPE.MANUAL_UNINDEXED;
+        }
+        
+        public BOUNDARY_TYPE getBoundaryType() {
+            return this.boundaryType;
+        }
+        
+        public void setDate(Date date) {
+            this.date = date;
+        }
+        
+        public Date getDate() {
+            return date;
         }
         
         public long getCount() {
@@ -1468,13 +1492,19 @@ public class AllFieldMetadataHelper {
             Text currColumnFamily;
             Date currDate;
             long currCount;
-            Boolean currBoundaryValue;
+            BOUNDARY_TYPE currBoundaryType;
             
             for (Map.Entry<Key,Value> entry : scanner) {
+                
                 // Parse the current row.
                 Key key = entry.getKey();
                 currFieldName = key.getRow().toString();
                 currColumnFamily = key.getColumnFamily();
+                
+                // avoid carrying over anything
+                currDatatype = null;
+                currDate = null;
+                currBoundaryType = BOUNDARY_TYPE.NONE;
                 
                 String cq = key.getColumnQualifier().toString();
                 int offset = cq.indexOf(NULL_BYTE);
@@ -1489,7 +1519,7 @@ public class AllFieldMetadataHelper {
                     // we can treat this like an index marker but the ts of the entry denotes the boundary
                     currDate = getPreviousDay(key.getTimestamp());
                     log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
-                    currBoundaryValue = true;
+                    currBoundaryType = BOUNDARY_TYPE.IMPLIED;
                     currCount = 0;
                 } else {
                     currDatatype = cq.substring(0, offset);
@@ -1504,11 +1534,11 @@ public class AllFieldMetadataHelper {
                     // where the boolean denotes that we can assume the field is indexed/no on and before this date
                     offset = cqRemainder.indexOf(NULL_BYTE);
                     if (offset >= 0) {
-                        currBoundaryValue = Boolean.valueOf(cqRemainder.substring(offset + 1));
+                        currBoundaryType = Boolean.valueOf(cqRemainder.substring(offset + 1)) ? BOUNDARY_TYPE.MANUAL_INDEXED : BOUNDARY_TYPE.MANUAL_UNINDEXED;
                         currDate = DateHelper.parse(cqRemainder.substring(0, offset));
                         currCount = 0;
                     } else {
-                        currBoundaryValue = null;
+                        currBoundaryType = null;
                         try {
                             currDate = DateHelper.parse(cqRemainder);
                             ByteArrayInputStream byteStream = new ByteArrayInputStream(entry.getValue().get());
@@ -1519,7 +1549,7 @@ public class AllFieldMetadataHelper {
                             // we can treat this like an index marker but the ts of the entry denotes the boundary
                             currDate = getPreviousDay(key.getTimestamp());
                             log.warn("Found an index entry missing the date, treating as an index marker at " + currDate + " : " + key);
-                            currBoundaryValue = true;
+                            currBoundaryType = BOUNDARY_TYPE.IMPLIED;
                             currCount = 0;
                         }
                     }
@@ -1556,7 +1586,7 @@ public class AllFieldMetadataHelper {
                     }
                     
                     // Add the current entry to the target entry map.
-                    addToTargetMap(currDatatype, currDate, currCount, currBoundaryValue);
+                    addToTargetMap(currDatatype, currDate, currCount, currBoundaryType);
                 } else {
                     // The column family is the same. We have two possible scenarios:
                     // - A row with a field that is different to the previous field.
@@ -1569,10 +1599,10 @@ public class AllFieldMetadataHelper {
                         // Clear the entry maps.
                         clearEntryMaps();
                         // Add the current entry to the target entry map.
-                        addToTargetMap(currDatatype, currDate, currCount, currBoundaryValue);
+                        addToTargetMap(currDatatype, currDate, currCount, currBoundaryType);
                     } else {
                         // The current row has the same field. Add the current entry to the target map.
-                        addToTargetMap(currDatatype, currDate, currCount, currBoundaryValue);
+                        addToTargetMap(currDatatype, currDate, currCount, currBoundaryType);
                     }
                 }
                 
@@ -1599,6 +1629,17 @@ public class AllFieldMetadataHelper {
             return c.getTime();
         }
         
+        private Date getNextDay(long ts) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(ts);
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            c.add(Calendar.DATE, +1);
+            return c.getTime();
+        }
+        
         /**
          * Return whether the given field and datatype represent a pairing that should be evaluated for field index holes.
          */
@@ -1609,11 +1650,17 @@ public class AllFieldMetadataHelper {
         /**
          * Add the current date and count to the current target map for the current datatype.
          */
-        private void addToTargetMap(String datatype, Date date, long count, Boolean boundaryValue) {
+        private void addToTargetMap(String datatype, Date date, long count, BOUNDARY_TYPE boundaryType) {
             FieldCount fieldCount = getFieldCount(targetMap, datatype, date);
             fieldCount.increment(count);
-            if (boundaryValue != null) {
-                fieldCount.setBoundaryValue(boundaryValue);
+            if (boundaryType != null) {
+                fieldCount.setBoundaryValue(boundaryType);
+                
+                // If this is an implied boundary type, then the date of field count is actually the following day
+                // (see calls to getPreviousDay above)
+                if (boundaryType == BOUNDARY_TYPE.IMPLIED) {
+                    fieldCount.setDate(getNextDay(date.getTime()));
+                }
             }
             
             // we need to ensure we have a frequency entry if a boundary so that we will catch this when finding holes
@@ -1632,6 +1679,7 @@ public class AllFieldMetadataHelper {
             FieldCount fieldCount = datesToCounts.get(date);
             if (fieldCount == null) {
                 fieldCount = new FieldCount();
+                fieldCount.setDate(date);
                 datesToCounts.put(date, fieldCount);
             }
             return fieldCount;
@@ -1670,6 +1718,25 @@ public class AllFieldMetadataHelper {
         }
         
         /**
+         * An expression to determine if we can assume a field is index on a particular date given the previous boundary and the date in question. This is true
+         * if the previous boundary was an implied boundary (previous index entry type, based on timestamp of key) and the date in question is the date that the
+         * implied boundary was found. In this case the boundary is actually assigned the previous date in the map but the date in the FieldCount is the actual
+         * date the marker was found on based on the key timestamp.
+         * 
+         * @param date
+         *            the date in question
+         * @param prevBoundary
+         *            the previous boundary if any
+         * @return true if we can assume indexed
+         */
+        private boolean canAssumeIndexed(Date date, FieldCount prevBoundary) {
+            if (prevBoundary != null && prevBoundary.getBoundaryType() == BOUNDARY_TYPE.IMPLIED) {
+                return date.equals(prevBoundary.getDate());
+            }
+            return false;
+        }
+        
+        /**
          * Return a set of all index hole date ranges found for the given maps of frequency and index entries.
          * 
          * @param frequencyMap
@@ -1682,24 +1749,31 @@ public class AllFieldMetadataHelper {
             Set<Pair<Date,Date>> indexHoles = new HashSet<>();
             Date holeStartDate = null;
             Date prevDate = null;
+            FieldCount prevBoundary = null;
             
             for (Date date : frequencyMap.keySet()) {
+                // see if we can assume this date is indexed
+                boolean canAssumeIndexed = canAssumeIndexed(date, prevBoundary);
+                prevBoundary = null;
+                
                 // There is a corresponding index entry for the current date.
-                if (indexMap.containsKey(date)) {
+                if (indexMap.containsKey(date) || canAssumeIndexed) {
                     FieldCount indexCount = indexMap.get(date);
                     
                     // if this is a boundary marker, then replace/clear map thus far
-                    if (indexCount.isBoundary()) {
+                    if (indexCount != null && indexCount.isBoundary()) {
                         // all holes thus far are to be replaced
                         indexHoles.clear();
                         // if not indexed, then start a hole since the beginning
-                        if (!indexCount.getBoundaryValue()) {
+                        if (indexCount.isUnindexedBoundary()) {
                             holeStartDate = frequencyMap.firstKey();
                         } else {
                             // else indexed since the beginning
                             holeStartDate = null;
+                            // keep track of the previous indexed boundary
+                            prevBoundary = indexCount;
                         }
-                    } else if (meetsMinThreshold(frequencyMap.get(date), indexCount)) {
+                    } else if (canAssumeIndexed || meetsMinThreshold(frequencyMap.get(date), indexCount)) {
                         // The count for the current index entry meets the minimum threshold.
                         // The previous entry was part of an index hole. Capture the index hole range.
                         if (holeStartDate != null) {
@@ -1708,8 +1782,7 @@ public class AllFieldMetadataHelper {
                         }
                     } else {
                         // The count for the current index entry does not meet the minimum threshold, and thus this entry is part of an index hole. Mark the
-                        // start
-                        // of an index hole date range if we have not already found one.
+                        // start of an index hole date range if we have not already found one.
                         if (holeStartDate == null) {
                             holeStartDate = date;
                         }
@@ -1721,7 +1794,7 @@ public class AllFieldMetadataHelper {
                     }
                 }
                 
-                // Track the previous date.
+                // Track the previous date
                 prevDate = date;
             }
             
