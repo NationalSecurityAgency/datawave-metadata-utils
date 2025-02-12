@@ -169,4 +169,28 @@
             <url>https://maven.pkg.github.com/NationalSecurityAgency/datawave</url>
         </repository>
     </repositories>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.8.1</version>
+                    <configuration>
+                        <encoding>UTF-8</encoding>
+                        <showDeprecation>true</showDeprecation>
+                        <showWarnings>true</showWarnings>
+                        <source>${maven.compiler.source}</source>
+                        <target>${maven.compiler.target}</target>
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                            <arg>-Xlint:all</arg>
+                            <arg>-Xlint:-processing</arg>
+                            <arg>-Xmaxwarns</arg>
+                            <arg>5</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>
