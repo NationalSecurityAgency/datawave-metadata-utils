@@ -21,6 +21,7 @@ import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -75,8 +76,8 @@ import datawave.iterators.filter.EdgeMetadataCQStrippingIterator;
 import datawave.marking.MarkingFunctions;
 import datawave.query.composite.CompositeMetadata;
 import datawave.query.model.Direction;
-import datawave.query.model.FieldIndexHole;
 import datawave.query.model.FieldMapping;
+import datawave.query.model.IndexFieldHole;
 import datawave.query.model.ModelKeyParser;
 import datawave.query.model.QueryModel;
 import datawave.security.util.AuthorizationsMinimizer;
@@ -467,11 +468,11 @@ public class MetadataHelper {
      * @return
      * @throws TableNotFoundException
      */
+    @Cacheable(value = "getQueryModel", key = "{#root.target.auths,#modelTableName,#modelName,#unevaluatedFields,#ingestTypeFilter}",
+                    cacheManager = "metadataHelperCacheManager")
     public QueryModel getQueryModel(String modelTableName, String modelName, Collection<String> unevaluatedFields, Set<String> ingestTypeFilter)
                     throws TableNotFoundException {
-        // Note that we used to cache this, however this method is dependent on some variables in the all fields metadata helper
-        // @Cacheable(value = "getQueryModel", key = "{#root.target.auths,#p0,#p1,#p2,#p3}", cacheManager = "metadataHelperCacheManager")
-        
+        log.debug("cache fault for getQueryModel({}, {}, {}, {}, {})", this.auths, modelTableName, modelName, unevaluatedFields, ingestTypeFilter);
         Preconditions.checkNotNull(modelTableName);
         Preconditions.checkNotNull(modelName);
         
@@ -501,13 +502,22 @@ public class MetadataHelper {
                     if (!mapping.isFieldMapping()) {
                         queryModel.setModelFieldAttributes(mapping.getModelFieldName(), mapping.getAttributes());
                     } else if (mapping.getDirection() == Direction.FORWARD) {
-                        // Do not add a forward mapping entry
-                        // when the replacement does not exist in the database
+                        // If a direct match is found for the field in the database, add a forward mapping entry.
                         if (allFields.contains(mapping.getFieldName())) {
                             queryModel.addTermToModel(mapping.getModelFieldName(), mapping.getFieldName());
-                        } else if (log.isTraceEnabled()) {
-                            log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
-                                            mapping.getModelFieldName());
+                        } else {
+                            // If a direct match was not found for the field name, it's possible that a regex pattern was supplied. Attempt to find matches
+                            // based off matching against the field name as a pattern.
+                            Pattern pattern = Pattern.compile(mapping.getFieldName());
+                            Set<String> matches = allFields.stream().filter(field -> pattern.matcher(field).matches()).collect(Collectors.toSet());
+                            if (!matches.isEmpty()) {
+                                matches.forEach(field -> queryModel.addTermToModel(mapping.getModelFieldName(), field));
+                            } else {
+                                if (log.isTraceEnabled()) {
+                                    log.trace("Ignoring forward mapping of {} for {} because the metadata table has no reference to it", mapping.getFieldName(),
+                                                    mapping.getModelFieldName());
+                                }
+                            }
                         }
                     } else {
                         queryModel.addTermToReverseModel(mapping.getFieldName(), mapping.getModelFieldName());
@@ -523,7 +533,7 @@ public class MetadataHelper {
                 log.trace("empty query model for {}", this);
             }
             if ("DatawaveMetadata".equals(modelTableName)) {
-                log.error("Query Model should not be empty...");
+                log.warn("Query Model {} has no reverse mappings", modelName);
             }
         }
         
@@ -537,7 +547,7 @@ public class MetadataHelper {
      * @return a list of query model names
      * @throws TableNotFoundException
      */
-    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#table}", cacheManager = "metadataHelperCacheManager")
+    @Cacheable(value = "getQueryModelNames", key = "{#root.target.auths,#modelTableName}", cacheManager = "metadataHelperCacheManager")
     public Set<String> getQueryModelNames(String modelTableName) throws TableNotFoundException {
         Preconditions.checkNotNull(modelTableName);
         
@@ -1754,7 +1764,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String,IndexFieldHole>> getFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getFieldIndexHoles(fields, datatypes, minThreshold);
     }
@@ -1771,7 +1781,7 @@ public class MetadataHelper {
      *            0.0 (inclusive) to 1.0 (inclusive)
      * @return the field index holes
      */
-    public Map<String,Map<String,FieldIndexHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
+    public Map<String,Map<String,IndexFieldHole>> getReversedFieldIndexHoles(Set<String> fields, Set<String> datatypes, double minThreshold)
                     throws TableNotFoundException, IOException {
         return allFieldMetadataHelper.getReversedFieldIndexHoles(fields, datatypes, minThreshold);
     }
