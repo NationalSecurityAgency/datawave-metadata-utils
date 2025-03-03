@@ -124,12 +124,23 @@ public class CompositeMetadata implements Message<CompositeMetadata> {
         return filter(ingestTypes, componentFields);
     }
     
+    /**
+     * Returns a new instance of {@link CompositeMetadata} filtered by the provided ingest types and fields. The fields can be component fields or composite
+     * fields.
+     * 
+     * @param ingestTypes
+     *            the ingest types
+     * @param componentFields
+     *            the component or composite fields
+     * @return an instance of filtered composite metadata
+     */
     public CompositeMetadata filter(Set<String> ingestTypes, Set<String> componentFields) {
         if (!isEmpty()) {
             CompositeMetadata compositeMetadata = new CompositeMetadata();
             for (String ingestType : ingestTypes) {
                 for (String componentField : componentFields) {
                     if (this.compositeFieldMapByType.containsKey(ingestType)) {
+                        // add composites via the requisite component fields
                         for (String compositeField : this.compositeFieldMapByType.get(ingestType).keySet()) {
                             if (this.compositeFieldMapByType.get(ingestType).get(compositeField).contains(componentField)) {
                                 compositeMetadata.setCompositeFieldMappingByType(ingestType, compositeField,
@@ -145,6 +156,22 @@ public class CompositeMetadata implements Message<CompositeMetadata> {
                                     compositeMetadata.addCompositeFieldSeparatorByType(ingestType, compositeField,
                                                     this.compositeFieldSeparatorsByType.get(ingestType).get(compositeField));
                             }
+                        }
+                        
+                        // also check for the case when the filter field is also a composite field
+                        if (this.compositeFieldMapByType.get(ingestType).containsKey(componentField)) {
+                            Collection<String> parts = this.compositeFieldMapByType.get(ingestType).get(componentField);
+                            compositeMetadata.setCompositeFieldMappingByType(ingestType, componentField, parts);
+                            
+                            if (this.compositeTransitionDatesByType.containsKey(ingestType)
+                                            && this.compositeTransitionDatesByType.get(ingestType).containsKey(componentField))
+                                compositeMetadata.addCompositeTransitionDateByType(ingestType, componentField,
+                                                this.compositeTransitionDatesByType.get(ingestType).get(componentField));
+                            
+                            if (this.compositeFieldSeparatorsByType.containsKey(ingestType)
+                                            && this.compositeFieldSeparatorsByType.get(ingestType).containsKey(componentField))
+                                compositeMetadata.addCompositeFieldSeparatorByType(ingestType, componentField,
+                                                this.compositeFieldSeparatorsByType.get(ingestType).get(componentField));
                         }
                     }
                 }

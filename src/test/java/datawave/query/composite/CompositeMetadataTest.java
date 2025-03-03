@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,10 +23,14 @@ public class CompositeMetadataTest {
     
     private CompositeMetadata compositeMetadata;
     
-    private String[] ingestTypes = new String[] {"EARTH", "FIRE", "WIND", "WATER", "HEART"};
-    private String[][] compositeFields = new String[][] {new String[] {"CAPTAIN_PLANET", "HES", "A", "HERO"},
+    private final String[] ingestTypes = new String[] {"EARTH", "FIRE", "WIND", "WATER", "HEART"};
+    //  @formatter:off
+    private final String[][] compositeFields = new String[][] {
+            new String[] {"CAPTAIN_PLANET", "HES", "A", "HERO"},
             new String[] {"GONNA_TAKE", "POLLUTION", "DOWN", "TO", "ZERO"},
-            new String[] {"CAPTAIN_POLLUTION", "RADIATION", "DEFORESTATION", "SMOG", "TOXICS", "HATE"}};
+            new String[] {"CAPTAIN_POLLUTION", "RADIATION", "DEFORESTATION", "SMOG", "TOXICS", "HATE"}
+    };
+    //  @formatter:on
     
     @BeforeEach
     public void setup() {
@@ -73,6 +78,21 @@ public class CompositeMetadataTest {
             assertFalse(compFieldMap.keySet().contains("CAPTAIN_POLLUTION"));
         }
         assertTrue(filteredCompMetadata.compositeTransitionDatesByType.isEmpty());
+    }
+    
+    @Test
+    public void filterCompositeMetadataViaCompositeField() {
+        CompositeMetadata metadata = new CompositeMetadata();
+        metadata.setCompositeFieldMappingByType("country", "CITY_STATE", List.of("CITY", "STATE"));
+        metadata.addCompositeTransitionDateByType("country", "CITY_STATE", new Date(0));
+        
+        CompositeMetadata filtered = metadata.filter(Set.of("CITY", "STATE"));
+        assertEquals(metadata.getCompositeFieldMapByType(), filtered.getCompositeFieldMapByType());
+        assertEquals(metadata.getCompositeTransitionDatesByType(), filtered.getCompositeTransitionDatesByType());
+        
+        filtered = metadata.filter(Set.of("CITY_STATE"));
+        assertEquals(metadata.getCompositeFieldMapByType(), filtered.getCompositeFieldMapByType());
+        assertEquals(metadata.getCompositeTransitionDatesByType(), filtered.getCompositeTransitionDatesByType());
     }
     
     @Test
