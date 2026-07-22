@@ -6,3 +6,6 @@ Metadata Utils are utilities for working with the DATAWAVE metadata table.
 
 [li]: http://img.shields.io/badge/license-ASL-blue.svg
 [ll]: https://www.apache.org/licenses/LICENSE-2.0
+java -version
+mvn -version
+cd core/utils/metadata-utils
